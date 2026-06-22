@@ -13,6 +13,50 @@
   <title>스마트처치</title>
   <link rel="preconnect" href="https://cdn.jsdelivr.net">
   <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css" rel="stylesheet">
+
+  <!-- ✅ Firebase SDK -->
+  <script type="module">
+    import { initializeApp }                              from "https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js";
+    import { getAuth, createUserWithEmailAndPassword,
+             signInWithEmailAndPassword, signOut,
+             onAuthStateChanged }                         from "https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js";
+    import { getFirestore, doc, setDoc, getDoc,
+             updateDoc, collection, getDocs,
+             query, where, onSnapshot,
+             serverTimestamp }                            from "https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey:            "AIzaSyBSjbD1j0mQBw6KFFgetTwk-iDHXkkBX0A",
+      authDomain:        "smartchurch-868e3.firebaseapp.com",
+      projectId:         "smartchurch-868e3",
+      storageBucket:     "smartchurch-868e3.firebasestorage.app",
+      messagingSenderId: "826976279573",
+      appId:             "1:826976279573:web:49c222868c44f82071821c"
+    };
+
+    const fbApp  = initializeApp(firebaseConfig);
+    const fbAuth = getAuth(fbApp);
+    const fbDb   = getFirestore(fbApp);
+
+    // 전역 노출 (모듈 밖에서 사용하기 위해)
+    window._fbAuth = fbAuth;
+    window._fbDb   = fbDb;
+    window._fb = {
+      // Auth
+      createUser: (email, pw) => createUserWithEmailAndPassword(fbAuth, email, pw),
+      signIn:     (email, pw) => signInWithEmailAndPassword(fbAuth, email, pw),
+      signOut:    ()          => signOut(fbAuth),
+      // Firestore
+      setUser:    (uid, data) => setDoc(doc(fbDb, 'users', uid), data, { merge: true }),
+      getUser:    (uid)       => getDoc(doc(fbDb, 'users', uid)),
+      updateUser: (uid, data) => updateDoc(doc(fbDb, 'users', uid), data),
+      // 교회 교인 목록 실시간
+      watchChurch: (churchCode, cb) =>
+        onSnapshot(query(collection(fbDb, 'users'), where('churchCode','==',churchCode)), cb),
+    };
+    window._fbReady = true;
+    console.log('✅ Firebase 초기화 완료');
+  </script>
   <style>
     /* =============================================
        RESET & BASE
@@ -4844,40 +4888,77 @@ function closeTermsModal(e) {
 // ================================================
 //  AUTH
 // ================================================
-function doLogin() {
+async function doLogin() {
   const email = document.getElementById('l-email').value.trim();
   const pw    = document.getElementById('l-pw').value;
   clearErrors('l-err');
   if (!email || !pw) { showErr('l-err', '이메일과 비밀번호를 입력해 주세요.'); return; }
 
+  // ── Firebase Auth 로그인 시도 ──
+  if (window._fbReady && window._fb) {
+    try {
+      showLoadingOverlay('로그인 중...');
+      const cred     = await window._fb.signIn(email, pw);
+      const uid      = cred.user.uid;
+      const snap     = await window._fb.getUser(uid);
+
+      if (snap.exists()) {
+        const fbUser = snap.data();
+        // Firestore 데이터를 localStorage에도 캐시
+        const users  = DB.get('users', []);
+        const idx    = users.findIndex(u => u.id === uid);
+        if (idx >= 0) users[idx] = fbUser; else users.push(fbUser);
+        DB.set('users', users);
+        DB.setSession(uid);
+        me = fbUser;
+
+        hideLoadingOverlay();
+        if (fbUser.status === 'rejected') {
+          showErr('l-err', '계정 신청이 거절됐어요. 담당 교역자에게 문의해 주세요.'); return;
+        }
+        if (fbUser.status === 'pending') {
+          updatePendingScreen(fbUser); setTimeout(() => go('pending'), 200); return;
+        }
+        toast('로그인됐어요 🙏');
+        try { bootApp(); } catch(e) { toast('앱 오류: ' + e.message); }
+        setTimeout(() => go('main'), 300);
+        return;
+      }
+    } catch (e) {
+      hideLoadingOverlay();
+      // Firebase 오류 코드별 한국어 메시지
+      const msg = {
+        'auth/user-not-found':   '등록된 이메일이 없어요.',
+        'auth/wrong-password':   '비밀번호가 틀렸어요.',
+        'auth/invalid-credential': '이메일 또는 비밀번호가 올바르지 않습니다.',
+        'auth/too-many-requests':'잠시 후 다시 시도해 주세요.',
+        'auth/network-request-failed': '네트워크 오류예요. 연결을 확인해 주세요.',
+      }[e.code] || null;
+
+      if (msg) { showErr('l-err', msg); return; }
+      // Firebase에 없으면 localStorage로 fallback
+    }
+  }
+
+  // ── localStorage fallback ──
   const user = DB.findByEmail(email);
   if (!user || user.password !== pw) {
-    showErr('l-err', '이메일 또는 비밀번호가 올바르지 않습니다.');
-    return;
+    showErr('l-err', '이메일 또는 비밀번호가 올바르지 않습니다.'); return;
   }
-
-  // 거절된 계정
   if (user.status === 'rejected') {
-    showErr('l-err', '계정 신청이 거절됐어요. 담당 교역자에게 문의해 주세요.');
-    return;
+    showErr('l-err', '계정 신청이 거절됐어요. 담당 교역자에게 문의해 주세요.'); return;
   }
-
   DB.setSession(user.id);
   me = user;
-
-  // 승인 대기 중인 계정
   if (user.status === 'pending') {
-    updatePendingScreen(user);
-    setTimeout(() => go('pending'), 200);
-    return;
+    updatePendingScreen(user); setTimeout(() => go('pending'), 200); return;
   }
-
   toast('로그인 중...');
-  try { bootApp(); } catch(e) { toast('앱 초기화 오류: ' + e.message); console.error(e); }
+  try { bootApp(); } catch(e) { toast('앱 초기화 오류: ' + e.message); }
   setTimeout(() => go('main'), 300);
 }
 
-function doRegister() {
+async function doRegister() {
   const name  = document.getElementById('r-name').value.trim();
   const email = document.getElementById('r-email').value.trim();
   const pw    = document.getElementById('r-pw').value;
@@ -4887,44 +4968,87 @@ function doRegister() {
 
   clearErrors('r-name-err','r-email-err','r-pw-err','r-pw2-err');
   let ok = true;
-  if (!name)                      { showErr('r-name-err', '이름을 입력해 주세요.'); ok = false; }
+  if (!name)                        { showErr('r-name-err',  '이름을 입력해 주세요.'); ok = false; }
   if (!email || !email.includes('@')) { showErr('r-email-err', '올바른 이메일을 입력해 주세요.'); ok = false; }
-  if (pw.length < 8)              { showErr('r-pw-err', '비밀번호는 8자 이상이어야 합니다.'); ok = false; }
-  if (pw !== pw2)                 { showErr('r-pw2-err', '비밀번호가 일치하지 않습니다.'); ok = false; }
+  if (pw.length < 8)                { showErr('r-pw-err',   '비밀번호는 8자 이상이어야 합니다.'); ok = false; }
+  if (pw !== pw2)                   { showErr('r-pw2-err',  '비밀번호가 일치하지 않습니다.'); ok = false; }
   if (!ok) return;
 
-  // 필수 약관 동의 검증
   if (!isRequiredTermsChecked()) {
     const err = document.getElementById('terms-err');
     if (err) { err.classList.add('show'); setTimeout(() => err.classList.remove('show'), 3000); }
     return;
   }
 
-  if (DB.findByEmail(email)) {
-    showErr('r-email-err', '이미 사용 중인 이메일입니다.'); return;
-  }
-
-  // 미성년자 여부 + 보호자 정보
   const isMinor = document.getElementById('cb-age-minor')?.classList.contains('checked') || false;
   let guardianName = '', guardianContact = '';
   if (isMinor) {
     guardianName    = document.getElementById('r-guardian-name')?.value.trim()    || '';
     guardianContact = document.getElementById('r-guardian-contact')?.value.trim() || '';
-    if (!guardianName || !guardianContact) {
-      toast('보호자 이름과 연락처를 입력해 주세요 📋'); return;
-    }
+    if (!guardianName || !guardianContact) { toast('보호자 이름과 연락처를 입력해 주세요 📋'); return; }
   }
 
   const marketing = document.getElementById('cb-marketing')?.classList.contains('checked') || false;
+
+  // ── Firebase Auth 회원가입 시도 ──
+  if (window._fbReady && window._fb) {
+    try {
+      showLoadingOverlay('가입 처리 중...');
+      const cred = await window._fb.createUser(email, pw);
+      const uid  = cred.user.uid;
+
+      const userData = {
+        id: uid, name, email,
+        church:  _regOrgType !== 'personal' ? (church || '') : '',
+        role:    role || '교인',
+        orgType: _regOrgType,
+        status:          isMinor ? 'pending' : 'active',
+        churchStatus:    'pending',
+        isMinor, guardianName, guardianContact,
+        isAppAdmin:      false,
+        isAppointedLeader: false,
+        leaderPerms:     [],
+        marketingConsent: marketing,
+        createdAt:       new Date().toISOString()
+      };
+
+      // Firestore에 저장
+      await window._fb.setUser(uid, userData);
+      // localStorage에도 캐시
+      DB.saveUser(userData);
+      DB.setSession(uid);
+      me = userData;
+
+      hideLoadingOverlay();
+      if (isMinor) {
+        toast(name + '님, 가입 신청이 접수됐어요! 교역자 승인 후 이용 가능해요 🙏');
+        updatePendingScreen(userData);
+        setTimeout(() => go('pending'), 400);
+      } else {
+        toast(name + '님, 가입을 축하해요! 🎉');
+        setTimeout(() => startOnboarding(), 400);
+      }
+      return;
+    } catch (e) {
+      hideLoadingOverlay();
+      const msg = {
+        'auth/email-already-in-use': '이미 사용 중인 이메일이에요.',
+        'auth/weak-password':        '비밀번호는 6자 이상이어야 해요.',
+        'auth/network-request-failed': '네트워크 오류예요.',
+      }[e.code] || null;
+      if (msg) { showErr('r-email-err', msg); return; }
+    }
+  }
+
+  // ── localStorage fallback ──
+  if (DB.findByEmail(email)) { showErr('r-email-err', '이미 사용 중인 이메일입니다.'); return; }
   const user = {
     id: uid(), name, email, password: pw,
     church:  _regOrgType !== 'personal' ? (church || '') : '',
     role:    role || '교인',
     orgType: _regOrgType,
     status:          isMinor ? 'pending' : 'active',
-    isMinor,
-    guardianName,
-    guardianContact,
+    isMinor, guardianName, guardianContact,
     isAppAdmin:      false,
     marketingConsent: marketing,
     createdAt:       new Date().toISOString()
@@ -4932,7 +5056,6 @@ function doRegister() {
   DB.saveUser(user);
   DB.setSession(user.id);
   me = user;
-
   if (isMinor) {
     toast(name + '님, 가입 신청이 접수됐어요! 교역자 승인 후 이용 가능해요 🙏');
     updatePendingScreen(user);
@@ -4944,8 +5067,25 @@ function doRegister() {
 }
 
 function demoLogin() {
-  // 데모 계정 기능 비활성화
   toast('데모 계정은 사용할 수 없어요. 회원가입을 이용해 주세요!');
+}
+
+function showLoadingOverlay(msg) {
+  let el = document.getElementById('_fb_loading');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = '_fb_loading';
+    el.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px';
+    el.innerHTML = '<div style="width:40px;height:40px;border:3px solid rgba(255,255,255,0.3);border-top-color:white;border-radius:50%;animation:spin 0.8s linear infinite"></div>' +
+      '<div id="_fb_loading_msg" style="color:white;font-size:15px;font-weight:600;font-family:Pretendard,sans-serif"></div>';
+    document.body.appendChild(el);
+  }
+  document.getElementById('_fb_loading_msg').textContent = msg || '처리 중...';
+  el.style.display = 'flex';
+}
+function hideLoadingOverlay() {
+  const el = document.getElementById('_fb_loading');
+  if (el) el.style.display = 'none';
 }
 
 // ================================================
