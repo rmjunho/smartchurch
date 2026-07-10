@@ -10,227 +10,223 @@
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
 <style>
   :root{
-    --navy:#1a237e;
-    --navy-deep:#0d1442;
-    --navy-soft:#283593;
-    --gold:#ffd700;
+    --bg:#0a0a0a;        /* 배경 (블랙) */
+    --card:#1e1e1e;      /* 카드 (다크) */
+    --gold:#ffd700;      /* 포인트 (골드) */
     --gold-soft:#ffe870;
     --gold-deep:#c9a227;
-    --white:#ffffff;
-    --cream:#fff8e1;
-    --ink:#1c1c28;
-    --muted:#6b6f82;
-    --line:#eceef5;
+    --text:#ffffff;      /* 텍스트 */
+    --muted:#a8a8a8;
+    --line:#ffd700;      /* 카드 테두리 */
     --radius:20px;
-    --shadow:0 10px 30px rgba(26,35,126,.10);
   }
   *{margin:0;padding:0;box-sizing:border-box}
   html{scroll-behavior:smooth}
   body{
     font-family:'Noto Sans KR',system-ui,sans-serif;
-    color:var(--ink);
-    background:#e9ebf4;
+    color:var(--text);
+    background:var(--bg);
     -webkit-font-smoothing:antialiased;
     line-height:1.6;
   }
-  /* 앱 프레임 (모바일 우선, 최대 430px) */
+  img{max-width:100%;display:block}
+
+  /* ============ 반응형 컨테이너 ============ */
+  /* 모바일 430px → 태블릿 768px → 데스크탑 1200px */
   .app{
     max-width:430px;
     margin:0 auto;
-    background:var(--white);
+    background:var(--bg);
     min-height:100vh;
-    overflow:hidden;
-    box-shadow:0 0 60px rgba(13,20,66,.18);
+    overflow-x:hidden;
   }
   section{padding:56px 22px}
+  .inner{max-width:1080px;margin:0 auto}
+  @media (min-width:768px){
+    .app{max-width:768px}
+    section{padding:72px 40px}
+  }
+  @media (min-width:1200px){
+    .app{max-width:1200px}
+    section{padding:92px 64px}
+  }
+
   .kicker{
-    display:inline-block;
-    font-size:12px;font-weight:700;letter-spacing:2px;
-    color:var(--gold-deep);
-    text-transform:uppercase;
-    margin-bottom:12px;
+    display:inline-block;font-size:12px;font-weight:700;letter-spacing:2px;
+    color:var(--gold);text-transform:uppercase;margin-bottom:12px;
   }
   h2.sec-title{
-    font-size:24px;font-weight:900;line-height:1.35;
-    color:var(--navy);
-    margin-bottom:10px;
-    letter-spacing:-.5px;
+    font-size:24px;font-weight:900;line-height:1.35;color:var(--text);
+    margin-bottom:10px;letter-spacing:-.5px;
   }
-  .sec-sub{font-size:14px;color:var(--muted);margin-bottom:28px}
+  .sec-sub{font-size:14px;color:var(--muted);margin-bottom:28px;max-width:640px}
+  @media (min-width:768px){ h2.sec-title{font-size:30px} }
+  @media (min-width:1200px){ h2.sec-title{font-size:36px} }
 
-  /* ============ HERO ============ */
+  /* ============ 1. HERO ============ */
   .hero{
-    position:relative;
-    background:radial-gradient(120% 90% at 50% -10%, #33409a 0%, var(--navy) 45%, var(--navy-deep) 100%);
-    color:var(--white);
-    padding:70px 24px 64px;
-    text-align:center;
-    overflow:hidden;
+    position:relative;background:var(--bg);color:var(--text);
+    padding:64px 24px 60px;text-align:center;overflow:hidden;
+    border-bottom:1px solid rgba(255,215,0,.18);
   }
-  /* 순수 CSS 빛/십자가 모티프 */
   .hero .glow{
-    position:absolute;top:-40px;left:50%;transform:translateX(-50%);
-    width:340px;height:340px;
-    background:radial-gradient(circle, rgba(255,215,0,.28) 0%, rgba(255,215,0,.06) 40%, transparent 70%);
-    filter:blur(6px);
-    pointer-events:none;
+    position:absolute;top:-60px;left:50%;transform:translateX(-50%);
+    width:380px;height:380px;pointer-events:none;
+    background:radial-gradient(circle, rgba(255,215,0,.22) 0%, rgba(255,215,0,.05) 42%, transparent 70%);
+    filter:blur(8px);
   }
-  .cross{
-    position:relative;width:56px;height:76px;margin:0 auto 22px;
-    filter:drop-shadow(0 6px 18px rgba(255,215,0,.55));
+  .hero .logo{
+    width:120px;height:auto;margin:0 auto 24px;
+    filter:drop-shadow(0 8px 24px rgba(255,215,0,.35));
   }
-  .cross::before,.cross::after{
-    content:"";position:absolute;border-radius:6px;
-    background:linear-gradient(180deg,var(--gold-soft),var(--gold));
-  }
-  .cross::before{width:14px;height:76px;left:50%;transform:translateX(-50%)}
-  .cross::after{width:44px;height:14px;left:50%;top:22px;transform:translateX(-50%)}
-  .hero h1{
-    font-size:40px;font-weight:900;letter-spacing:-1px;
-    line-height:1.1;margin-bottom:6px;
-  }
+  .hero h1{font-size:40px;font-weight:900;letter-spacing:-1px;line-height:1.1;margin-bottom:6px}
   .hero h1 .en{
     display:block;font-size:15px;font-weight:500;letter-spacing:5px;
     color:var(--gold);margin-top:8px;text-transform:uppercase;
   }
-  .hero .tagline{
-    font-size:18px;font-weight:700;margin:20px 0 10px;
-    color:#eef0ff;
+  .hero .tagline{font-size:18px;font-weight:700;margin:20px 0 10px;color:var(--text)}
+  .hero .subtext{font-size:13.5px;color:var(--muted);max-width:340px;margin:0 auto 30px;line-height:1.7}
+  @media (min-width:768px){
+    .hero{padding:84px 24px 78px}
+    .hero .logo{width:150px;margin-bottom:28px}
+    .hero h1{font-size:52px}
+    .hero .tagline{font-size:21px}
+    .hero .subtext{font-size:15px;max-width:420px}
   }
-  .hero .subtext{
-    font-size:13.5px;color:#b9beeb;max-width:320px;margin:0 auto 30px;
-    line-height:1.7;
+  @media (min-width:1200px){
+    .hero{padding:104px 24px 92px}
+    .hero .logo{width:160px}
+    .hero h1{font-size:60px}
   }
+
   .btn-cta{
     display:inline-flex;align-items:center;gap:8px;
     background:linear-gradient(135deg,var(--gold),var(--gold-deep));
-    color:var(--navy-deep);
-    font-weight:900;font-size:15px;
-    padding:16px 26px;border-radius:50px;border:none;
-    text-decoration:none;cursor:pointer;
-    box-shadow:0 12px 26px rgba(255,215,0,.32);
+    color:#0a0a0a;font-weight:900;font-size:15px;
+    padding:16px 26px;border-radius:50px;border:none;text-decoration:none;cursor:pointer;
+    box-shadow:0 12px 30px rgba(255,215,0,.28);
     transition:transform .2s ease, box-shadow .2s ease;
   }
-  .btn-cta:hover{transform:translateY(-2px);box-shadow:0 16px 32px rgba(255,215,0,.45)}
+  .btn-cta:hover{transform:translateY(-2px);box-shadow:0 16px 38px rgba(255,215,0,.42)}
   .btn-cta small{font-weight:500;font-size:12px;opacity:.75}
   .hero .badges{margin-top:22px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
   .hero .badges span{
-    font-size:11px;color:#cfd4ff;background:rgba(255,255,255,.08);
-    border:1px solid rgba(255,255,255,.14);padding:6px 12px;border-radius:50px;
+    font-size:11px;color:#d8d8d8;background:rgba(255,255,255,.05);
+    border:1px solid rgba(255,215,0,.25);padding:6px 12px;border-radius:50px;
   }
 
-  /* ============ FEATURES ============ */
-  .feature-grid{display:flex;flex-direction:column;gap:14px}
+  /* ============ 2. FEATURES ============ */
+  .feature-grid{display:grid;grid-template-columns:1fr;gap:14px}
+  @media (min-width:768px){ .feature-grid{grid-template-columns:repeat(2,1fr);gap:18px} }
+  @media (min-width:1200px){ .feature-grid{grid-template-columns:repeat(3,1fr);gap:22px} }
   .fcard{
     display:flex;gap:15px;align-items:flex-start;
-    background:var(--white);border:1px solid var(--line);
+    background:var(--card);border:1px solid var(--line);
     border-radius:var(--radius);padding:18px;
-    box-shadow:var(--shadow);
   }
   .fcard .ic{
     flex-shrink:0;width:52px;height:52px;border-radius:15px;
-    background:linear-gradient(135deg,#eef0ff,#dfe3ff);
+    background:rgba(255,215,0,.1);box-shadow:inset 0 0 0 1px rgba(255,215,0,.35);
     display:flex;align-items:center;justify-content:center;font-size:26px;
-    box-shadow:inset 0 0 0 1.5px rgba(26,35,126,.08);
   }
-  .fcard h3{font-size:16px;font-weight:900;color:var(--navy);margin-bottom:3px}
+  .fcard h3{font-size:16px;font-weight:900;color:var(--gold);margin-bottom:3px}
   .fcard p{font-size:13px;color:var(--muted);line-height:1.6}
 
-  /* ============ TODAY'S UPDATE ============ */
+  /* ============ 3. TODAY'S UPDATE (리포트 핵심) ============ */
   .update{
-    background:linear-gradient(180deg,var(--cream) 0%,#fffdf5 100%);
-    border-top:2px solid rgba(255,215,0,.4);
-    border-bottom:2px solid rgba(255,215,0,.4);
+    background:var(--bg);
+    border-top:2px solid var(--gold);
+    border-bottom:2px solid var(--gold);
+    position:relative;
+  }
+  .update .glow2{
+    position:absolute;top:0;left:50%;transform:translateX(-50%);
+    width:520px;max-width:100%;height:200px;pointer-events:none;
+    background:radial-gradient(ellipse at top, rgba(255,215,0,.12), transparent 70%);
   }
   .update .date-pill{
     display:inline-flex;align-items:center;gap:7px;
-    background:var(--navy);color:var(--gold);
-    font-size:12px;font-weight:700;letter-spacing:.5px;
+    background:var(--gold);color:#0a0a0a;
+    font-size:12px;font-weight:800;letter-spacing:.5px;
     padding:8px 16px;border-radius:50px;margin-bottom:16px;
   }
-  .update h2.sec-title{margin-bottom:8px}
-  .timeline{position:relative;margin-top:26px;padding-left:8px}
+  .timeline{display:grid;grid-template-columns:1fr;gap:26px 18px;margin-top:34px}
+  @media (min-width:768px){ .timeline{grid-template-columns:repeat(2,1fr)} }
+  @media (min-width:1200px){ .timeline{grid-template-columns:repeat(3,1fr)} }
   .ucard{
-    position:relative;
-    background:var(--white);
-    border-radius:16px;
-    border:1px solid #f0e6bf;
-    border-left:5px solid var(--gold);
-    padding:18px 18px 16px;
-    margin-bottom:16px;
-    box-shadow:0 8px 22px rgba(201,162,39,.12);
+    position:relative;background:var(--card);
+    border:1px solid var(--line);border-radius:16px;
+    padding:20px 18px 16px;
   }
   .ucard .num{
-    position:absolute;top:-11px;left:16px;
+    position:absolute;top:-13px;left:16px;
     width:30px;height:30px;border-radius:50%;
-    background:linear-gradient(135deg,var(--navy),var(--navy-soft));
-    color:var(--gold);font-weight:900;font-size:13px;
+    background:linear-gradient(135deg,var(--gold),var(--gold-deep));
+    color:#0a0a0a;font-weight:900;font-size:13px;
     display:flex;align-items:center;justify-content:center;
-    box-shadow:0 4px 10px rgba(26,35,126,.3);
+    box-shadow:0 4px 12px rgba(255,215,0,.35);
   }
   .ucard .new-badge{
     position:absolute;top:14px;right:14px;
     background:linear-gradient(135deg,var(--gold),var(--gold-deep));
-    color:var(--navy-deep);font-size:10px;font-weight:900;letter-spacing:.5px;
+    color:#0a0a0a;font-size:10px;font-weight:900;letter-spacing:.5px;
     padding:4px 9px;border-radius:50px;
   }
-  .ucard h3{font-size:16px;font-weight:900;color:var(--navy);margin:8px 0 12px;padding-right:44px}
+  .ucard h3{font-size:16px;font-weight:900;color:var(--gold);margin:8px 0 12px;padding-right:44px}
   .ba-row{display:flex;gap:9px;font-size:13px;line-height:1.55;margin-top:7px}
   .ba-row .tag{
-    flex-shrink:0;font-size:10.5px;font-weight:800;
-    padding:2px 8px;border-radius:6px;margin-top:1px;height:fit-content;min-width:52px;text-align:center;
+    flex-shrink:0;font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:6px;
+    margin-top:1px;height:fit-content;min-width:52px;text-align:center;
   }
-  .ba-row.before .tag{background:#fdecec;color:#c0392b}
-  .ba-row.after  .tag{background:#e8f6ee;color:#1e8e4e}
-  .ba-row.before .txt{color:var(--muted)}
-  .ba-row.after  .txt{color:var(--ink);font-weight:500}
-  .ba-row .txt .chk{color:#1e8e4e;font-weight:900;margin-right:3px}
+  .ba-row.before .tag{background:rgba(255,255,255,.08);color:#9a9a9a}
+  .ba-row.after  .tag{background:rgba(255,215,0,.16);color:var(--gold)}
+  .ba-row.before .txt{color:#9a9a9a}
+  .ba-row.after  .txt{color:var(--text);font-weight:500}
+  .ba-row .txt .chk{color:var(--gold);font-weight:900;margin-right:3px}
 
-  /* ============ STEPS ============ */
-  .steps{background:var(--white)}
+  /* ============ 4. STEPS ============ */
+  .steps-grid{display:grid;grid-template-columns:1fr;gap:14px}
+  @media (min-width:1200px){ .steps-grid{grid-template-columns:repeat(3,1fr);gap:20px} }
   .step{
     display:flex;gap:16px;align-items:flex-start;
-    padding:18px 0;border-bottom:1px dashed var(--line);
+    background:var(--card);border:1px solid var(--line);
+    border-radius:16px;padding:20px;
   }
-  .step:last-child{border-bottom:none}
+  @media (min-width:1200px){ .step{flex-direction:column} }
   .step .sn{
-    flex-shrink:0;width:42px;height:42px;border-radius:50%;
+    flex-shrink:0;width:44px;height:44px;border-radius:50%;
     background:linear-gradient(135deg,var(--gold),var(--gold-deep));
-    color:var(--navy-deep);font-weight:900;font-size:18px;
+    color:#0a0a0a;font-weight:900;font-size:18px;
     display:flex;align-items:center;justify-content:center;
-    box-shadow:0 6px 14px rgba(255,215,0,.3);
+    box-shadow:0 6px 16px rgba(255,215,0,.3);
   }
-  .step h3{font-size:15.5px;font-weight:900;color:var(--navy);margin-bottom:2px}
+  .step h3{font-size:15.5px;font-weight:900;color:var(--gold);margin-bottom:3px}
   .step p{font-size:13px;color:var(--muted)}
 
-  /* ============ STATS ============ */
-  .stats{
-    background:radial-gradient(120% 100% at 50% 0%, var(--navy-soft) 0%, var(--navy) 55%, var(--navy-deep) 100%);
-    color:var(--white);
-  }
-  .stats .kicker{color:var(--gold)}
-  .stats h2.sec-title{color:var(--white)}
-  .stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:24px}
+  /* ============ 5. STATS ============ */
+  .stat-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-top:24px}
+  @media (min-width:1200px){ .stat-grid{grid-template-columns:repeat(4,1fr);gap:20px} }
   .stat{
-    background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);
-    border-radius:16px;padding:22px 14px;text-align:center;
+    background:var(--card);border:1px solid var(--line);
+    border-radius:16px;padding:26px 14px;text-align:center;
   }
-  .stat .n{font-size:34px;font-weight:900;color:var(--gold);line-height:1;letter-spacing:-1px}
-  .stat .l{font-size:12.5px;color:#c9cdf2;margin-top:8px;font-weight:500}
+  .stat .n{font-size:36px;font-weight:900;color:var(--gold);line-height:1;letter-spacing:-1px}
+  .stat .l{font-size:12.5px;color:var(--muted);margin-top:8px;font-weight:500}
+  @media (min-width:768px){ .stat .n{font-size:44px} }
 
-  /* ============ FINAL CTA ============ */
+  /* ============ 6. FINAL CTA ============ */
   .final{
-    background:linear-gradient(180deg,var(--navy-deep),#080c2e);
-    color:var(--white);text-align:center;padding:64px 24px 40px;
+    background:var(--bg);text-align:center;padding:64px 24px 44px;
+    border-top:1px solid rgba(255,215,0,.18);
   }
-  .final .cross{width:40px;height:56px;margin-bottom:18px}
-  .final .cross::before{height:56px}.final .cross::after{top:16px}
+  .final .logo{width:64px;height:auto;margin:0 auto 20px;filter:drop-shadow(0 6px 18px rgba(255,215,0,.35))}
   .final h2{font-size:26px;font-weight:900;margin-bottom:10px;letter-spacing:-.5px}
-  .final p{font-size:14px;color:#b9beeb;margin-bottom:28px}
+  .final p{font-size:14px;color:var(--muted);margin-bottom:28px}
   .final .btn-cta{margin-bottom:34px}
+  @media (min-width:768px){ .final h2{font-size:34px} .final .logo{width:80px} }
   .footer{
     border-top:1px solid rgba(255,255,255,.1);padding-top:22px;
-    font-size:12px;color:#8890c8;line-height:1.8;
+    font-size:12px;color:#888;line-height:1.8;
   }
   .footer b{color:var(--gold-soft);font-weight:700}
 
@@ -246,7 +242,7 @@
   <!-- ══════════ 1. HERO ══════════ -->
   <header class="hero">
     <div class="glow"></div>
-    <div class="cross"></div>
+    <img class="logo" src="logo.png" alt="스마트처치 로고">
     <h1>스마트처치<span class="en">SmartChurch</span></h1>
     <p class="tagline">교회 공동체를 하나로 잇는<br>스마트한 방법</p>
     <p class="subtext">챌린지, 채팅, 매칭, 바인더까지 —<br>신앙의 모든 순간을 함께</p>
@@ -260,149 +256,162 @@
 
   <!-- ══════════ 2. CORE FEATURES ══════════ -->
   <section class="features">
-    <span class="kicker reveal">Core Features</span>
-    <h2 class="sec-title reveal">하나의 앱, 다섯 개의 신앙 공간</h2>
-    <p class="sec-sub reveal">하단 탭 하나로 신앙 생활의 모든 것을 담았습니다.</p>
-    <div class="feature-grid">
-      <div class="fcard reveal">
-        <div class="ic">🙏</div>
-        <div><h3>삶의 예배</h3><p>QT 바인더, 할일, 시간표, 일기를 한 곳에서. 손글씨 묵상까지 기록해요.</p></div>
-      </div>
-      <div class="fcard reveal">
-        <div class="ic">🏆</div>
-        <div><h3>챌린지</h3><p>교회 챌린지와 공개 챌린지, 스트릭(연속 기록)으로 신앙 습관을 만들어요.</p></div>
-      </div>
-      <div class="fcard reveal">
-        <div class="ic">💬</div>
-        <div><h3>채팅</h3><p>1:1 DM, 그룹채팅, 교회 오픈채팅, 회의까지 실시간으로 소통해요.</p></div>
-      </div>
-      <div class="fcard reveal">
-        <div class="ic">⛪</div>
-        <div><h3>교회</h3><p>교인 커뮤니티, 행사·티켓팅, 매칭 허브로 공동체가 더 가까워져요.</p></div>
-      </div>
-      <div class="fcard reveal">
-        <div class="ic">👤</div>
-        <div><h3>마이페이지</h3><p>프로필, 친구코드, 알림·화면 설정을 자유롭게 관리해요.</p></div>
+    <div class="inner">
+      <span class="kicker reveal">Core Features</span>
+      <h2 class="sec-title reveal">하나의 앱, 다섯 개의 신앙 공간</h2>
+      <p class="sec-sub reveal">하단 탭 하나로 신앙 생활의 모든 것을 담았습니다.</p>
+      <div class="feature-grid">
+        <div class="fcard reveal">
+          <div class="ic">🙏</div>
+          <div><h3>삶의 예배</h3><p>QT 바인더, 할일, 시간표, 일기를 한 곳에서. 손글씨 묵상까지 기록해요.</p></div>
+        </div>
+        <div class="fcard reveal">
+          <div class="ic">🏆</div>
+          <div><h3>챌린지</h3><p>교회 챌린지와 공개 챌린지, 스트릭(연속 기록)으로 신앙 습관을 만들어요.</p></div>
+        </div>
+        <div class="fcard reveal">
+          <div class="ic">💬</div>
+          <div><h3>채팅</h3><p>1:1 DM, 그룹채팅, 교회 오픈채팅, 회의까지 실시간으로 소통해요.</p></div>
+        </div>
+        <div class="fcard reveal">
+          <div class="ic">⛪</div>
+          <div><h3>교회</h3><p>교인 커뮤니티, 행사·티켓팅, 매칭 허브로 공동체가 더 가까워져요.</p></div>
+        </div>
+        <div class="fcard reveal">
+          <div class="ic">👤</div>
+          <div><h3>마이페이지</h3><p>프로필, 친구코드, 알림·화면 설정을 자유롭게 관리해요.</p></div>
+        </div>
       </div>
     </div>
   </section>
 
   <!-- ══════════ 3. TODAY'S UPDATE (리포트 핵심) ══════════ -->
   <section class="update">
-    <div class="date-pill reveal">🗓 2026년 7월 10일 업데이트</div>
-    <h2 class="sec-title reveal">오늘 무엇이 달라졌나요?</h2>
-    <p class="sec-sub reveal">비개발자도 한눈에 이해할 수 있도록 <b>이전(Before) → 이후(After)</b>로 정리했어요. 오늘 하루 9가지 기능이 새로 완성됐습니다.</p>
+    <div class="glow2"></div>
+    <div class="inner">
+      <div class="date-pill reveal">🗓 2026년 7월 10일 업데이트</div>
+      <h2 class="sec-title reveal">오늘 무엇이 달라졌나요?</h2>
+      <p class="sec-sub reveal">비개발자도 한눈에 이해할 수 있도록 <b style="color:var(--gold)">이전(Before) → 이후(After)</b>로 정리했어요. 오늘 하루 9가지 기능이 새로 완성됐습니다.</p>
 
-    <div class="timeline">
+      <div class="timeline">
 
-      <div class="ucard reveal">
-        <div class="num">①</div><div class="new-badge">✅ NEW</div>
-        <h3>알림 시스템</h3>
-        <div class="ba-row before"><span class="tag">이전</span><span class="txt">알림 설정 버튼만 있고 실제 알림이 오지 않았어요.</span></div>
-        <div class="ba-row after"><span class="tag">이후</span><span class="txt"><span class="chk">✔</span>채팅·매칭·챌린지 알림이 실제로 작동합니다.</span></div>
+        <div class="ucard reveal">
+          <div class="num">①</div><div class="new-badge">✅ NEW</div>
+          <h3>알림 시스템</h3>
+          <div class="ba-row before"><span class="tag">이전</span><span class="txt">알림 설정 버튼만 있고 실제 알림이 오지 않았어요.</span></div>
+          <div class="ba-row after"><span class="tag">이후</span><span class="txt"><span class="chk">✔</span>채팅·매칭·챌린지 알림이 실제로 작동합니다.</span></div>
+        </div>
+
+        <div class="ucard reveal">
+          <div class="num">②</div><div class="new-badge">✅ NEW</div>
+          <h3>매칭 &amp; 행사 실시간 공유</h3>
+          <div class="ba-row before"><span class="tag">이전</span><span class="txt">내 폰에서만 보이고 다른 교인에게는 안 보였어요.</span></div>
+          <div class="ba-row after"><span class="tag">이후</span><span class="txt"><span class="chk">✔</span>등록 즉시 모든 교인 화면에 공유됩니다.</span></div>
+        </div>
+
+        <div class="ucard reveal">
+          <div class="num">③</div><div class="new-badge">✅ NEW</div>
+          <h3>할일 ↔ 챌린지 자동 연동</h3>
+          <div class="ba-row before"><span class="tag">이전</span><span class="txt">챌린지와 할일을 각각 따로 체크해야 했어요.</span></div>
+          <div class="ba-row after"><span class="tag">이후</span><span class="txt"><span class="chk">✔</span>할일을 완료하면 연결된 챌린지가 자동 체크됩니다.</span></div>
+        </div>
+
+        <div class="ucard reveal">
+          <div class="num">④</div><div class="new-badge">✅ NEW</div>
+          <h3>생년월일 입력</h3>
+          <div class="ba-row before"><span class="tag">이전</span><span class="txt">회원가입 시 생년월일을 입력할 수 없었어요.</span></div>
+          <div class="ba-row after"><span class="tag">이후</span><span class="txt"><span class="chk">✔</span>입력 가능해졌고, 성인 전용 기능을 자동으로 구분합니다.</span></div>
+        </div>
+
+        <div class="ucard reveal">
+          <div class="num">⑤</div><div class="new-badge">✅ NEW</div>
+          <h3>성경 말씀 60개</h3>
+          <div class="ba-row before"><span class="tag">이전</span><span class="txt">말씀이 7개뿐이라 금방 반복됐어요.</span></div>
+          <div class="ba-row after"><span class="tag">이후</span><span class="txt"><span class="chk">✔</span>60개로 확장돼 매일 다른 말씀을 만납니다.</span></div>
+        </div>
+
+        <div class="ucard reveal">
+          <div class="num">⑥</div><div class="new-badge">✅ NEW</div>
+          <h3>매칭 수락 시 자동 채팅방 생성</h3>
+          <div class="ba-row before"><span class="tag">이전</span><span class="txt">수락 후 채팅방을 따로 만들어야 했어요.</span></div>
+          <div class="ba-row after"><span class="tag">이후</span><span class="txt"><span class="chk">✔</span>수락하는 즉시 1:1 채팅방이 자동으로 열립니다.</span></div>
+        </div>
+
+        <div class="ucard reveal">
+          <div class="num">⑦</div><div class="new-badge">✅ NEW</div>
+          <h3>홈화면 설치 (PWA)</h3>
+          <div class="ba-row before"><span class="tag">이전</span><span class="txt">매번 브라우저에서 주소를 입력해야 했어요.</span></div>
+          <div class="ba-row after"><span class="tag">이후</span><span class="txt"><span class="chk">✔</span>홈화면 아이콘으로 앱처럼 실행할 수 있습니다.</span></div>
+        </div>
+
+        <div class="ucard reveal">
+          <div class="num">⑧</div><div class="new-badge">✅ NEW</div>
+          <h3>이성 교제 매칭</h3>
+          <div class="ba-row before"><span class="tag">이전</span><span class="txt">"오픈 예정" 안내만 표시됐어요.</span></div>
+          <div class="ba-row after"><span class="tag">이후</span><span class="txt"><span class="chk">✔</span>만 19세 이상 인증 후 이용할 수 있습니다.</span></div>
+        </div>
+
+        <div class="ucard reveal">
+          <div class="num">⑨</div><div class="new-badge">✅ NEW</div>
+          <h3>행사 티켓 기기 간 공유</h3>
+          <div class="ba-row before"><span class="tag">이전</span><span class="txt">예약 정보가 해당 기기에서만 보였어요.</span></div>
+          <div class="ba-row after"><span class="tag">이후</span><span class="txt"><span class="chk">✔</span>어느 기기에서든 내 예약을 확인할 수 있습니다.</span></div>
+        </div>
+
       </div>
-
-      <div class="ucard reveal">
-        <div class="num">②</div><div class="new-badge">✅ NEW</div>
-        <h3>매칭 &amp; 행사 실시간 공유</h3>
-        <div class="ba-row before"><span class="tag">이전</span><span class="txt">내 폰에서만 보이고 다른 교인에게는 안 보였어요.</span></div>
-        <div class="ba-row after"><span class="tag">이후</span><span class="txt"><span class="chk">✔</span>등록 즉시 모든 교인 화면에 공유됩니다.</span></div>
-      </div>
-
-      <div class="ucard reveal">
-        <div class="num">③</div><div class="new-badge">✅ NEW</div>
-        <h3>할일 ↔ 챌린지 자동 연동</h3>
-        <div class="ba-row before"><span class="tag">이전</span><span class="txt">챌린지와 할일을 각각 따로 체크해야 했어요.</span></div>
-        <div class="ba-row after"><span class="tag">이후</span><span class="txt"><span class="chk">✔</span>할일을 완료하면 연결된 챌린지가 자동 체크됩니다.</span></div>
-      </div>
-
-      <div class="ucard reveal">
-        <div class="num">④</div><div class="new-badge">✅ NEW</div>
-        <h3>생년월일 입력</h3>
-        <div class="ba-row before"><span class="tag">이전</span><span class="txt">회원가입 시 생년월일을 입력할 수 없었어요.</span></div>
-        <div class="ba-row after"><span class="tag">이후</span><span class="txt"><span class="chk">✔</span>입력 가능해졌고, 성인 전용 기능을 자동으로 구분합니다.</span></div>
-      </div>
-
-      <div class="ucard reveal">
-        <div class="num">⑤</div><div class="new-badge">✅ NEW</div>
-        <h3>성경 말씀 60개</h3>
-        <div class="ba-row before"><span class="tag">이전</span><span class="txt">말씀이 7개뿐이라 금방 반복됐어요.</span></div>
-        <div class="ba-row after"><span class="tag">이후</span><span class="txt"><span class="chk">✔</span>60개로 확장돼 매일 다른 말씀을 만납니다.</span></div>
-      </div>
-
-      <div class="ucard reveal">
-        <div class="num">⑥</div><div class="new-badge">✅ NEW</div>
-        <h3>매칭 수락 시 자동 채팅방 생성</h3>
-        <div class="ba-row before"><span class="tag">이전</span><span class="txt">수락 후 채팅방을 따로 만들어야 했어요.</span></div>
-        <div class="ba-row after"><span class="tag">이후</span><span class="txt"><span class="chk">✔</span>수락하는 즉시 1:1 채팅방이 자동으로 열립니다.</span></div>
-      </div>
-
-      <div class="ucard reveal">
-        <div class="num">⑦</div><div class="new-badge">✅ NEW</div>
-        <h3>홈화면 설치 (PWA)</h3>
-        <div class="ba-row before"><span class="tag">이전</span><span class="txt">매번 브라우저에서 주소를 입력해야 했어요.</span></div>
-        <div class="ba-row after"><span class="tag">이후</span><span class="txt"><span class="chk">✔</span>홈화면 아이콘으로 앱처럼 실행할 수 있습니다.</span></div>
-      </div>
-
-      <div class="ucard reveal">
-        <div class="num">⑧</div><div class="new-badge">✅ NEW</div>
-        <h3>이성 교제 매칭</h3>
-        <div class="ba-row before"><span class="tag">이전</span><span class="txt">"오픈 예정" 안내만 표시됐어요.</span></div>
-        <div class="ba-row after"><span class="tag">이후</span><span class="txt"><span class="chk">✔</span>만 19세 이상 인증 후 이용할 수 있습니다.</span></div>
-      </div>
-
-      <div class="ucard reveal">
-        <div class="num">⑨</div><div class="new-badge">✅ NEW</div>
-        <h3>행사 티켓 기기 간 공유</h3>
-        <div class="ba-row before"><span class="tag">이전</span><span class="txt">예약 정보가 해당 기기에서만 보였어요.</span></div>
-        <div class="ba-row after"><span class="tag">이후</span><span class="txt"><span class="chk">✔</span>어느 기기에서든 내 예약을 확인할 수 있습니다.</span></div>
-      </div>
-
     </div>
   </section>
 
   <!-- ══════════ 4. HOW IT WORKS ══════════ -->
   <section class="steps">
-    <span class="kicker reveal">How It Works</span>
-    <h2 class="sec-title reveal">3단계면 충분해요</h2>
-    <p class="sec-sub reveal">가입부터 신앙 생활 시작까지, 1분이면 됩니다.</p>
-    <div class="step reveal">
-      <div class="sn">1</div>
-      <div><h3>smartchurch.kro.kr 접속</h3><p>앱 설치 없이 웹에서 바로 시작해요. 홈화면 추가도 가능합니다.</p></div>
-    </div>
-    <div class="step reveal">
-      <div class="sn">2</div>
-      <div><h3>회원가입 후 교회 코드 입력</h3><p>이름·생년월일·이메일로 가입하고 우리 교회 코드를 연결해요.</p></div>
-    </div>
-    <div class="step reveal">
-      <div class="sn">3</div>
-      <div><h3>교인들과 함께 신앙 생활 시작</h3><p>챌린지, 채팅, 매칭, 삶의 예배 바인더를 함께 누려요.</p></div>
+    <div class="inner">
+      <span class="kicker reveal">How It Works</span>
+      <h2 class="sec-title reveal">3단계면 충분해요</h2>
+      <p class="sec-sub reveal">가입부터 신앙 생활 시작까지, 1분이면 됩니다.</p>
+      <div class="steps-grid">
+        <div class="step reveal">
+          <div class="sn">1</div>
+          <div><h3>smartchurch.kro.kr 접속</h3><p>앱 설치 없이 웹에서 바로 시작해요. 홈화면 추가도 가능합니다.</p></div>
+        </div>
+        <div class="step reveal">
+          <div class="sn">2</div>
+          <div><h3>회원가입 후 교회 코드 입력</h3><p>이름·생년월일·이메일로 가입하고 우리 교회 코드를 연결해요.</p></div>
+        </div>
+        <div class="step reveal">
+          <div class="sn">3</div>
+          <div><h3>교인들과 함께 신앙 생활 시작</h3><p>챌린지, 채팅, 매칭, 삶의 예배 바인더를 함께 누려요.</p></div>
+        </div>
+      </div>
     </div>
   </section>
 
   <!-- ══════════ 5. STATS ══════════ -->
   <section class="stats">
-    <span class="kicker reveal">By the Numbers</span>
-    <h2 class="sec-title reveal">숫자로 보는 스마트처치</h2>
-    <div class="stat-grid">
-      <div class="stat reveal"><div class="n" data-count="25" data-suffix="+">0</div><div class="l">구현 기능</div></div>
-      <div class="stat reveal"><div class="n" data-count="60">0</div><div class="l">성경 말씀</div></div>
-      <div class="stat reveal"><div class="n" data-count="3">0</div><div class="l">지원 교회 유형</div></div>
-      <div class="stat reveal"><div class="n" data-count="9">0</div><div class="l">오늘 추가된 기능</div></div>
+    <div class="inner">
+      <span class="kicker reveal">By the Numbers</span>
+      <h2 class="sec-title reveal">숫자로 보는 스마트처치</h2>
+      <div class="stat-grid">
+        <div class="stat reveal"><div class="n" data-count="25" data-suffix="+">0</div><div class="l">구현 기능</div></div>
+        <div class="stat reveal"><div class="n" data-count="60">0</div><div class="l">성경 말씀</div></div>
+        <div class="stat reveal"><div class="n" data-count="3">0</div><div class="l">지원 교회 유형</div></div>
+        <div class="stat reveal"><div class="n" data-count="9">0</div><div class="l">오늘 추가된 기능</div></div>
+      </div>
     </div>
   </section>
 
   <!-- ══════════ 6. FINAL CTA ══════════ -->
   <section class="final">
-    <div class="cross"></div>
-    <h2>지금 바로 시작해보세요</h2>
-    <p>신앙의 모든 순간, 스마트처치와 함께합니다.</p>
-    <a class="btn-cta" href="https://smartchurch.kro.kr" target="_blank" rel="noopener">
-      스마트처치 시작하기 <small>→ smartchurch.kro.kr</small>
-    </a>
-    <div class="footer">
-      <b>SmartChurch</b> — BEM 사역 트랙 | 2026<br>
-      교회 공동체를 하나로 잇는 스마트한 방법
+    <div class="inner">
+      <img class="logo" src="logo.png" alt="스마트처치 로고">
+      <h2>지금 바로 시작해보세요</h2>
+      <p>신앙의 모든 순간, 스마트처치와 함께합니다.</p>
+      <a class="btn-cta" href="https://smartchurch.kro.kr" target="_blank" rel="noopener">
+        스마트처치 시작하기 <small>→ smartchurch.kro.kr</small>
+      </a>
+      <div class="footer">
+        <b>SmartChurch</b> — BEM 사역 트랙 | 2026<br>
+        교회 공동체를 하나로 잇는 스마트한 방법
+      </div>
     </div>
   </section>
 
@@ -413,7 +422,6 @@
   (function(){
     var els = Array.prototype.slice.call(document.querySelectorAll('.reveal'));
 
-    // 한 요소를 등장시키고, 통계 숫자는 카운트업
     function reveal(el){
       if (el.classList.contains('visible')) return;
       var sibs = Array.prototype.slice.call(el.parentNode.children)
@@ -437,7 +445,6 @@
     }
 
     // 2) 안전망: 뷰포트 안에 들어온 요소는 수동으로도 등장 처리
-    //    (일부 환경에서 IO 콜백이 지연/미발생해도 콘텐츠가 절대 숨겨지지 않도록)
     function revealInView(){
       var vh = window.innerHeight || document.documentElement.clientHeight;
       els.forEach(function(el){
@@ -455,8 +462,8 @@
     window.addEventListener('scroll', onScroll, { passive:true });
     window.addEventListener('resize', onScroll);
     window.addEventListener('load', revealInView);
-    revealInView();                 // 첫 화면(above-the-fold) 즉시 표시
-    setTimeout(revealInView, 400);  // 폰트/레이아웃 로드 후 한 번 더
+    revealInView();
+    setTimeout(revealInView, 400);
 
     // 통계 숫자 카운트업 (setInterval 기반 — 모든 환경에서 동작)
     function countUp(node){
