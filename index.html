@@ -11,6 +11,12 @@
   </script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>스마트처치</title>
+  <!-- PWA / 홈 화면 설치 (item 7) — 매니페스트는 단일 파일 유지를 위해 런타임 Blob 으로 주입 -->
+  <meta name="theme-color" content="#C9A96E">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="스마트처치">
   <link rel="preconnect" href="https://cdn.jsdelivr.net">
   <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css" rel="stylesheet">
 
@@ -21,7 +27,7 @@
              signInWithEmailAndPassword, signOut,
              onAuthStateChanged }                         from "https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js";
     import { getFirestore, doc, setDoc, getDoc,
-             updateDoc, deleteDoc, collection, getDocs,
+             updateDoc, deleteDoc, collection, collectionGroup, getDocs,
              addDoc, query, where, orderBy, limit,
              arrayUnion, onSnapshot, serverTimestamp }              from "https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js";
 
@@ -137,20 +143,29 @@
       deleteInviteCode: (code)    => deleteDoc(doc(fbDb, 'inviteCodes', code)),
       useInviteCode: (code, userId) => updateDoc(doc(fbDb, 'inviteCodes', code),
         { usedBy: arrayUnion(userId) }),
-      // 취미 매칭
-      setMatchProfile:  (uid, data)    => setDoc(doc(fbDb, 'matchProfiles', uid), data, { merge: true }),
-      getMatchProfile:  (uid)          => getDoc(doc(fbDb, 'matchProfiles', uid)),
-      searchMatches:    (region)       =>
-        getDocs(query(collection(fbDb, 'matchProfiles'),
-          where('isVisible', '==', true),
-          where('region', '==', region), limit(30))),
-      sendMatchRequest: (id, data)     => setDoc(doc(fbDb, 'matchRequests', id), data),
-      listenMatchReqs:  (uid, cb)      =>
-        onSnapshot(query(collection(fbDb, 'matchRequests'),
-          where('toId', '==', uid), where('status', '==', 'pending')), cb),
-      updateMatchReq:   (id, data)     => updateDoc(doc(fbDb, 'matchRequests', id), data),
-      getMyMatchReqs:   (uid)          =>
-        getDocs(query(collection(fbDb, 'matchRequests'), where('fromId', '==', uid))),
+      // ── 매칭 (취미/기도/멘토 — 교회 단위 공유) ──
+      setMatchProfileDoc:       (id, data)    => setDoc(doc(fbDb, 'matchProfiles', id), data, { merge: true }),
+      deleteMatchProfileDoc:    (id)          => deleteDoc(doc(fbDb, 'matchProfiles', id)),
+      getMatchProfilesByChurch: (churchCode)  =>
+        getDocs(query(collection(fbDb, 'matchProfiles'), where('churchCode', '==', churchCode))),
+      setMatchRequestDoc:       (id, data)    => setDoc(doc(fbDb, 'matchRequests', id), data, { merge: true }),
+      deleteMatchRequestDoc:    (id)          => deleteDoc(doc(fbDb, 'matchRequests', id)),
+      getMatchRequestsByChurch: (churchCode)  =>
+        getDocs(query(collection(fbDb, 'matchRequests'), where('churchCode', '==', churchCode))),
+      // ── 행사/티켓팅 (교회 단위 공유) ──
+      setEventDoc:       (id, data)   => setDoc(doc(fbDb, 'events', id), data, { merge: true }),
+      deleteEventDoc:    (id)         => deleteDoc(doc(fbDb, 'events', id)),
+      getEventsByChurch: (churchCode) =>
+        getDocs(query(collection(fbDb, 'events'), where('churchCode', '==', churchCode))),
+      // ── 행사 예약(티켓) — churchData/{churchCode}/events/{eventId}/reservations/{uid} ──
+      setReservation:    (churchCode, eventId, uid, data) =>
+        setDoc(doc(fbDb, 'churchData', churchCode, 'events', eventId, 'reservations', uid), data),
+      deleteReservation: (churchCode, eventId, uid) =>
+        deleteDoc(doc(fbDb, 'churchData', churchCode, 'events', eventId, 'reservations', uid)),
+      getEventReservations: (churchCode, eventId) =>
+        getDocs(collection(fbDb, 'churchData', churchCode, 'events', eventId, 'reservations')),
+      getMyReservations: (uid) =>
+        getDocs(query(collectionGroup(fbDb, 'reservations'), where('uid', '==', uid))),
     };
     window._fbReady = true;
     console.log('✅ Firebase 초기화 완료');
@@ -3045,6 +3060,11 @@
             <div class="form-error" id="r-name-err">이름을 입력해 주세요.</div>
           </div>
           <div class="form-group">
+            <label class="form-label">생년월일</label>
+            <input id="r-birth" type="date" class="form-input" max="2100-12-31">
+            <div class="form-error" id="r-birth-err">생년월일을 입력해 주세요.</div>
+          </div>
+          <div class="form-group">
             <label class="form-label">이메일</label>
             <input id="r-email" type="email" class="form-input" placeholder="이메일 주소">
             <div class="form-error" id="r-email-err">올바른 이메일을 입력해 주세요.</div>
@@ -4767,6 +4787,46 @@
     </div>
   </div>
 
+  <!-- 이성 교제 프로필 모달 (성인 전용) -->
+  <div class="modal-backdrop" id="modal-romance-profile" onclick="closeRomanceProfileModal(event)">
+    <div class="modal-sheet" style="max-height:88vh;overflow-y:auto">
+      <div class="modal-title">💑 이성 교제 프로필</div>
+      <div style="background:var(--cream2);border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:12px;color:var(--muted);line-height:1.6">
+        🔞 성인(만 19세 이상) 인증 회원만 이용할 수 있어요.<br>진실한 만남을 위해 예의를 지켜주세요 🙏
+      </div>
+      <div class="form-group">
+        <label class="form-label">성별</label>
+        <div style="display:flex;gap:10px">
+          <label style="flex:1;display:flex;align-items:center;gap:8px;padding:12px;border-radius:10px;border:1.5px solid var(--border);cursor:pointer;background:white">
+            <input type="radio" name="romance-gender" id="romance-gender-m" value="brother" style="accent-color:var(--black)">
+            <div style="font-size:13.5px;font-weight:700">🙋‍♂️ 형제</div>
+          </label>
+          <label style="flex:1;display:flex;align-items:center;gap:8px;padding:12px;border-radius:10px;border:1.5px solid var(--border);cursor:pointer;background:white">
+            <input type="radio" name="romance-gender" id="romance-gender-f" value="sister" style="accent-color:var(--black)">
+            <div style="font-size:13.5px;font-weight:700">🙋‍♀️ 자매</div>
+          </label>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">자기소개</label>
+        <textarea id="romance-bio" class="qt-ta" rows="3"
+          placeholder="예: 찬양팀에서 섬기는 청년입니다. 신앙 안에서 함께 성장할 동역자를 만나고 싶어요 😊"
+          style="font-size:13px;line-height:1.7;resize:none"></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">원하는 만남 <span style="font-weight:400;font-size:11.5px;color:var(--muted)">선택</span></label>
+        <input id="romance-looking" type="text" class="form-input" placeholder="예: 진지한 교제를 원해요 / 함께 예배하는 사람">
+      </div>
+      <div class="modal-actions">
+        <button class="btn-cancel" onclick="closeRomanceProfileModal()">취소</button>
+        <button class="btn-confirm" onclick="saveRomanceProfile()">저장하기</button>
+      </div>
+      <div style="text-align:center;margin-top:8px">
+        <button onclick="deleteRomanceProfile()" style="background:none;border:none;font-size:12.5px;color:var(--muted);cursor:pointer;font-family:inherit;text-decoration:underline">프로필 삭제</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ============================================
        게시판 모달
   ============================================= -->
@@ -5396,6 +5456,108 @@ const DB = {
 };
 
 // ================================================
+//  PWA — 홈 화면 설치 (item 7)
+//  단일 HTML 유지 원칙에 따라 매니페스트/아이콘을 런타임에 생성해 주입한다.
+//  (서비스워커는 별도 파일이 필요해 이 구조에선 생략 — iOS/안드로이드 홈 화면 추가는 동작)
+// ================================================
+let _deferredInstallPrompt = null;
+function _pwaMakeIcon(size) {
+  // 앱 아이콘을 캔버스로 그려 dataURL 반환 (골드 배경 + 🙏 + SmartChurch)
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  const x = c.getContext('2d');
+  x.fillStyle = '#C9A96E';
+  x.fillRect(0, 0, size, size);
+  x.fillStyle = '#1A1A1A';
+  x.textAlign = 'center';
+  x.textBaseline = 'middle';
+  x.font = `${Math.round(size * 0.5)}px serif`;
+  x.fillText('🙏', size / 2, size * 0.44);
+  x.fillStyle = '#1A1A1A';
+  x.font = `bold ${Math.round(size * 0.13)}px Pretendard, sans-serif`;
+  x.fillText('스마트처치', size / 2, size * 0.82);
+  return c.toDataURL('image/png');
+}
+function setupPWA() {
+  try {
+    const icon192 = _pwaMakeIcon(192);
+    const icon512 = _pwaMakeIcon(512);
+    const manifest = {
+      name: '스마트처치',
+      short_name: '스마트처치',
+      description: '교회 커뮤니티 · 묵상 · 챌린지 · 채팅',
+      start_url: '.',
+      scope: '.',
+      display: 'standalone',
+      orientation: 'portrait',
+      background_color: '#FBF7F0',
+      theme_color: '#C9A96E',
+      lang: 'ko',
+      icons: [
+        { src: icon192, sizes: '192x192', type: 'image/png', purpose: 'any maskable' },
+        { src: icon512, sizes: '512x512', type: 'image/png', purpose: 'any maskable' }
+      ]
+    };
+    _appIconUrl = icon192;   // 시스템 알림 아이콘으로 재사용 (item 9)
+    const blobUrl = URL.createObjectURL(new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' }));
+    let link = document.querySelector('link[rel="manifest"]');
+    if (!link) { link = document.createElement('link'); link.rel = 'manifest'; document.head.appendChild(link); }
+    link.href = blobUrl;
+    // iOS 홈 화면 아이콘
+    let apple = document.querySelector('link[rel="apple-touch-icon"]');
+    if (!apple) { apple = document.createElement('link'); apple.rel = 'apple-touch-icon'; document.head.appendChild(apple); }
+    apple.href = icon192;
+  } catch (e) { /* 캔버스 미지원 등 — 무시 */ }
+}
+
+// ── 브라우저 로컬 알림 (item 9) ──
+// 참고: 서버 없는 단일 HTML 구조라 원격 FCM 푸시(백그라운드 전송)는 불가.
+//       대신 Web Notifications API로 앱 실행 중 발생하는 이벤트를 시스템 알림으로 띄운다.
+let _appIconUrl = null;
+function ensureNotifPermission() {
+  try {
+    if ('Notification' in window && Notification.permission === 'default')
+      Notification.requestPermission().catch(() => {});
+  } catch (e) {}
+}
+function showSystemNotification(notif) {
+  try {
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    if (!document.hidden) return;   // 앱이 보일 땐 인앱 토스트로 충분 → 중복 방지
+    const n = new Notification((notif.icon ? notif.icon + ' ' : '') + (notif.title || '스마트처치'), {
+      body: notif.body || '',
+      icon: _appIconUrl || undefined,
+      tag:  notif.dedupeId || undefined
+    });
+    n.onclick = () => { try { window.focus(); } catch (e) {} n.close(); };
+  } catch (e) {}
+}
+// 안드로이드/크롬 설치 프롬프트 캡처 → 나중에 버튼으로 띄움
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  _deferredInstallPrompt = e;
+  const btn = document.getElementById('pwa-install-row');
+  if (btn) btn.style.display = '';
+});
+function canInstallPWA() {
+  return !!_deferredInstallPrompt ||
+    (/iphone|ipad|ipod/i.test(navigator.userAgent) && !navigator.standalone);
+}
+async function promptPWAInstall() {
+  if (_deferredInstallPrompt) {
+    _deferredInstallPrompt.prompt();
+    const { outcome } = await _deferredInstallPrompt.userChoice;
+    _deferredInstallPrompt = null;
+    toast(outcome === 'accepted' ? '홈 화면에 설치됐어요! 🎉' : '언제든 다시 설치할 수 있어요');
+  } else if (/iphone|ipad|ipod/i.test(navigator.userAgent)) {
+    toast('사파리 공유 버튼 → "홈 화면에 추가"를 눌러주세요 📲');
+  } else {
+    toast('브라우저 메뉴 → "홈 화면에 추가"를 선택해 주세요 📲');
+  }
+}
+setupPWA();
+
+// ================================================
 //  APP STATE
 // ================================================
 let me = null;
@@ -5758,6 +5920,7 @@ async function doLogin() {
 
 async function doRegister() {
   const name  = document.getElementById('r-name').value.trim();
+  const birth = document.getElementById('r-birth').value;   // YYYY-MM-DD
   const email = document.getElementById('r-email').value.trim();
   const pw    = document.getElementById('r-pw').value;
   const pw2   = document.getElementById('r-pw2').value;
@@ -5765,9 +5928,11 @@ async function doRegister() {
   const role  = '성도';
   const orgType = 'church';
 
-  clearErrors('r-name-err','r-email-err','r-pw-err','r-pw2-err');
+  clearErrors('r-name-err','r-birth-err','r-email-err','r-pw-err','r-pw2-err');
   let ok = true;
   if (!name)                        { showErr('r-name-err',  '이름을 입력해 주세요.'); ok = false; }
+  if (!birth)                       { showErr('r-birth-err', '생년월일을 입력해 주세요.'); ok = false; }
+  else if (birth > todayDateKey())  { showErr('r-birth-err', '생년월일이 올바르지 않아요.'); ok = false; }
   if (!email || !email.includes('@')) { showErr('r-email-err', '올바른 이메일을 입력해 주세요.'); ok = false; }
   if (pw.length < 8)                { showErr('r-pw-err',   '비밀번호는 8자 이상이어야 합니다.'); ok = false; }
   if (pw !== pw2)                   { showErr('r-pw2-err',  '비밀번호가 일치하지 않습니다.'); ok = false; }
@@ -5797,7 +5962,7 @@ async function doRegister() {
       const uid  = cred.user.uid;
 
       const userData = {
-        id: uid, name, email,
+        id: uid, name, email, birthdate: birth,
         church:      '',
         churchCode:  '',
         role:        '교인',   // 온보딩 ob2에서 선택
@@ -5843,7 +6008,7 @@ async function doRegister() {
   // ── localStorage fallback ──
   if (DB.findByEmail(email)) { showErr('r-email-err', '이미 사용 중인 이메일입니다.'); return; }
   const user = {
-    id: uid(), name, email, password: pw,
+    id: uid(), name, email, password: pw, birthdate: birth,
     church:  '',
     role:    '교인',   // 온보딩 ob2에서 선택
     orgType: 'church', // 온보딩 ob2에서 선택
@@ -5922,6 +6087,59 @@ const VERSES = [
   { t: '주는 나의 피난처시요 나의 방패시라\n나는 주의 말씀을 바라나이다', r: '시편 119:114' },
   { t: '여호와가 너를 지키시는 이시라\n여호와께서 네 오른쪽에서 네 그늘이 되시나니', r: '시편 121:5' },
   { t: '평강의 하나님이 친히\n너희를 온전히 거룩하게 하시고', r: '데살로니가전서 5:23' },
+  { t: '하나님이 세상을 이처럼 사랑하사\n독생자를 주셨으니', r: '요한복음 3:16' },
+  { t: '내게 능력 주시는 자 안에서\n내가 모든 것을 할 수 있느니라', r: '빌립보서 4:13' },
+  { t: '아무 것도 염려하지 말고\n다만 감사함으로 너희 구할 것을 아뢰라', r: '빌립보서 4:6' },
+  { t: '너는 마음을 다하여 여호와를 신뢰하고\n네 명철을 의지하지 말라', r: '잠언 3:5' },
+  { t: '너는 범사에 그를 인정하라\n그리하면 네 길을 지도하시리라', r: '잠언 3:6' },
+  { t: '강하고 담대하라 두려워하지 말며\n놀라지 말라 네 하나님 여호와가 함께 하느니라', r: '여호수아 1:9' },
+  { t: '하나님을 사랑하는 자에게는\n모든 것이 합력하여 선을 이루느니라', r: '로마서 8:28' },
+  { t: '수고하고 무거운 짐 진 자들아\n다 내게로 오라 내가 너희를 쉬게 하리라', r: '마태복음 11:28' },
+  { t: '하나님은 우리의 피난처시요 힘이시니\n환난 중에 만날 큰 도움이시라', r: '시편 46:1' },
+  { t: '오직 여호와를 앙망하는 자는\n새 힘을 얻으리니 독수리가 날개치며 올라감 같을 것이요', r: '이사야 40:31' },
+  { t: '너희를 향한 나의 생각은\n평안이요 재앙이 아니니라', r: '예레미야 29:11' },
+  { t: '여호와는 나의 빛이요 나의 구원이시니\n내가 누구를 두려워하리요', r: '시편 27:1' },
+  { t: '사랑은 오래 참고 사랑은 온유하며\n시기하지 아니하며', r: '고린도전서 13:4' },
+  { t: '믿음, 소망, 사랑 이 세 가지는 항상 있을 것인데\n그 중의 제일은 사랑이라', r: '고린도전서 13:13' },
+  { t: '내가 곧 길이요 진리요 생명이니\n나로 말미암지 않고는 아버지께로 올 자가 없느니라', r: '요한복음 14:6' },
+  { t: '나는 세상의 빛이니\n나를 따르는 자는 어둠에 다니지 아니하고', r: '요한복음 8:12' },
+  { t: '너희는 먼저 그의 나라와 그의 의를 구하라\n그리하면 이 모든 것을 너희에게 더하시리라', r: '마태복음 6:33' },
+  { t: '이같이 너희 빛이 사람 앞에 비치게 하여\n너희 착한 행실을 보고 하나님께 영광을 돌리게 하라', r: '마태복음 5:16' },
+  { t: '이 날은 여호와께서 정하신 것이라\n이 날에 우리가 즐거워하고 기뻐하리로다', r: '시편 118:24' },
+  { t: '또 여호와를 기뻐하라\n그가 네 마음의 소원을 네게 이루어 주시리로다', r: '시편 37:4' },
+  { t: '지존자의 은밀한 곳에 거주하며\n전능자의 그늘 아래에 사는 자여', r: '시편 91:1' },
+  { t: '내 영혼아 여호와를 송축하며\n그의 모든 은택을 잊지 말지어다', r: '시편 103:2' },
+  { t: '이제는 내가 사는 것이 아니요\n오직 내 안에 그리스도께서 사시는 것이라', r: '갈라디아서 2:20' },
+  { t: '오직 성령의 열매는\n사랑과 희락과 화평과 오래 참음과 자비와', r: '갈라디아서 5:22' },
+  { t: '너희는 그 은혜에 의하여 믿음으로 말미암아\n구원을 받았으니 이것은 하나님의 선물이라', r: '에베소서 2:8' },
+  { t: '너희 염려를 다 주께 맡기라\n이는 그가 너희를 돌보심이라', r: '베드로전서 5:7' },
+  { t: '믿음은 바라는 것들의 실상이요\n보이지 않는 것들의 증거니', r: '히브리서 11:1' },
+  { t: '예수 그리스도는 어제나 오늘이나\n영원토록 동일하시니라', r: '히브리서 13:8' },
+  { t: '우리가 사랑함은\n그가 먼저 우리를 사랑하셨음이라', r: '요한일서 4:19' },
+  { t: '우리가 우리 죄를 자백하면\n그는 미쁘시고 의로우사 우리 죄를 사하시며', r: '요한일서 1:9' },
+  { t: '나의 반석이시요 나의 구속자이신\n여호와여 주께 열납되기를 원하나이다', r: '시편 19:14' },
+  { t: '너희는 여호와의 선하심을 맛보아 알지어다\n그에게 피하는 자는 복이 있도다', r: '시편 34:8' },
+  { t: '내가 주께 감사하옴은\n나를 지으심이 심히 기묘하심이라', r: '시편 139:14' },
+  { t: '너의 행사를 여호와께 맡기라\n그리하면 네가 경영하는 것이 이루어지리라', r: '잠언 16:3' },
+  { t: '여호와의 이름은 견고한 망대라\n의인은 그리로 달려가서 안전함을 얻느니라', r: '잠언 18:10' },
+  { t: '범사에 기한이 있고\n천하 만사가 다 때가 있나니', r: '전도서 3:1' },
+  { t: '네가 물 가운데로 지날 때에\n내가 너와 함께 할 것이라', r: '이사야 43:2' },
+  { t: '볼지어다 내가 세상 끝날까지\n너희와 항상 함께 있으리라', r: '마태복음 28:20' },
+  { t: '구하라 그리하면 너희에게 주실 것이요\n찾으라 그리하면 찾아낼 것이요', r: '마태복음 7:7' },
+  { t: '대저 하나님의 모든 말씀은\n능하지 못하심이 없느니라', r: '누가복음 1:37' },
+  { t: '나는 포도나무요 너희는 가지라\n그가 내 안에, 내가 그 안에 거하면', r: '요한복음 15:5' },
+  { t: '세상에서는 너희가 환난을 당하나\n담대하라 내가 세상을 이기었노라', r: '요한복음 16:33' },
+  { t: '이 세대를 본받지 말고\n오직 마음을 새롭게 함으로 변화를 받아', r: '로마서 12:2' },
+  { t: '우리가 아직 죄인 되었을 때에\n그리스도께서 우리를 위하여 죽으심으로', r: '로마서 5:8' },
+  { t: '누구든지 그리스도 안에 있으면\n새로운 피조물이라', r: '고린도후서 5:17' },
+  { t: '내 은혜가 네게 족하도다\n이는 내 능력이 약한 데서 온전하여짐이라', r: '고린도후서 12:9' },
+  { t: '모든 지각에 뛰어난 하나님의 평강이\n너희 마음과 생각을 지키시리라', r: '빌립보서 4:7' },
+  { t: '무슨 일을 하든지 마음을 다하여\n주께 하듯 하고 사람에게 하듯 하지 말라', r: '골로새서 3:23' },
+  { t: '하나님이 우리에게 주신 것은\n두려워하는 마음이 아니요 오직 능력과 사랑과 절제하는 마음이니', r: '디모데후서 1:7' },
+  { t: '너희 중에 누구든지 지혜가 부족하거든\n하나님께 구하라 그리하면 주시리라', r: '야고보서 1:5' },
+  { t: '네 짐을 여호와께 맡기라\n그가 너를 붙드시고 의인의 요동함을 영원히 허락하지 아니하시리로다', r: '시편 55:22' },
+  { t: '내가 산을 향하여 눈을 들리라\n나의 도움이 어디서 올까', r: '시편 121:1' },
+  { t: '여호와는 네게 복을 주시고\n너를 지키시기를 원하며', r: '민수기 6:24' },
 ];
 
 const GREETINGS = [
@@ -6091,8 +6309,10 @@ function bootApp() {
   // Date
   updateDateSegments();
 
-  // My page verse
-  const v = VERSES[new Date().getDay()];
+  // My page verse — 연중 일자 기준으로 60개 구절을 매일 순환
+  const _now = new Date();
+  const _doy = Math.floor((_now - new Date(_now.getFullYear(), 0, 0)) / 86400000);
+  const v = VERSES[_doy % VERSES.length];
   const vt = document.getElementById('verse-text');
   const vr = document.getElementById('verse-ref');
   if (vt) vt.textContent = v.t;
@@ -6118,6 +6338,10 @@ function bootApp() {
   const ms = document.getElementById('member-self');
   if (cx) cx.textContent = me.church || '';
   if (ms) ms.textContent = me.name + ' ' + (me.role||'성도') + ' (나)';
+
+  // 알림 배지 초기화 + 오늘의 챌린지 체크 독려 알림
+  updateNotifBadge();
+  checkChallengeReminder();
 }
 
 // ================================================
@@ -7706,6 +7930,7 @@ function commitProgress(e, id) {
   t.progress = v;
   t.done = v === 100;        // 100 → 자동 체크, 0~99 → 반드시 해제
   saveDayTodos(todos);
+  syncTodoLinkedChallenge(t);
   renderTodos();
 }
 
@@ -7718,6 +7943,7 @@ function toggleSubCheck(id, idx) {
   // 전부 체크 → 대표 체크 ON / 하나라도 미체크 → 대표 체크 OFF
   t.done = t.subChecks.length > 0 && t.subChecks.every(s => s.done);
   saveDayTodos(todos);
+  syncTodoLinkedChallenge(t);
   renderTodos();
 }
 
@@ -7729,7 +7955,33 @@ function toggleTodo(id) {
   if (t.inputMode === 'progress' || t.inputMode === 'subcheck') return;
   t.done = !t.done;
   saveDayTodos(todos);
+  syncTodoLinkedChallenge(t);
   renderTodos();
+}
+
+// ── 🚩 연동된 챌린지 자동 체크/해제 ──
+// 오늘 날짜의 할 일이 완료되면 연동 챌린지를 오늘 체크, 해제되면 오늘 체크 취소
+function syncTodoLinkedChallenge(todo) {
+  if (!todo || !todo.linkedChallengeUid) return;
+  if (dateKey() !== todayDateKey()) return;      // 오늘 할 일에만 적용
+  const list = myChallenges();
+  const c = list.find(x => x.uid === todo.linkedChallengeUid);
+  if (!c) return;
+  const today = todayDateKey();
+  if (c.endDate && c.endDate < today) return;    // 종료된 챌린지는 건드리지 않음
+  if (!c.checkedDates) c.checkedDates = [];
+  const has = c.checkedDates.includes(today);
+  if (todo.done && !has)       c.checkedDates.push(today);
+  else if (!todo.done && has)  c.checkedDates = c.checkedDates.filter(d => d !== today);
+  else return;                                   // 상태 변화 없음
+  const freqType = c.freqType || (c.type === 'weekly' ? 'weekly' : 'daily');
+  c.lastCheckedDate = c.checkedDates[c.checkedDates.length - 1] || '';
+  c.streak  = calculateStreak(c.checkedDates);
+  c.current = getCurrentPeriodCount(c.checkedDates, freqType);
+  saveMyChallenges(list);
+  renderChallenge();
+  _refreshSubscreenIfCurrent(['my-challenges']);
+  if (todo.done) toast(`🚩 "${c.label}" 챌린지 자동 체크!`);
 }
 
 // ── renderTodos ──
@@ -8671,6 +8923,67 @@ function updateNotifBadge() {
   }
 }
 
+// ── 인앱 알림 기록 (notifs_<uid>) ──
+// 알림 설정 토글 상태 확인 (type: 'Challenge' | 'Chat' | 'Event' | 'Board')
+function notifPrefOn(type) {
+  if (!me) return false;
+  return DB.get('notif' + type + '_' + me.id, true) !== false;
+}
+function notifTimeLabel(d) {
+  d = d || new Date();
+  const h = d.getHours(), m = d.getMinutes();
+  const ap = h < 12 ? '오전' : '오후';
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return `${ap} ${h12}:${String(m).padStart(2,'0')}`;
+}
+// 현재 사용자(me)에게 인앱 알림 추가. notif: {icon, title, body, dedupeId}
+function pushNotif(notif) {
+  if (!me) return;
+  const key  = 'notifs_' + me.id;
+  const list = DB.get(key, []);
+  // dedupeId 중복 방지 (같은 이벤트 재수신 시 중복 알림 억제)
+  if (notif.dedupeId && list.some(n => n.dedupeId === notif.dedupeId)) return;
+  list.unshift({
+    icon:     notif.icon || '📣',
+    title:    notif.title || '',
+    body:     notif.body  || '',
+    time:     notifTimeLabel(),
+    dedupeId: notif.dedupeId || null,
+    ts:       new Date().toISOString()
+  });
+  if (list.length > 50) list.length = 50; // 최근 50개만 유지
+  DB.set(key, list);
+  DB.set('notifCount_' + me.id, DB.get('notifCount_' + me.id, 0) + 1);
+  updateNotifBadge();
+  // 로컬 브라우저 알림 (권한이 있으면) — item 9
+  showSystemNotification(notif);
+  // 알림 화면이 열려 있으면 즉시 갱신 + 카운트 리셋
+  const ss = document.getElementById('subscreen');
+  if (ss && ss.classList.contains('open') && ss.dataset.current === 'notifications') {
+    document.getElementById('subscreen-body').innerHTML = renderNotifications();
+    DB.set('notifCount_' + me.id, 0);
+    updateNotifBadge();
+  }
+}
+// 오늘 미완료 챌린지가 있으면 하루 1회 체크 독려 알림
+function checkChallengeReminder() {
+  if (!notifPrefOn('Challenge')) return;
+  const today = todayDateKey();
+  if (DB.get('challReminderDate_' + me.id, '') === today) return; // 오늘 이미 알림함
+  const pending = myChallenges().filter(c => {
+    if (c.endDate && c.endDate < today) return false;            // 종료된 챌린지 제외
+    return !(c.checkedDates || []).includes(today);              // 오늘 미체크
+  });
+  if (!pending.length) return;
+  DB.set('challReminderDate_' + me.id, today);
+  pushNotif({
+    icon: '🔥',
+    title: '오늘의 챌린지 체크',
+    body: `아직 완료하지 않은 챌린지가 ${pending.length}개 있어요`,
+    dedupeId: 'challRemind_' + today
+  });
+}
+
 function confirmLogout() {
   closeSideMenu();
   document.getElementById('modal-logout').classList.add('open');
@@ -8702,6 +9015,7 @@ const SUBSCREEN_TITLES = {
   'hobby-match'    : '🎯 취미 매칭',
   'prayer-match'   : '🙏 기도 파트너',
   'mentor-match'   : '🌱 멘토링',
+  'romance-match'  : '💑 이성 교제',
   'match-inbox'    : '📬 받은 매칭 신청',
   'invite-codes'   : '🎫 초대 코드 관리',
   'member-binder'  : '📖 삶의 예배 열람',
@@ -8718,11 +9032,15 @@ function openSubscreen(id) {
   body.innerHTML = renderSubscreenContent(id);
   el.classList.add('open');
   el.dataset.current = id;
-  // 알림 서브스크린: 배지 초기화
+  // 알림 서브스크린: 배지 초기화 + 브라우저 알림 권한 요청 (사용자 제스처)
   if (id === 'notifications') {
     DB.set('notifCount_' + me.id, 0);
     updateNotifBadge();
+    ensureNotifPermission();
   }
+  // 매칭/행사 화면 진입 시 Firestore 최신 데이터 동기화 (교인 간 공유)
+  if (MATCH_SUBSCREENS.includes(id)) syncMatchingFromFirestore();
+  if (EVENT_SUBSCREENS.includes(id)) syncEventsFromFirestore();
 }
 function closeSubscreen() {
   const el = document.getElementById('subscreen');
@@ -8754,6 +9072,7 @@ function renderSubscreenContent(id) {
     case 'hobby-match':     return renderHobbyMatch();
     case 'prayer-match':    return renderPrayerMatch();
     case 'mentor-match':    return renderMentorMatch();
+    case 'romance-match':   return renderRomanceMatch();
     case 'match-inbox':     return renderMatchInbox();
     case 'event-manage':    return renderEventManage();
     case 'app-settings':    return renderAppSettings();
@@ -10114,6 +10433,17 @@ function renderAppSettings() {
         <div style="border-top:1px solid var(--border)">${toggleRow('notifBoard','게시판 알림','공지 및 건의함 답변 알림',notifBoard)}</div>
       </div>
 
+      <!-- 홈 화면 설치 (PWA) -->
+      <div style="font-size:12px;font-weight:700;color:var(--muted);letter-spacing:0.5px;margin-bottom:8px">📲 앱 설치</div>
+      <div style="background:white;border-radius:14px;border:1.5px solid var(--border);padding:14px 16px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;gap:12px">
+        <div>
+          <div style="font-size:13.5px;font-weight:700">홈 화면에 설치</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px">앱처럼 전체화면으로 실행돼요</div>
+        </div>
+        <button onclick="promptPWAInstall()"
+          style="height:34px;padding:0 16px;border-radius:10px;border:none;background:var(--black);color:white;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit">설치하기</button>
+      </div>
+
       <!-- 화면 설정 -->
       <div style="font-size:12px;font-weight:700;color:var(--muted);letter-spacing:0.5px;margin-bottom:8px">🖥 화면 설정</div>
       <div style="background:white;border-radius:14px;border:1.5px solid var(--border);padding:14px 16px;margin-bottom:16px">
@@ -10306,6 +10636,8 @@ function toggleSetting(storageKey, toggle) {
   const on = !toggle.classList.contains('on');
   toggle.classList.toggle('on', on);
   DB.set(storageKey, on);
+  // 알림 토글을 켜면 브라우저 알림 권한 요청 (사용자 제스처)
+  if (on && storageKey.indexOf('notif') === 0) ensureNotifPermission();
   toast(on ? '켰어요 ✅' : '껐어요');
 }
 // 글자 크기 설정
@@ -11718,6 +12050,15 @@ function _detectNewMessages(rooms) {
 
     if (isNew && isFromOther && notInRoom) {
       _showNotifyBanner(room);
+      // 인앱 알림 벨에도 기록 (채팅 알림 설정이 켜져 있을 때)
+      if (notifPrefOn('Chat')) {
+        pushNotif({
+          icon: room.type === 'open' ? '🌐' : (room.type === 'group' ? '👥' : '💬'),
+          title: (room.name || '채팅') + ' · 새 메시지',
+          body: room.lastMessage || '메시지가 도착했어요',
+          dedupeId: 'chat_' + room.id + '_' + curr
+        });
+      }
     }
     if (curr) _prevRoomTimestamps[room.id] = curr;
   });
@@ -13306,13 +13647,19 @@ function createEvent() {
   if (!name)  { toast('행사 이름을 입력해 주세요'); return; }
   if (!start) { toast('행사 시작일을 입력해 주세요'); return; }
   const events = DB.get(getChurchEventsKey(), []);
-  events.push({ id:uid(), name, tagline, poster:_eventPosterBase64||null,
+  const ev = { id:uid(), name, tagline, poster:_eventPosterBase64||null,
     startDate:start, endDate:end||start,
     ticketStartDate:ticketStart||start, ticketEndDate:ticketEnd||end||start,
     location, price, maxTickets, desc, ticketCount:0,
-    createdBy:me.name, createdById:me.id, church:me.church||'',
-    createdAt:new Date().toISOString() });
+    createdBy:me.name, createdById:me.id, church:me.church||'', churchCode:matchScope(),
+    createdAt:new Date().toISOString() };
+  events.push(ev);
   DB.set(getChurchEventsKey(), events);
+  // Firestore 동기화 (교인 간 공유)
+  if (window._fbReady && window._fb) {
+    const seen = DB.get('seenEvents_' + me.id, []); if (!seen.includes(ev.id)) { seen.push(ev.id); DB.set('seenEvents_' + me.id, seen); } // 내 행사 자기 알림 방지
+    window._fb.setEventDoc(ev.id, ev).catch(() => {});
+  }
   closeCreateEventModal();
   setTimeout(() => openSubscreen('event-browse'), 150);
   toast('✅ "' + name + '" 행사가 등록됐어요!');
@@ -13412,16 +13759,31 @@ function applyTicket(eventId) {
   if (myTickets.includes(eventId)) { toast('이미 신청했어요'); return; }
   myTickets.push(eventId); DB.set('myTickets_'+me.id, myTickets);
   e.ticketCount=(e.ticketCount||0)+1; DB.set(getChurchEventsKey(), events);
+  // Firestore: 예약 문서 생성 + 행사 신청 수 반영
+  if (window._fbReady && window._fb) {
+    const scope = e.churchCode || matchScope();
+    window._fb.setReservation(scope, e.id, me.id, {
+      uid: me.id, eventId: e.id, churchCode: scope, name: me.name || '', createdAt: new Date().toISOString()
+    }).catch(() => {});
+    window._fb.setEventDoc(e.id, { ticketCount: e.ticketCount }).catch(() => {});
+  }
   openSubscreen('event-detail'); toast('✅ "'+e.name+'" 신청 완료!');
 }
 function cancelTicket(eventId) {
   DB.set('myTickets_'+me.id, DB.get('myTickets_'+me.id,[]).filter(id=>id!==eventId));
   const events=DB.get(getChurchEventsKey(),[]), e=events.find(x=>x.id===eventId);
   if (e&&e.ticketCount>0){e.ticketCount--;DB.set(getChurchEventsKey(),events);}
+  // Firestore: 예약 문서 삭제 + 행사 신청 수 반영
+  if (e && window._fbReady && window._fb) {
+    const scope = e.churchCode || matchScope();
+    window._fb.deleteReservation(scope, e.id, me.id).catch(() => {});
+    window._fb.setEventDoc(e.id, { ticketCount: e.ticketCount || 0 }).catch(() => {});
+  }
   openSubscreen('event-detail'); toast('신청을 취소했어요');
 }
 function deleteEvent(eventId) {
   DB.set(getChurchEventsKey(), DB.get(getChurchEventsKey(),[]).filter(e=>e.id!==eventId));
+  if (window._fbReady && window._fb) window._fb.deleteEventDoc(eventId).catch(() => {});
   closeSubscreen(); toast('행사를 삭제했어요');
 }
 
@@ -13442,16 +13804,37 @@ function getMatchProfiles(type) {
 function getAllMyMatchProfiles() {
   return DB.get(matchProfilesKey(), []).filter(p => p.userId === me.id);
 }
+function matchScope() { return me.churchCode || me.church || 'default'; }
+// ── 나이 계산 / 성인 인증 (item 8) ──
+function userAge(birthdate) {
+  const bd = birthdate || (me && me.birthdate);
+  if (!bd) return null;
+  const b = new Date(bd);
+  if (isNaN(b.getTime())) return null;
+  const now = new Date();
+  let age = now.getFullYear() - b.getFullYear();
+  const m = now.getMonth() - b.getMonth();
+  if (m < 0 || (m === 0 && now.getDate() < b.getDate())) age--;
+  return age;
+}
+function isAdult() { const a = userAge(); return a !== null && a >= 19; }
 function saveMatchProfile(data) {
   const profiles = DB.get(matchProfilesKey(), []);
   const idx = profiles.findIndex(p => p.userId === me.id && p.type === data.type);
   const now = new Date().toISOString();
-  if (idx >= 0) profiles[idx] = { ...profiles[idx], ...data, updatedAt: now };
-  else profiles.push({ ...data, id: uid(), userId: me.id, userName: me.name, createdAt: now });
+  let profile;
+  if (idx >= 0) { profiles[idx] = { ...profiles[idx], ...data, updatedAt: now }; profile = profiles[idx]; }
+  else { profile = { ...data, id: uid(), userId: me.id, userName: me.name, createdAt: now }; profiles.push(profile); }
+  profile.churchCode = matchScope();  // Firestore 교회 단위 조회용
   DB.set(matchProfilesKey(), profiles);
+  // Firestore 동기화 (교인 간 공유)
+  if (window._fbReady && window._fb) window._fb.setMatchProfileDoc(profile.id, profile).catch(() => {});
 }
 function deleteMyMatchProfile(type) {
-  DB.set(matchProfilesKey(), DB.get(matchProfilesKey(), []).filter(p => !(p.userId === me.id && p.type === type)));
+  const all     = DB.get(matchProfilesKey(), []);
+  const removed = all.filter(p => p.userId === me.id && p.type === type);
+  DB.set(matchProfilesKey(), all.filter(p => !(p.userId === me.id && p.type === type)));
+  if (window._fbReady && window._fb) removed.forEach(p => window._fb.deleteMatchProfileDoc(p.id).catch(() => {}));
 }
 function getMatchReqsSent(type) {
   return DB.get(matchReqsKey(), []).filter(r => r.fromId === me.id && (!type || r.type === type));
@@ -13464,8 +13847,10 @@ function doSendMatchReq(toId, profileId, type, msg) {
   if (reqs.find(r => r.fromId === me.id && r.profileId === profileId && r.status === 'pending')) {
     toast('이미 신청한 프로필이에요'); return false;
   }
-  reqs.push({ id: uid(), fromId: me.id, fromName: me.name, toId, profileId, type, msg: msg||'', status: 'pending', createdAt: new Date().toISOString() });
+  const req = { id: uid(), fromId: me.id, fromName: me.name, toId, profileId, type, msg: msg||'', status: 'pending', createdAt: new Date().toISOString(), churchCode: matchScope() };
+  reqs.push(req);
   DB.set(matchReqsKey(), reqs);
+  if (window._fbReady && window._fb) window._fb.setMatchRequestDoc(req.id, req).catch(() => {});
   return true;
 }
 function respondMatchReq(reqId, accept) {
@@ -13488,21 +13873,152 @@ function respondMatchReq(reqId, accept) {
   req.status = accept ? 'accepted' : 'rejected';
   req.respondedAt = new Date().toISOString();
   DB.set(matchReqsKey(), reqs);
+  if (window._fbReady && window._fb) window._fb.setMatchRequestDoc(req.id, { status: req.status, respondedAt: req.respondedAt }).catch(() => {});
   if (accept) {
     const profiles = DB.get(matchProfilesKey(), []);
     const p = profiles.find(x => x.id === req.profileId);
-    if (p) p.status = 'matched';
-    DB.set(matchProfilesKey(), profiles);
+    if (p) {
+      p.status = 'matched';
+      DB.set(matchProfilesKey(), profiles);
+      if (window._fbReady && window._fb) window._fb.setMatchProfileDoc(p.id, { status: 'matched' }).catch(() => {});
+    }
+    // 수락 시 두 사람의 1:1 DM 채팅방 자동 생성 (item 6)
+    createMatchDMRoom(req);
   }
   toast(accept ? '✅ 수락했어요! 연결이 됐어요 🤝' : '거절했어요');
   openSubscreen('match-inbox');
+}
+
+// 매칭 수락 시 신청자와 1:1 DM 채팅방 자동 생성 (item 6)
+function createMatchDMRoom(req) {
+  if (!req || !req.fromId || req.fromId === me.id) return;
+  const partnerId   = req.fromId;
+  const partnerName = req.fromName || '상대방';
+  const rooms = getChatRooms();
+  // 이미 있는 1:1 방이면 재사용
+  let room = rooms.find(r => r.type === 'dm' && (r.members || []).includes(partnerId));
+  if (!room) {
+    room = {
+      id:            'dm_' + [me.id, partnerId].sort().join('_'), // 두 사람 공통 결정적 ID
+      type:          'dm',
+      name:          partnerName,       // 생성자(수락자) 관점 표시명 — 기존 DM 규칙과 동일
+      emoji:         '💛',
+      members:       [me.id, partnerId],
+      memberNames:   [partnerName],
+      createdBy:     me.id,
+      createdAt:     new Date().toISOString(),
+      lastMessage:   `🤝 ${matchTypeLabel(req.type)}(으)로 연결되었어요`,
+      lastMessageAt: new Date().toISOString(),
+      lastSenderId:  'system',
+      fromMatch:     true
+    };
+    rooms.push(room);
+    saveChatRooms(rooms);
+  }
+  // Firestore 저장 → 상대방도 listenMyRooms 로 방을 받게 됨
+  if (window._fbReady && window._fb) {
+    window._fb.ensureChatRoom(room.id, room).catch(() => {});
+    window._fb.sendChatMsg(room.id, {
+      text: `🤝 ${matchTypeLabel(req.type)} 매칭으로 연결되었어요! 반갑게 인사해보세요 😊`,
+      senderId: 'system', senderName: '스마트처치', senderRole: '', senderPhoto: null
+    }).catch(() => {});
+  }
+  toast('💬 매칭 상대와 1:1 채팅방이 열렸어요!');
 }
 
 const MATCH_HOBBY_LIST = ['독서','운동','음악','요리','사진','영화','등산','캘리그라피','그림','게임','바느질','원예','봉사','기타'];
 const MATCH_PRAYER_TOPICS = ['진로','건강','가정','재정','믿음 성장','전도','자녀','결혼','직장','학업','기타'];
 const MATCH_MENTOR_AREAS  = ['신앙 초보','성경 공부','기도 습관','청년 생활','가정·결혼','직장 생활','봉사·사역','기타'];
 function matchTypeLabel(type) {
-  return type === 'hobby' ? '취미 매칭' : type === 'prayer' ? '기도 파트너' : '멘토링';
+  return type === 'hobby' ? '취미 매칭' : type === 'prayer' ? '기도 파트너'
+       : type === 'romance' ? '이성 교제' : '멘토링';
+}
+
+// ── 매칭 Firestore 동기화 ──
+const MATCH_SUBSCREENS = ['matching-browse','hobby-match','prayer-match','mentor-match','romance-match','match-inbox','my-matches'];
+function _refreshSubscreenIfCurrent(ids) {
+  const ss = document.getElementById('subscreen');
+  if (!ss || !ss.classList.contains('open')) return;
+  if (ids.includes(ss.dataset.current))
+    document.getElementById('subscreen-body').innerHTML = renderSubscreenContent(ss.dataset.current);
+}
+async function syncMatchingFromFirestore() {
+  if (!window._fbReady || !window._fb || !me) return;
+  try {
+    const [pSnap, rSnap] = await Promise.all([
+      window._fb.getMatchProfilesByChurch(matchScope()),
+      window._fb.getMatchRequestsByChurch(matchScope())
+    ]);
+    const profiles = []; pSnap.forEach(d => profiles.push({ id: d.id, ...d.data() }));
+    const reqs     = []; rSnap.forEach(d => reqs.push({ id: d.id, ...d.data() }));
+    DB.set(matchProfilesKey(), profiles);
+    DB.set(matchReqsKey(), reqs);
+    _detectNewMatchReqs(reqs);
+    _refreshSubscreenIfCurrent(MATCH_SUBSCREENS);
+  } catch (e) { /* 색인/권한 문제 시 로컬 캐시 유지 */ }
+}
+// 새로 받은 매칭 신청 → 인앱 알림
+function _detectNewMatchReqs(reqs) {
+  const seenKey = 'seenMatchReqs_' + me.id;
+  const seen = DB.get(seenKey, []);
+  const mine = reqs.filter(r => r.toId === me.id && r.status === 'pending');
+  let changed = false;
+  mine.forEach(r => {
+    if (seen.includes(r.id)) return;
+    seen.push(r.id); changed = true;
+    pushNotif({
+      icon: '📬',
+      title: '새 매칭 신청',
+      body: `${r.fromName || '누군가'}님이 ${matchTypeLabel(r.type)} 신청을 보냈어요`,
+      dedupeId: 'matchreq_' + r.id
+    });
+  });
+  if (changed) DB.set(seenKey, seen);
+}
+
+// ── 행사 Firestore 동기화 ──
+const EVENT_SUBSCREENS = ['event-browse','event-detail','my-events'];
+async function syncEventsFromFirestore() {
+  if (!window._fbReady || !window._fb || !me) return;
+  try {
+    const snap = await window._fb.getEventsByChurch(matchScope());
+    const events = []; snap.forEach(d => events.push({ id: d.id, ...d.data() }));
+    DB.set(getChurchEventsKey(), events);
+    _detectNewEvents(events);
+    _refreshSubscreenIfCurrent(EVENT_SUBSCREENS);
+  } catch (e) { /* 로컬 캐시 유지 */ }
+  // 내 티켓 예약도 Firestore 기준으로 동기화
+  syncMyTicketsFromFirestore();
+}
+// 내 행사 예약(티켓)을 Firestore에서 불러와 localStorage 를 덮어씀 (기기 간 공유)
+async function syncMyTicketsFromFirestore() {
+  if (!window._fbReady || !window._fb || !me) return;
+  try {
+    const snap = await window._fb.getMyReservations(me.id);
+    const ids = [];
+    snap.forEach(d => { const r = d.data(); if (r && r.eventId) ids.push(r.eventId); });
+    DB.set('myTickets_' + me.id, ids);   // Firestore 가 소스 → 로컬 덮어쓰기
+    _refreshSubscreenIfCurrent(EVENT_SUBSCREENS);
+  } catch (e) { /* collectionGroup 색인 필요 시 로컬 유지 */ }
+}
+// 새로 등록된 행사(내가 만든 것 제외) → 인앱 알림
+function _detectNewEvents(events) {
+  if (!notifPrefOn('Event')) return;
+  const seenKey = 'seenEvents_' + me.id;
+  const seen = DB.get(seenKey, []);
+  let changed = false;
+  events.forEach(e => {
+    if (seen.includes(e.id)) return;
+    seen.push(e.id); changed = true;
+    if (e.createdById === me.id) return; // 내가 만든 행사는 알림 생략
+    pushNotif({
+      icon: '🎫',
+      title: '새 행사가 등록됐어요',
+      body: `${e.name || '행사'} · ${e.startDate || ''}`,
+      dedupeId: 'event_' + e.id
+    });
+  });
+  if (changed) DB.set(seenKey, seen);
 }
 
 // ── 허브 ──
@@ -13511,6 +14027,7 @@ function renderMatchingBrowse() {
   const hobbyCount  = getMatchProfiles('hobby').filter(p => p.userId !== me.id && p.status !== 'matched').length;
   const prayerCount = getMatchProfiles('prayer').filter(p => p.userId !== me.id && p.status !== 'matched').length;
   const mentorCount = getMatchProfiles('mentor').filter(p => p.userId !== me.id && p.status !== 'matched').length;
+  const romanceCount = isAdult() ? getMatchProfiles('romance').filter(p => p.userId !== me.id && p.status !== 'matched').length : 0;
   const myProfiles  = getAllMyMatchProfiles();
   const pendingIn   = getMatchReqsReceived().filter(r => r.status === 'pending');
 
@@ -13542,10 +14059,22 @@ function renderMatchingBrowse() {
     ${card('hobby-match',  '🎯', '취미 매칭',   '같은 취미를 가진 교인과 소모임을 만들어요', hobbyCount,  !!myProfiles.find(p=>p.type==='hobby'))}
     ${card('prayer-match', '🙏', '기도 파트너', '비슷한 기도 제목으로 함께 중보기도해요',   prayerCount, !!myProfiles.find(p=>p.type==='prayer'))}
     ${card('mentor-match', '🌱', '멘토링',       '신앙 선배/후배와 1:1로 연결돼요',           mentorCount, !!myProfiles.find(p=>p.type==='mentor'))}
-    <div style="text-align:center;font-size:12px;color:var(--muted);margin-top:8px;padding:12px;background:var(--cream2);border-radius:10px;line-height:1.7">
-      💑 <b>이성 교재 매칭</b>은 성인 인증 시스템 도입 후<br>별도로 오픈될 예정이에요
-    </div>
+    ${isAdult()
+      ? card('romance-match', '💑', '이성 교제 <span style="font-size:10px;background:rgba(231,76,60,0.12);color:#E74C3C;border-radius:5px;padding:1px 6px;font-weight:700;margin-left:4px">🔞 성인</span>', '신앙 안에서 진지한 만남을 찾아요', romanceCount, !!myProfiles.find(p=>p.type==='romance'))
+      : `<div onclick="_romanceLockedNotice()" style="background:var(--cream2);border-radius:16px;border:1.5px dashed var(--border);padding:16px;margin-bottom:12px;cursor:pointer;display:flex;align-items:center;gap:14px;opacity:0.85">
+          <div style="width:52px;height:52px;border-radius:14px;background:white;display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0">🔒</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:15px;font-weight:800;margin-bottom:3px">이성 교제 <span style="font-size:10px;background:rgba(231,76,60,0.12);color:#E74C3C;border-radius:5px;padding:1px 6px;font-weight:700">🔞 성인 전용</span></div>
+            <div style="font-size:12.5px;color:var(--muted);line-height:1.5">만 19세 이상만 이용할 수 있어요${userAge()!==null?` · 현재 만 ${userAge()}세`:''}</div>
+          </div>
+          <span style="color:var(--muted);font-size:20px">›</span>
+        </div>`}
   </div>`;
+}
+function _romanceLockedNotice() {
+  const age = userAge();
+  if (age === null) toast('마이페이지에서 생년월일을 등록하면 이용할 수 있어요 🔞');
+  else toast(`만 19세 이상만 이용할 수 있어요 (현재 만 ${age}세) 🔞`);
 }
 
 // ── 프로필 카드 공통 렌더러 ──
@@ -13577,6 +14106,9 @@ function _renderMatchProfileCard(p, sentReqs) {
   if (p.type === 'prayer') chips = p.prayerTopic ? `<span style="background:rgba(41,128,185,0.1);color:#2980B9;border-radius:20px;padding:3px 10px;font-size:11.5px;font-weight:700">${escHtml(p.prayerTopic)}</span>` : '';
   if (p.type === 'mentor') chips = `<span style="background:${p.mentorRole==='mentor'?'rgba(39,174,96,0.1)':'rgba(243,156,18,0.1)'};color:${p.mentorRole==='mentor'?'#27AE60':'#E67E22'};border-radius:20px;padding:3px 10px;font-size:11.5px;font-weight:700">${p.mentorRole==='mentor'?'🎓 멘토':'🌱 멘티'}</span>` +
     (p.mentorArea ? ` <span style="background:var(--cream2);border-radius:20px;padding:3px 10px;font-size:11.5px;font-weight:600">${escHtml(p.mentorArea)}</span>` : '');
+  if (p.type === 'romance') chips = `<span style="background:${p.gender==='brother'?'rgba(41,128,185,0.1)':'rgba(231,76,60,0.1)'};color:${p.gender==='brother'?'#2980B9':'#E74C3C'};border-radius:20px;padding:3px 10px;font-size:11.5px;font-weight:700">${p.gender==='brother'?'🙋‍♂️ 형제':'🙋‍♀️ 자매'}</span>` +
+    (p.age ? ` <span style="background:var(--cream2);border-radius:20px;padding:3px 10px;font-size:11.5px;font-weight:600">만 ${p.age}세</span>` : '') +
+    (p.lookingFor ? ` <span style="background:var(--cream2);border-radius:20px;padding:3px 10px;font-size:11.5px;font-weight:600">${escHtml(p.lookingFor)}</span>` : '');
 
   let actionHtml = '';
   if (p.status === 'matched') {
@@ -13635,6 +14167,8 @@ function _renderMyMatchBanner(myProfile, type) {
   if (type === 'hobby')  chips = (myProfile.hobbies||[]).map(h=>`<span style="background:rgba(201,169,110,0.2);color:var(--dark);border-radius:20px;padding:3px 10px;font-size:11.5px;font-weight:600">${escHtml(h)}</span>`).join('');
   if (type === 'prayer') chips = myProfile.prayerTopic ? `<span style="background:rgba(201,169,110,0.2);color:var(--dark);border-radius:20px;padding:3px 10px;font-size:11.5px;font-weight:600">${escHtml(myProfile.prayerTopic)}</span>` : '';
   if (type === 'mentor') chips = (myProfile.mentorRole==='mentor'?'🎓 멘토':'🌱 멘티') + (myProfile.mentorArea ? ` · ${myProfile.mentorArea}` : '');
+  if (type === 'romance') chips = `<span style="background:rgba(201,169,110,0.2);color:var(--dark);border-radius:20px;padding:3px 10px;font-size:11.5px;font-weight:600">${myProfile.gender==='brother'?'🙋‍♂️ 형제':'🙋‍♀️ 자매'}</span>` +
+    (myProfile.age ? ` <span style="background:rgba(201,169,110,0.2);color:var(--dark);border-radius:20px;padding:3px 10px;font-size:11.5px;font-weight:600">만 ${myProfile.age}세</span>` : '');
 
   // 인원 현황 바 (취미만)
   let memberBar = '';
@@ -13757,6 +14291,72 @@ function renderMentorMatch() {
     }
   }
   return html + '</div>';
+}
+
+// ── 이성 교제 매칭 (성인 전용) ──
+function renderRomanceMatch() {
+  if (!isAdult()) {
+    return `<div class="ss-empty">
+      <div class="ss-empty-icon">🔒</div>
+      <div class="ss-empty-title">성인 전용 서비스예요</div>
+      <div class="ss-empty-sub">만 19세 이상만 이용할 수 있어요${userAge()!==null?` (현재 만 ${userAge()}세)`:'<br>마이페이지에서 생년월일을 등록해 주세요'}</div>
+    </div>`;
+  }
+  const myProfile = getMyMatchProfile('romance');
+  let others      = getMatchProfiles('romance').filter(p => p.userId !== me.id);
+  // 내 프로필이 있으면 반대 성별만 노출
+  if (myProfile?.gender) {
+    const opp = myProfile.gender === 'brother' ? 'sister' : 'brother';
+    others = others.filter(p => p.gender === opp);
+  }
+  const sentReqs = getMatchReqsSent('romance');
+  let html = `
+    <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+      <span style="font-size:13px;font-weight:700;color:var(--muted)">💑 이성 교제 <span style="font-size:10px;background:rgba(231,76,60,0.12);color:#E74C3C;border-radius:5px;padding:1px 6px;font-weight:700">🔞 성인</span></span>
+      <button onclick="openRomanceProfileModal()" style="height:34px;padding:0 14px;border-radius:20px;border:none;background:var(--black);color:white;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit">${myProfile ? '✏️ 내 프로필 수정' : '+ 프로필 등록'}</button>
+    </div>
+    <div style="padding:14px 16px 24px">`;
+  if (myProfile) html += _renderMyMatchBanner(myProfile, 'romance');
+  if (!others.length) {
+    html += `<div class="ss-empty" style="padding:24px 0"><div class="ss-empty-icon">💑</div><div class="ss-empty-title">아직 없어요</div><div class="ss-empty-sub">${myProfile ? '상대가 등록하면 보여드릴게요' : '먼저 프로필을 등록해보세요!'}</div></div>`;
+  } else {
+    others.forEach(p => { html += _renderMatchProfileCard(p, sentReqs); });
+  }
+  return html + '</div>';
+}
+// 이성 교제 프로필 모달
+function openRomanceProfileModal() {
+  if (!isAdult()) { _romanceLockedNotice(); return; }
+  const existing = getMyMatchProfile('romance');
+  const g = existing?.gender;
+  document.getElementById('romance-gender-m').checked = g === 'brother';
+  document.getElementById('romance-gender-f').checked = g === 'sister';
+  document.getElementById('romance-bio').value     = existing?.bio || '';
+  document.getElementById('romance-looking').value = existing?.lookingFor || '';
+  document.getElementById('modal-romance-profile').classList.add('open');
+}
+function closeRomanceProfileModal(e) {
+  if (!e || e.target.id === 'modal-romance-profile')
+    document.getElementById('modal-romance-profile').classList.remove('open');
+}
+function saveRomanceProfile() {
+  if (!isAdult()) { _romanceLockedNotice(); return; }
+  const gender = document.getElementById('romance-gender-m').checked ? 'brother'
+               : document.getElementById('romance-gender-f').checked ? 'sister' : '';
+  if (!gender) { toast('성별을 선택해 주세요'); return; }
+  const bio = document.getElementById('romance-bio').value.trim();
+  if (!bio) { toast('자기소개를 입력해 주세요'); return; }
+  const lookingFor = document.getElementById('romance-looking').value.trim();
+  saveMatchProfile({ type:'romance', gender, bio, lookingFor, age: userAge(), status:'open' });
+  closeRomanceProfileModal();
+  toast('✅ 이성 교제 프로필이 등록됐어요!');
+  setTimeout(() => openSubscreen('romance-match'), 150);
+}
+function deleteRomanceProfile() {
+  deleteMyMatchProfile('romance');
+  closeRomanceProfileModal();
+  toast('프로필을 삭제했어요');
+  setTimeout(() => openSubscreen('romance-match'), 150);
 }
 
 // ── 받은 매칭 신청함 ──
@@ -13885,14 +14485,16 @@ function execMatchAction() {
     req.status = 'left';
     req.leftAt = new Date().toISOString();
     DB.set(matchReqsKey(), reqs);
+    if (window._fbReady && window._fb) window._fb.setMatchRequestDoc(req.id, { status: 'left', leftAt: req.leftAt }).catch(() => {});
     closeMatchActionModal();
     toast('매칭에서 나갔어요');
-    const screenMap = { hobby:'hobby-match', prayer:'prayer-match', mentor:'mentor-match' };
+    const screenMap = { hobby:'hobby-match', prayer:'prayer-match', mentor:'mentor-match', romance:'romance-match' };
     setTimeout(() => openSubscreen(screenMap[matchType] || 'matching-browse'), 150);
   } else if (type === 'kick') {
     req.status = 'kicked';
     req.kickedAt = new Date().toISOString();
     DB.set(matchReqsKey(), reqs);
+    if (window._fbReady && window._fb) window._fb.setMatchRequestDoc(req.id, { status: 'kicked', kickedAt: req.kickedAt }).catch(() => {});
     closeMatchActionModal();
     toast('멤버를 내보냈어요');
     const cur = document.getElementById('subscreen')?.dataset?.current;
@@ -13923,7 +14525,7 @@ function submitMatchReq() {
   if (doSendMatchReq(_matchReqTargetUserId, _matchReqTargetProfileId, _matchReqTargetType, msg)) {
     closeMatchReqModal();
     toast('✅ 매칭 신청을 보냈어요!');
-    const screenMap = {hobby:'hobby-match', prayer:'prayer-match', mentor:'mentor-match'};
+    const screenMap = {hobby:'hobby-match', prayer:'prayer-match', mentor:'mentor-match', romance:'romance-match'};
     setTimeout(() => openSubscreen(screenMap[_matchReqTargetType]||'matching-browse'), 150);
   }
 }
