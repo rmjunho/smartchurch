@@ -2711,7 +2711,7 @@
       transition: max-height 0.32s cubic-bezier(0.4,0,0.2,1);
       background: var(--cream);
     }
-    .binder-sec-body.open { max-height: 1800px; }
+    .binder-sec-body.open { max-height: 6000px; }  /* 긴 일기/시간표 잘림 방지 */
     .binder-sec-inner { padding: 4px 20px 20px; }
 
     /* QT inputs */
@@ -2762,6 +2762,14 @@
       color: var(--black); padding: 10px 10px;
     }
     .sch-input::placeholder { color: #C5BFB9; }
+    /* 행 삭제 버튼 — 기본 숨김, 셀 포커스 시에만 표시 */
+    .sch-del-btn {
+      flex-shrink: 0; background: none; border: none; padding: 0 10px;
+      font-size: 16px; color: #999; cursor: pointer; line-height: 1;
+      opacity: 0; pointer-events: none; transition: opacity 0.15s;
+    }
+    .sch-del-btn:hover { color: #ff4444; }
+    .sch-table tbody tr:focus-within .sch-del-btn { opacity: 1; pointer-events: auto; }
 
     /* Diary */
     .diary-wrap { display: flex; gap: 0; border-radius: 12px; overflow: hidden; border: 1.5px solid var(--border); }
@@ -4437,16 +4445,7 @@
     <div class="modal-sheet" style="max-height:90vh;overflow-y:auto">
       <div class="modal-title">시간표 설정 ⚙</div>
 
-      <!-- 수동 입력 토글 -->
-      <div class="settings-row" style="margin-bottom:18px">
-        <div class="settings-row-text">
-          <div class="settings-row-title">수동 시간 직접 입력</div>
-          <div class="settings-row-desc">시작·종료 및 간격 대신<br>시간 슬롯을 직접 입력해요</div>
-        </div>
-        <div class="toggle-switch" id="sch-manual-toggle" onclick="toggleSchManual()">
-          <div class="toggle-knob"></div>
-        </div>
-      </div>
+      <div style="font-size:14px;color:#666;font-weight:500;margin-top:6px;margin-bottom:14px">시간표 시간 설정</div>
 
       <!-- 자동 설정 영역 -->
       <div id="sch-auto-area">
@@ -4470,15 +4469,6 @@
             <option value="90">1시간 30분</option>
             <option value="120">2시간</option>
           </select>
-        </div>
-      </div>
-
-      <!-- 수동 설정 영역 -->
-      <div id="sch-manual-area" style="display:none">
-        <div class="form-group">
-          <label class="form-label">시간 슬롯 <span class="form-sub-label">예: 9:00 ~ 10:30</span></label>
-          <div id="sch-manual-list"></div>
-          <button class="btn-add-subcheck" onclick="addManualSlot()">+ 시간 추가</button>
         </div>
       </div>
 
@@ -6354,6 +6344,9 @@ function bootApp() {
     DB.del('todoCats_' + me.id);
   }
 
+  // 시간표 기본값 1회 정리
+  migrateClearSchDefaults();
+
   // 사이드 메뉴 초기화
   initSideMenu();
 
@@ -6461,7 +6454,7 @@ function setMode(m) {
 //  BINDER (삶의 예배 텍스트형)
 // ================================================
 // ── 시간표 설정 (동적 슬롯 생성) ──
-const SCH_QUICK_DEFAULTS = { '7:00 ~ 8:00': '기상 / 세면', '8:00 ~ 9:00': '출근 / 이동 중 말씀 묵상' };
+const SCH_QUICK_DEFAULTS = {};  // 기본 채움값 제거 (placeholder만 사용)
 const SCH_BASE_SETTINGS  = { start: 7, end: 22, interval: 60, manual: false, manualSlots: [] };
 
 function getSchDefault()     { return DB.get('schDefault_' + me.id, Object.assign({}, SCH_BASE_SETTINGS)); }
@@ -6544,7 +6537,7 @@ function buildScheduleRows(data) {
     const savedPlan = (data.schedule && typeof data.schedule === 'object') ? data.schedule : {};
     const cfg   = getSchForDate() || getSchDefault();
     const slots = generateSchSlots(cfg);
-    rows = slots.map(slot => ({ time: slot, plan: savedPlan[slot] !== undefined ? savedPlan[slot] : (SCH_QUICK_DEFAULTS[slot] || '') }));
+    rows = slots.map(slot => ({ time: slot, plan: savedPlan[slot] !== undefined ? savedPlan[slot] : '' }));
   }
   renderSchRows(rows);
   updateSchDateBadge();
@@ -6555,15 +6548,14 @@ function renderSchRows(rows) {
   tbody.innerHTML = rows.map(r => `
     <tr>
       <td style="border-right:1px solid var(--cream2)">
-        <input class="sch-time-input" value="${escHtml(r.time||'')}" placeholder="09:00"
+        <input class="sch-time-input" value="${escHtml(r.time||'')}" placeholder="00:00"
           oninput="autoSave('schedule')"
           style="width:100%;background:transparent;border:none;outline:none;font-size:12px;font-weight:600;color:var(--muted);font-family:'Pretendard',sans-serif;padding:9px 10px 9px 14px;box-sizing:border-box">
       </td>
       <td>
         <div style="display:flex;align-items:center">
-          <input class="sch-input" value="${escHtml(r.plan||'')}" placeholder="계획을 입력하세요" oninput="autoSave('schedule')">
-          <button type="button" onclick="deleteSchRow(this)" title="행 삭제"
-            style="flex-shrink:0;background:none;border:none;color:var(--muted);font-size:14px;cursor:pointer;padding:0 10px">🗑️</button>
+          <input class="sch-input" value="${escHtml(r.plan||'')}" placeholder="계획 입력" oninput="autoSave('schedule')">
+          <button type="button" class="sch-del-btn" onclick="deleteSchRow(this)" title="행 삭제">✕</button>
         </div>
       </td>
     </tr>`).join('');
@@ -6591,6 +6583,28 @@ function deleteSchRow(btn) {
   const tr = btn.closest('tr');
   if (tr) tr.remove();
   autoSave('schedule');
+}
+// 기존에 자동 채워졌던 시간표 기본값을 1회 정리 (localStorage)
+function migrateClearSchDefaults() {
+  if (DB.get('schDefaultsCleared_v1', false)) return;
+  const OLD = ['기상 / 세면', '출근 / 이동 중 말씀 묵상'];
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k || k.indexOf('sc2_binder_') !== 0) continue;
+      let obj; try { obj = JSON.parse(localStorage.getItem(k)); } catch (e) { continue; }
+      if (!obj || typeof obj !== 'object') continue;
+      let changed = false;
+      if (Array.isArray(obj.schRows)) {
+        obj.schRows.forEach(r => { if (r && OLD.includes(r.plan)) { r.plan = ''; changed = true; } });
+      }
+      if (obj.schedule && typeof obj.schedule === 'object') {
+        Object.keys(obj.schedule).forEach(s => { if (OLD.includes(obj.schedule[s])) { delete obj.schedule[s]; changed = true; } });
+      }
+      if (changed) localStorage.setItem(k, JSON.stringify(obj));
+    }
+  } catch (e) {}
+  DB.set('schDefaultsCleared_v1', true);
 }
 
 function buildDiaryRings() {
@@ -6665,6 +6679,10 @@ function toggleSec(name) {
   const chev = document.getElementById(name + '-chev');
   const open = body.classList.toggle('open');
   chev.classList.toggle('open', open);
+  // 펼칠 때 접힌 상태에서 잘못 측정된 textarea 높이 재계산 (배경 잘림 방지)
+  if (open) setTimeout(() => {
+    body.querySelectorAll('textarea').forEach(autoGrow);
+  }, 40);
 }
 
 // ================================================
@@ -8657,15 +8675,9 @@ function openSchSettingsModal() {
     `<option value="${h+1}"${(h+1) === (cfg.end || 22) ? ' selected' : ''}>${h+1}:00</option>`).join('');
   document.getElementById('sch-interval').value = cfg.interval || 60;
 
-  const isManual = !!cfg.manual;
-  document.getElementById('sch-manual-toggle').classList.toggle('on', isManual);
-  document.getElementById('sch-auto-area').style.display   = isManual ? 'none' : 'block';
-  document.getElementById('sch-manual-area').style.display = isManual ? 'block' : 'none';
-
   // 기본값 체크박스: 현재 날짜별 설정이 없으면(=기본값 사용중) 체크
   document.getElementById('sch-set-default').checked = !custom;
 
-  renderSchManualSlots();
   document.getElementById('modal-sch-settings').classList.add('open');
 }
 
@@ -8707,18 +8719,17 @@ function removeManualSlot(idx) {
 }
 
 function applySchSettings() {
-  const isManual = document.getElementById('sch-manual-toggle').classList.contains('on');
   const start    = parseInt(document.getElementById('sch-start').value) || 7;
   const end      = parseInt(document.getElementById('sch-end').value)   || 22;
   const interval = parseInt(document.getElementById('sch-interval').value) || 60;
   const setDef   = document.getElementById('sch-set-default').checked;
 
-  if (!isManual && start >= end) { toast('시작 시간은 종료 시간보다 빨라야 해요'); return; }
+  if (start >= end) { toast('시작 시간은 종료 시간보다 빨라야 해요'); return; }
 
   const cfg = {
     start, end, interval,
-    manual: isManual,
-    manualSlots: _schManualSlots.map(s => s.trim()).filter(Boolean)
+    manual: false,        // 수동 모드 제거 — 항상 자동 슬롯
+    manualSlots: []
   };
 
   // 현재 날짜 바인더에 저장
