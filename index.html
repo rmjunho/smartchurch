@@ -8677,37 +8677,41 @@ function saveAppointLeader() {
 // ── 미성년자 승인/거절 ──
 function approveMinor(userId) {
   const users = DB.get('users', []);
-  const u = users.find(x => x.id === userId);
+  const u = _resolveMemberForAction(users, userId);  // 목록이 Firestore 기반 → 로컬 없으면 캐시 보강
   if (!u) return;
   u.status     = 'active';
   u.approvedBy = me.id;
   u.approvedAt = new Date().toISOString();
   DB.set('users', users);
+  const cached = _membersCache.find(x => x.id === userId);
+  if (cached) cached.status = 'active';
   // Firestore 동기화
   if (window._fbReady && window._fb) {
     window._fb.updateUser(userId, {
       status: 'active', approvedBy: me.id, approvedAt: u.approvedAt
-    }).catch(e => console.warn('Firestore 미성년자 승인 실패:', e));
+    }).catch(() => {});
   }
-  toast(`✅ ${u.name}님의 계정을 승인했어요`);
+  toast(`✅ ${u.name || '회원'}님의 계정을 승인했어요`);
   const cur = document.getElementById('subscreen')?.dataset?.current;
   if (cur) setTimeout(() => openSubscreen(cur), 200);
 }
 
 function rejectMinor(userId) {
   const users = DB.get('users', []);
-  const u = users.find(x => x.id === userId);
+  const u = _resolveMemberForAction(users, userId);
   if (!u) return;
   u.status = 'rejected';
   u.rejectedAt = new Date().toISOString();
   DB.set('users', users);
+  const cached = _membersCache.find(x => x.id === userId);
+  if (cached) cached.status = 'rejected';
   // Firestore 동기화
   if (window._fbReady && window._fb) {
     window._fb.updateUser(userId, {
       status: 'rejected', rejectedAt: u.rejectedAt
-    }).catch(e => console.warn('Firestore 미성년자 거절 실패:', e));
+    }).catch(() => {});
   }
-  toast(`${u.name}님의 계정 신청을 거절했어요`);
+  toast(`${u.name || '회원'}님의 계정 신청을 거절했어요`);
   const cur = document.getElementById('subscreen')?.dataset?.current;
   if (cur) setTimeout(() => openSubscreen(cur), 200);
 }
@@ -8729,9 +8733,41 @@ function switchMembersTab(tab) {
 //  관리자 사용자 관리
 // ═══════════════════════════════════════════════════
 let _adminUserSearch = '';
+let _adminUsersData  = null;   // Firestore에서 불러온 전체 사용자 캐시
 
+// 전체 사용자 목록 — Firestore 조회 (item ①). 이전엔 로컬 users 만 표시됐음.
 function renderAdminUsers() {
-  const allUsers = DB.get('users', []);
+  setTimeout(loadAdminUsersData, 80);
+  return `<div id="admin-users-body" style="padding:40px 16px;text-align:center;color:var(--muted)">
+    <div style="font-size:28px;margin-bottom:12px">🔄</div>
+    <div style="font-size:13px">전체 사용자 불러오는 중...</div>
+  </div>`;
+}
+async function loadAdminUsersData() {
+  const body = document.getElementById('admin-users-body');
+  if (!body) return;
+  let allUsers = [];
+  try {
+    if (window._fbReady && window._fb) {
+      const snap = await window._fb.getAllUsers();
+      snap.forEach(d => allUsers.push({ id: d.id, ...d.data() }));
+    }
+  } catch(e) { console.warn('Firestore 전체 사용자 로드 실패:', e); }
+  if (!allUsers.length) allUsers = DB.get('users', []);   // fallback
+  // isAppAdmin 등 로컬 전용 필드 머지
+  const localUsers = DB.get('users', []);
+  allUsers = allUsers.map(u => { const l = localUsers.find(x => x.id === u.id); return l ? { ...u, ...l } : u; });
+  _adminUsersData = allUsers;
+  _membersCache   = allUsers;   // 승인/거절 핸들러 공유 캐시
+  body.outerHTML = renderAdminUsersHtml(allUsers);
+}
+// 검색은 재조회 없이 캐시에서 필터링
+function filterAdminUsers(val) {
+  _adminUserSearch = val;
+  const body = document.getElementById('admin-users-body');
+  if (body && _adminUsersData) body.outerHTML = renderAdminUsersHtml(_adminUsersData);
+}
+function renderAdminUsersHtml(allUsers) {
   const q = _adminUserSearch.toLowerCase();
   const filtered = q
     ? allUsers.filter(u =>
@@ -8747,10 +8783,10 @@ function renderAdminUsers() {
     disabled: ['var(--muted)','var(--cream2)','비활성'],
   };
 
-  let html = `
+  let html = `<div id="admin-users-body">
     <div style="padding:12px 16px;border-bottom:1px solid var(--border)">
       <input type="text" value="${escHtml(_adminUserSearch)}"
-        oninput="_adminUserSearch=this.value;openSubscreen('admin-users')"
+        oninput="filterAdminUsers(this.value)"
         placeholder="🔍 이름, 이메일, 교회 검색..."
         style="width:100%;height:40px;border-radius:10px;border:1.5px solid var(--border);
                padding:0 14px;font-size:13.5px;font-family:inherit;box-sizing:border-box">
@@ -8816,7 +8852,7 @@ function renderAdminUsers() {
         </div>`;
     });
   }
-  return html + '</div>';
+  return html + '</div></div>';   // 카드 컨테이너 + admin-users-body 래퍼 닫기
 }
 
 function adminToggleDisable(userId) {
@@ -8854,7 +8890,8 @@ async function adminSyncAllToFirestore() {
   let count = 0;
   for (const u of users) {
     try {
-      await window._fb.updateUser(u.id, u);
+      // setUser(setDoc merge) → Firestore에 문서가 없어도 생성됨 (updateDoc는 실패)
+      await window._fb.setUser(u.id, u);
       count++;
     } catch(e) { console.warn('동기화 실패:', u.id, e); }
   }
@@ -9723,14 +9760,30 @@ function saveChurchInfoEdit() {
 }
 
 // ── 교회 가입 승인/거절 ──
+// 교인 관리/관리자 목록은 Firestore에서 불러오므로, 클릭 대상이 로컬 users에 없을 수 있다.
+// 마지막으로 렌더링된 목록을 캐시해 두었다가 승인/거절 시 대상 사용자를 보강한다.
+let _membersCache = [];
+// userId 로 대상 사용자 확보 (로컬 → 캐시 순). 로컬에 없으면 캐시본을 로컬에 추가.
+function _resolveMemberForAction(users, userId) {
+  let u = users.find(x => x.id === userId);
+  if (!u) {
+    const cached = _membersCache.find(x => x.id === userId);
+    if (cached) { u = { ...cached }; users.push(u); }
+  }
+  return u;
+}
+
 function approveChurchMember(userId) {
   const users = DB.get('users', []);
-  const u = users.find(x => x.id === userId);
+  const u = _resolveMemberForAction(users, userId);
   if (!u) return;
   u.churchStatus     = 'active';
   u.churchApprovedBy = me.id;
   u.churchApprovedAt = new Date().toISOString();
   DB.set('users', users);
+  // 캐시도 즉시 갱신 → 목록 새로고침 시 바로 반영
+  const cached = _membersCache.find(x => x.id === userId);
+  if (cached) cached.churchStatus = 'active';
 
   // Firestore 동기화
   if (window._fbReady && window._fb) {
@@ -9738,23 +9791,25 @@ function approveChurchMember(userId) {
       churchStatus:     'active',
       churchApprovedBy: u.churchApprovedBy,
       churchApprovedAt: u.churchApprovedAt
-    }).catch(e => console.warn('Firestore 승인 동기화 실패:', e));
+    }).catch(() => {});
   }
 
-  toast(`✅ ${u.name}님의 교회 가입을 승인했어요`);
+  toast(`✅ ${u.name || '교인'}님의 교회 가입을 승인했어요`);
   const cur = document.getElementById('subscreen')?.dataset?.current;
   if (cur) setTimeout(() => openSubscreen(cur), 150);
 }
 
 function rejectChurchMember(userId) {
   const users = DB.get('users', []);
-  const u = users.find(x => x.id === userId);
+  const u = _resolveMemberForAction(users, userId);
   if (!u) return;
   u.churchStatus     = 'rejected';
   u.churchRejectedAt = new Date().toISOString();
   u.churchRejectedBy = me.name;
   // 교회 정보는 유지 (교인이 어느 교회에서 거부됐는지 알 수 있게)
   DB.set('users', users);
+  const cached = _membersCache.find(x => x.id === userId);
+  if (cached) cached.churchStatus = 'rejected';
 
   // Firestore 동기화 (교인 기기에서도 반영되도록)
   if (window._fbReady && window._fb) {
@@ -9762,10 +9817,10 @@ function rejectChurchMember(userId) {
       churchStatus:     'rejected',
       churchRejectedAt: u.churchRejectedAt,
       churchRejectedBy: u.churchRejectedBy
-    }).catch(e => console.warn('Firestore 거부 동기화 실패:', e));
+    }).catch(() => {});
   }
 
-  toast(`${u.name}님의 교회 가입을 거절했어요`);
+  toast(`${u.name || '교인'}님의 교회 가입을 거절했어요`);
   const cur = document.getElementById('subscreen')?.dataset?.current;
   if (cur) setTimeout(() => openSubscreen(cur), 150);
 }
@@ -9817,6 +9872,7 @@ async function loadMembersScreenData() {
     return local ? { ...u, ...local } : u;
   });
 
+  _membersCache = allUsers;   // 승인/거절 핸들러가 대상 사용자를 찾을 수 있도록 캐시
   body.outerHTML = renderMembersScreenHtml(allUsers);
 }
 
@@ -10006,6 +10062,14 @@ function approveChurchRegistration(code) {
     u.pendingChurchCode = null; u.pendingChurchName = null;
     DB.set('users', users);
   }
+  // Firestore 동기화: 교회 정보 + 신청자 상태(다른 기기에도 반영)
+  if (window._fbReady && window._fb) {
+    window._fb.setChurchInfo(code, custom[code]).catch(() => {});
+    window._fb.updateUser(entry.requestedBy, {
+      church: entry.name, churchCode: code, churchStatus: 'active',
+      pendingChurchCode: null, pendingChurchName: null
+    }).catch(() => {});
+  }
   toast(`✅ "${entry.name}" [${code}] 교회 등록을 승인했어요!`);
   setTimeout(() => openSubscreen('admin-panel'), 150);
 }
@@ -10023,6 +10087,12 @@ function rejectChurchRegistration(code) {
     u.pendingChurchCode = null;
     u.pendingChurchName = null;
     DB.set('users', users);
+  }
+  // Firestore 동기화: 신청자 상태 초기화(다른 기기에도 반영)
+  if (window._fbReady && window._fb) {
+    window._fb.updateUser(entry.requestedBy, {
+      churchStatus: null, pendingChurchCode: null, pendingChurchName: null
+    }).catch(() => {});
   }
   toast(`"${entry.name}" 교회 등록 신청을 거절했어요`);
   setTimeout(() => openSubscreen('admin-panel'), 150);
@@ -10063,6 +10133,7 @@ async function loadAdminPanelData() {
     return local ? { ...u, ...local } : u;
   });
 
+  _membersCache = allUsers;   // 승인/거절 핸들러 공유 캐시
   body.outerHTML = renderAdminPanelHtml(allUsers);
 }
 
@@ -10721,8 +10792,10 @@ async function syncChallengesFromFirestore() {
     const fetched = [];
 
     // 내 교회 챌린지 (공개+비공개)
-    if (me.churchCode) {
-      const snap = await window._fb.getChallengesByChurch(me.churchCode);
+    // ⚠️ 챌린지는 createdByChurch 에 '교회 이름'을 저장하므로, 조회도 churchCode 가 아닌
+    //    me.church(이름)로 해야 매칭된다. (이전엔 churchCode 로 조회해 항상 0건이었음)
+    if (me.church) {
+      const snap = await window._fb.getChallengesByChurch(me.church);
       snap.forEach(d => fetched.push({ id: d.id, ...d.data() }));
     }
 
