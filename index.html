@@ -3578,6 +3578,11 @@
                 </thead>
                 <tbody id="sch-rows"></tbody>
               </table>
+              <button type="button" onclick="addSchRow()"
+                style="width:100%;margin-top:8px;height:40px;border-radius:10px;border:1.5px dashed var(--border);
+                       background:var(--cream2);color:var(--muted);font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">
+                ＋ 행 추가
+              </button>
             </div>
           </div>
         </div>
@@ -3694,12 +3699,27 @@
             <button class="draw-size-btn" data-size="8" onclick="setDrawSize(8,this)" style="font-size:16px">●</button>
             <button class="draw-size-btn" data-size="14" onclick="setDrawSize(14,this)" style="font-size:20px">●</button>
           </div>
+          <!-- 펜 굵기 슬라이더 (1~20px) -->
+          <div style="display:flex;flex-direction:column;align-items:center;gap:1px;width:100%">
+            <input type="range" min="1" max="20" value="4" id="pen-thickness"
+              oninput="setPenThickness(this.value)" style="width:46px">
+            <span id="pen-thickness-val" style="font-size:10px;color:#666;font-weight:700">4</span>
+          </div>
+          <!-- 지우개 크기 슬라이더 (지우개 선택 시에만) -->
+          <div class="dft-sep" id="eraser-size-sep" style="display:none"></div>
+          <div id="eraser-size-box" style="display:none;flex-direction:column;align-items:center;gap:1px;width:100%">
+            <span style="font-size:11px">🧹</span>
+            <input type="range" min="10" max="60" value="30" id="eraser-size"
+              oninput="setEraserSize(this.value)" style="width:46px">
+            <span id="eraser-size-val" style="font-size:10px;color:#666;font-weight:700">30</span>
+          </div>
           <div class="dft-sep"></div>
           <div class="draw-tool-col">
             <button class="draw-tool-btn on" id="tool-pen"         onclick="setDrawTool('pen')"         title="펜">✏</button>
             <button class="draw-tool-btn"    id="tool-highlighter" onclick="setDrawTool('highlighter')" title="형광펜">🖍</button>
             <button class="draw-tool-btn"    id="tool-eraser"      onclick="setDrawTool('eraser')"      title="지우개">🧹</button>
             <button class="draw-tool-btn"    id="tool-select"      onclick="setDrawTool('select')"      title="선택/이동">⬚</button>
+            <button class="draw-tool-btn"    id="tool-hand"        onclick="toggleHandMode()"           title="손 이동 모드">✋</button>
             <button class="draw-tool-btn danger" onclick="clearActiveCanvas()" title="마지막 편집 항목 지우기">🗑</button>
           </div>
           <div class="dft-sep"></div>
@@ -3712,6 +3732,8 @@
           <div class="draw-tool-col" id="sel-actions" style="display:none">
             <button class="draw-tool-btn small" onclick="commitSelection()" title="확정">✓</button>
             <button class="draw-tool-btn small" onclick="selCopy()"         title="복사">📋</button>
+            <button class="draw-tool-btn small" onclick="selDuplicate()"    title="복제">➕</button>
+            <button class="draw-tool-btn small" onclick="selRecolor()"      title="색 바꾸기">🎨</button>
             <button class="draw-tool-btn small" id="btn-sel-paste" onclick="selPaste()" title="붙여넣기" style="display:none">📌</button>
             <button class="draw-tool-btn small danger" onclick="selDelete()" title="삭제">✕</button>
           </div>
@@ -3720,8 +3742,9 @@
 
       <!-- Upload mode (사진 업로드) -->
       <div class="worship-upload" id="worship-upload-wrap">
-        <div class="upload-zone" id="upload-zone" onclick="document.getElementById('photo-input').click()">
+        <div class="upload-zone" id="upload-zone" onclick="openPhotoSourceModal()">
           <input type="file" id="photo-input" accept="image/*" style="display:none" onchange="handlePhotoSelect(event)">
+          <input type="file" id="photo-camera-input" accept="image/*" capture="environment" style="display:none" onchange="handlePhotoSelect(event)">
           <div id="upload-empty-state">
             <div class="upload-icon">📷</div>
             <div class="upload-text">오늘의 사진을 올려보세요</div>
@@ -3733,7 +3756,7 @@
         </div>
         <div class="upload-actions" id="upload-actions" style="display:none">
           <button class="btn-cancel" onclick="event.stopPropagation();removePhoto()">삭제</button>
-          <button class="btn-confirm" onclick="event.stopPropagation();document.getElementById('photo-input').click()">다른 사진 선택</button>
+          <button class="btn-confirm" onclick="event.stopPropagation();openPhotoSourceModal()">다른 사진 선택</button>
         </div>
         <textarea id="photo-caption" class="qt-ta" rows="2"
                   placeholder="사진에 대한 짧은 기록을 남겨보세요 (선택)"
@@ -5177,6 +5200,12 @@
         </div>
         <div id="binder-share-toggle" class="toggle-switch"></div>
       </div>
+      <!-- 리더에게 공유할 항목 선택 -->
+      <div style="margin-top:16px">
+        <div style="font-size:12.5px;font-weight:700;color:var(--dark);margin-bottom:4px">리더에게 공유할 항목 선택</div>
+        <div style="font-size:11.5px;color:var(--muted);margin-bottom:6px">체크한 항목만 리더가 볼 수 있어요</div>
+        <div id="binder-share-items"></div>
+      </div>
       <div style="font-size:12px;color:var(--muted);margin-top:14px;line-height:1.7;
                   background:var(--cream2);border-radius:10px;padding:12px 14px">
         🔒 <b>비공개</b> — 나만 볼 수 있어요<br>
@@ -5185,6 +5214,40 @@
       </div>
       <div class="modal-actions" style="margin-top:16px">
         <button class="btn-confirm" style="width:100%" onclick="closeBinderSettings()">확인</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 사진 소스 선택 모달 (카메라 / 갤러리) -->
+  <div class="modal-backdrop" id="modal-photo-source" onclick="closePhotoSourceModal(event)">
+    <div class="modal-sheet">
+      <div class="modal-title">📷 사진 추가</div>
+      <div style="display:flex;flex-direction:column;gap:10px;margin:6px 0 2px">
+        <button onclick="choosePhotoCamera()"
+          style="display:flex;align-items:center;gap:12px;width:100%;padding:16px;border-radius:12px;border:1.5px solid var(--border);background:white;font-size:14.5px;font-weight:700;cursor:pointer;font-family:inherit;text-align:left">
+          <span style="font-size:24px">📷</span> 카메라로 촬영
+        </button>
+        <button onclick="choosePhotoGallery()"
+          style="display:flex;align-items:center;gap:12px;width:100%;padding:16px;border-radius:12px;border:1.5px solid var(--border);background:white;font-size:14.5px;font-weight:700;cursor:pointer;font-family:inherit;text-align:left">
+          <span style="font-size:24px">🖼️</span> 갤러리에서 선택
+        </button>
+      </div>
+      <div class="modal-actions" style="margin-top:12px">
+        <button class="btn-cancel" style="width:100%" onclick="closePhotoSourceModal()">취소</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 갤러리 접근 권한 안내 모달 -->
+  <div class="modal-backdrop" id="modal-photo-perm" onclick="closePhotoPermModal(event)">
+    <div class="modal-sheet">
+      <div class="modal-title">🖼️ 갤러리 접근</div>
+      <div style="font-size:13.5px;color:var(--dark);line-height:1.75;margin:4px 0 16px">
+        사진을 업로드하려면 갤러리 접근을 허용해주세요.
+      </div>
+      <div class="modal-actions">
+        <button class="btn-cancel" onclick="closePhotoPermModal()">취소</button>
+        <button class="btn-confirm" onclick="allowPhotoGallery()">허용하기</button>
       </div>
     </div>
   </div>
@@ -6452,7 +6515,7 @@ function loadBinder() {
   // Diary
   document.getElementById('diary-text').value = data.diary || '';
   // Schedule - build rows if not yet built
-  buildScheduleRows(data.schedule || {});
+  buildScheduleRows(data);
   // Auto-grow all textareas
   ['qt-meditation','qt-application','qt-prayer','diary-text'].forEach(id => {
     autoGrow(document.getElementById(id));
@@ -6470,19 +6533,64 @@ function loadBinder() {
   }, 30);
 }
 
-function buildScheduleRows(savedPlan) {
+// 시간표: 행 편집형 (시간/계획 직접 입력, 행 추가/삭제). data.schRows = [{time, plan}]
+function buildScheduleRows(data) {
   const tbody = document.getElementById('sch-rows');
-  const cfg   = getSchForDate() || getSchDefault();
-  const slots = generateSchSlots(cfg);
-  tbody.innerHTML = slots.map(slot => {
-    const val = savedPlan[slot] !== undefined ? savedPlan[slot] : (SCH_QUICK_DEFAULTS[slot] || '');
-    return `<tr>
-      <td><div class="sch-time">${escHtml(slot)}</div></td>
-      <td><input class="sch-input" data-slot="${escHtml(slot)}" value="${escHtml(val)}"
-                 placeholder="계획을 입력하세요" oninput="autoSave('schedule')"></td>
-    </tr>`;
-  }).join('');
+  if (!tbody) return;
+  data = data || {};
+  let rows = Array.isArray(data.schRows) ? data.schRows.slice() : null;
+  if (!rows) {
+    // 레거시 마이그레이션: schedule(슬롯→계획) 또는 설정 기반 자동 슬롯에서 생성
+    const savedPlan = (data.schedule && typeof data.schedule === 'object') ? data.schedule : {};
+    const cfg   = getSchForDate() || getSchDefault();
+    const slots = generateSchSlots(cfg);
+    rows = slots.map(slot => ({ time: slot, plan: savedPlan[slot] !== undefined ? savedPlan[slot] : (SCH_QUICK_DEFAULTS[slot] || '') }));
+  }
+  renderSchRows(rows);
   updateSchDateBadge();
+}
+function renderSchRows(rows) {
+  const tbody = document.getElementById('sch-rows');
+  if (!tbody) return;
+  tbody.innerHTML = rows.map(r => `
+    <tr>
+      <td style="border-right:1px solid var(--cream2)">
+        <input class="sch-time-input" value="${escHtml(r.time||'')}" placeholder="09:00"
+          oninput="autoSave('schedule')"
+          style="width:100%;background:transparent;border:none;outline:none;font-size:12px;font-weight:600;color:var(--muted);font-family:'Pretendard',sans-serif;padding:9px 10px 9px 14px;box-sizing:border-box">
+      </td>
+      <td>
+        <div style="display:flex;align-items:center">
+          <input class="sch-input" value="${escHtml(r.plan||'')}" placeholder="계획을 입력하세요" oninput="autoSave('schedule')">
+          <button type="button" onclick="deleteSchRow(this)" title="행 삭제"
+            style="flex-shrink:0;background:none;border:none;color:var(--muted);font-size:14px;cursor:pointer;padding:0 10px">🗑️</button>
+        </div>
+      </td>
+    </tr>`).join('');
+}
+function readSchRowsFromDOM() {
+  const rows = [];
+  document.querySelectorAll('#sch-rows tr').forEach(tr => {
+    rows.push({
+      time: tr.querySelector('.sch-time-input')?.value || '',
+      plan: tr.querySelector('.sch-input')?.value || ''
+    });
+  });
+  return rows;
+}
+function addSchRow() {
+  const rows = readSchRowsFromDOM();
+  rows.push({ time: '', plan: '' });
+  renderSchRows(rows);
+  autoSave('schedule');
+  const inputs = document.querySelectorAll('#sch-rows .sch-time-input');
+  const last = inputs[inputs.length - 1];
+  if (last) last.focus();
+}
+function deleteSchRow(btn) {
+  const tr = btn.closest('tr');
+  if (tr) tr.remove();
+  autoSave('schedule');
 }
 
 function buildDiaryRings() {
@@ -6491,17 +6599,12 @@ function buildDiaryRings() {
 }
 
 function readBinder() {
-  // Read schedule from DOM
-  const schedule = {};
-  document.querySelectorAll('.sch-input').forEach(inp => {
-    schedule[inp.dataset.slot] = inp.value;
-  });
   return {
     verse:        document.getElementById('qt-verse').value,
     meditation:   document.getElementById('qt-meditation').value,
     application:  document.getElementById('qt-application').value,
     prayer:       document.getElementById('qt-prayer').value,
-    schedule,
+    schRows:      readSchRowsFromDOM(),   // 시간표 행 편집 데이터
     diary:        document.getElementById('diary-text').value,
     photoCaption: document.getElementById('photo-caption').value,
     updatedAt:    new Date().toISOString()
@@ -6514,21 +6617,24 @@ function saveBinderNow() {
   const merged   = Object.assign({}, existing, readBinder());
   DB.set(binderKey(), merged);
 
-  // 공유 허용한 경우 Firestore에도 동기화 (텍스트 데이터만)
+  // 공유 허용한 경우 Firestore에도 동기화 (선택한 항목만)
   if (me.binderShareEnabled && window._fbReady && window._fb) {
+    const items   = getBinderShareItems();
+    const qtText  = [merged.meditation, merged.application, merged.prayer].filter(Boolean).join('\n\n');
     const firestoreData = {
-      userId:    me.id,
-      userName:  me.name,
-      church:    me.church || '',
-      date:      dateKey(),
-      qt:        merged.qt       || '',
-      diary:     merged.diary    || '',
-      schedule:  merged.schedule || '',
-      todos:     (merged.todos   || []).map(t => ({ text: t.text || '', done: !!t.done })),
-      updatedAt: new Date().toISOString()
+      userId:     me.id,
+      userName:   me.name,
+      church:     me.church || '',
+      date:       dateKey(),
+      shareItems: items,                                       // 리더 열람 필터용
+      verse:      items.verse    ? (merged.verse || '')  : '',
+      qt:         items.qt       ? qtText                : '',
+      diary:      items.diary    ? (merged.diary || '')  : '',
+      schRows:    items.schedule ? (merged.schRows || []): [],
+      todos:      items.todos    ? (merged.todos || []).map(t => ({ text: t.text || '', done: !!t.done })) : [],
+      updatedAt:  new Date().toISOString()
     };
-    window._fb.setBinderEntry(`${me.id}_${dateKey()}`, firestoreData)
-      .catch(e => console.warn('바인더 Firestore 동기화 실패:', e));
+    window._fb.setBinderEntry(`${me.id}_${dateKey()}`, firestoreData).catch(() => {});
   }
 }
 
@@ -6567,14 +6673,16 @@ function toggleSec(name) {
 
 // ── 상수 ──
 const DRAW_COLORS = [
-  '#2D2D2D',  // 소프트 블랙
-  '#F4A7B9',  // 파스텔 핑크
-  '#FFD1A9',  // 파스텔 오렌지
-  '#FFF3B0',  // 파스텔 옐로
-  '#B5EAD7',  // 파스텔 민트
-  '#C7CEEA',  // 파스텔 라벤더
-  '#E2C5E8',  // 파스텔 보라
-  '#FFFFFF',  // 화이트
+  '#000000',  // 검정
+  '#FFFFFF',  // 흰색
+  '#E74C3C',  // 빨강
+  '#2980B9',  // 파랑
+  '#27AE60',  // 초록
+  '#F1C40F',  // 노랑
+  '#E67E22',  // 주황
+  '#8E44AD',  // 보라
+  '#FF6FA5',  // 분홍
+  '#8D6E4B',  // 갈색
 ];
 const DRAW_KEYS = ['qt', 'schedule', 'diary']; // todo는 개별 카드 캔버스로 처리
 const DEFAULT_DRAW_HEIGHTS = { qt: 170, todo: 170, schedule: 150, diary: 210 };
@@ -6586,8 +6694,10 @@ let selCtxMap  = {};   // { key: CanvasRenderingContext2D }
 let canvasReady = false;
 let isDrawingNow = false;
 let activeDrawKey = null;
-let currentColor = '#2D2D2D';
+let currentColor = '#000000';
 let currentSize  = 4;
+let eraserSize   = 30;      // 지우개 지름(px)
+let handMode     = false;   // ✋ 손 이동 모드 (드로잉 비활성 + 스크롤)
 let currentTool  = 'pen'; // 'pen' | 'highlighter' | 'eraser' | 'select'
 let lastX = 0, lastY = 0;
 
@@ -6819,23 +6929,60 @@ function setupCanvasFor(key) {
 function renderDrawColors() {
   const wrap = document.getElementById('draw-colors');
   if (!wrap) return;
+  const isPreset = DRAW_COLORS.includes(currentColor);
   wrap.innerHTML = DRAW_COLORS.map(c => `
     <div class="draw-color-sw${c === currentColor ? ' on' : ''}" style="background:${c}"
-         onclick="setDrawColor('${c}',this)"></div>`).join('');
+         onclick="setDrawColor('${c}',this)"></div>`).join('')
+    // 사용자 지정 색상 (color input)
+    + `<label class="draw-color-sw${isPreset?'':' on'}" title="사용자 색상"
+         style="position:relative;overflow:hidden;cursor:pointer;background:conic-gradient(red,#ff0,lime,cyan,blue,magenta,red)">
+         <input type="color" value="${isPreset?'#000000':currentColor}" oninput="setCustomColor(this.value)"
+                style="position:absolute;inset:-6px;width:200%;height:200%;opacity:0;cursor:pointer;border:none;padding:0">
+       </label>`;
 }
 
 function setDrawColor(c, el) {
   currentColor = c;
   if (currentTool === 'select' || currentTool === 'eraser') setDrawTool('pen');
   document.querySelectorAll('.draw-color-sw').forEach(s => s.classList.remove('on'));
-  el.classList.add('on');
+  if (el) el.classList.add('on');
+  refreshToolBtns();
+}
+// 사용자 지정 색상 선택
+function setCustomColor(val) {
+  currentColor = val;
+  if (currentTool === 'select' || currentTool === 'eraser') setDrawTool('pen');
+  renderDrawColors();
   refreshToolBtns();
 }
 
 function setDrawSize(size, btn) {
   currentSize = size;
   document.querySelectorAll('.draw-size-btn').forEach(b => b.classList.remove('on'));
-  btn.classList.add('on');
+  if (btn) btn.classList.add('on');
+  const sl = document.getElementById('pen-thickness'); if (sl) sl.value = size;
+  const vv = document.getElementById('pen-thickness-val'); if (vv) vv.textContent = size;
+}
+// 펜 굵기 슬라이더 (1~20px)
+function setPenThickness(v) {
+  currentSize = Math.max(1, Math.min(20, parseInt(v) || 4));
+  document.querySelectorAll('.draw-size-btn').forEach(b => b.classList.remove('on'));
+  const vv = document.getElementById('pen-thickness-val'); if (vv) vv.textContent = currentSize;
+}
+// 지우개 크기 슬라이더 (10~60px)
+function setEraserSize(v) {
+  eraserSize = Math.max(10, Math.min(60, parseInt(v) || 30));
+  const vv = document.getElementById('eraser-size-val'); if (vv) vv.textContent = eraserSize;
+}
+// ✋ 손 이동 모드 토글
+function toggleHandMode() {
+  handMode = !handMode;
+  const btn = document.getElementById('tool-hand');
+  if (btn) btn.classList.toggle('on', handMode);
+  document.querySelectorAll('.draw-cell-canvas, .draw-sel-canvas').forEach(c => {
+    c.style.touchAction = handMode ? 'auto' : 'none';   // 손 모드: 스크롤 허용
+  });
+  toast(handMode ? '✋ 손 이동 모드 — 드래그로 스크롤해요' : '✏️ 그리기 모드');
 }
 
 function setDrawTool(tool) {
@@ -6843,6 +6990,11 @@ function setDrawTool(tool) {
   if (currentTool === 'select' && tool !== 'select') commitSelection();
   currentTool = tool;
   refreshToolBtns();
+  // 지우개 크기 슬라이더는 지우개 선택 시에만 표시
+  const eBox = document.getElementById('eraser-size-box');
+  const eSep = document.getElementById('eraser-size-sep');
+  if (eBox) eBox.style.display = tool === 'eraser' ? 'flex' : 'none';
+  if (eSep) eSep.style.display = tool === 'eraser' ? 'block' : 'none';
   // 오버레이 캔버스 pointer-events 제어
   DRAW_KEYS.forEach(key => {
     const sel = document.getElementById('draw-sel-' + key);
@@ -6870,6 +7022,7 @@ function getCanvasPos(canvas, e) {
 // ── 그리기 이벤트 ──
 function bindCanvasEvents(key, canvas, ctx) {
   canvas.addEventListener('pointerdown', e => {
+    if (handMode) return;               // ✋ 손 이동 모드: 그리지 않고 스크롤 허용
     if (currentTool === 'select') return;
     e.preventDefault();
     isDrawingNow = true; activeDrawKey = key;
@@ -6921,7 +7074,7 @@ function bindCanvasEvents(key, canvas, ctx) {
 }
 
 function lineRadius() {
-  if (currentTool === 'eraser')      return currentSize * CANVAS_DENSITY * 2.5;
+  if (currentTool === 'eraser')      return eraserSize * CANVAS_DENSITY / 2;
   if (currentTool === 'highlighter') return currentSize * CANVAS_DENSITY * 3;
   return currentSize * CANVAS_DENSITY / 2;
 }
@@ -6932,7 +7085,7 @@ function applyToolCtx(ctx) {
     ctx.globalAlpha = 1;
     ctx.strokeStyle = 'rgba(0,0,0,1)';
     ctx.fillStyle   = 'rgba(0,0,0,1)';
-    ctx.lineWidth   = currentSize * CANVAS_DENSITY * 5;
+    ctx.lineWidth   = eraserSize * CANVAS_DENSITY;
   } else if (currentTool === 'highlighter') {
     ctx.globalCompositeOperation = 'source-over';
     ctx.globalAlpha = 0.35;
@@ -7684,18 +7837,93 @@ function selDelete() {
   toast('선택 영역을 삭제했어요');
 }
 
+// 선택 영역 복제 (복사 후 중앙에 붙여넣기)
+function selDuplicate() {
+  if (!SEL.active || !SEL.cutData) { toast('선택 영역이 없어요'); return; }
+  SEL.clipboard = { data: SEL.cutData, w: SEL.w, h: SEL.h };
+  selPaste();
+  toast('➕ 복제했어요 — 드래그로 이동 후 ✓ 확정하세요');
+}
+// 선택 영역 색상 변경 (불투명 픽셀을 현재 색으로 치환)
+function hexToRgb(hex) {
+  hex = String(hex || '#000000').replace('#', '');
+  if (hex.length === 3) hex = hex.split('').map(x => x + x).join('');
+  const n = parseInt(hex, 16) || 0;
+  return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+}
+function selRecolor() {
+  if (!SEL.active || !SEL.cutData) { toast('선택 영역이 없어요'); return; }
+  const rgb = hexToRgb(currentColor);
+  const d = SEL.cutData.data;
+  for (let i = 0; i < d.length; i += 4) {
+    if (d[i + 3] > 10) { d[i] = rgb.r; d[i + 1] = rgb.g; d[i + 2] = rgb.b; }  // 불투명 픽셀만
+  }
+  const selEl = document.getElementById('draw-sel-' + SEL.key);
+  const sCtx  = selCtxMap[SEL.key];
+  if (sCtx && selEl) {
+    sCtx.clearRect(0, 0, selEl.width, selEl.height);
+    sCtx.putImageData(SEL.cutData, Math.round(SEL.curX), Math.round(SEL.curY));
+    drawSelRect(sCtx, Math.round(SEL.curX), Math.round(SEL.curY), SEL.w, SEL.h);
+  }
+  toast('🎨 색상을 바꿨어요 — ✓ 확정하세요');
+}
+
 // ================================================
 //  PHOTO UPLOAD MODE
 // ================================================
 const MAX_PHOTO_UPLOAD_MB = 10;
 
+// ── 사진 소스 선택 (카메라 / 갤러리) + 권한 안내 ──
+let _photoPickPending = false;
+function openPhotoSourceModal() {
+  document.getElementById('modal-photo-source')?.classList.add('open');
+}
+function closePhotoSourceModal(e) {
+  if (!e || e.target.id === 'modal-photo-source')
+    document.getElementById('modal-photo-source')?.classList.remove('open');
+}
+function choosePhotoCamera() {
+  closePhotoSourceModal();
+  const inp = document.getElementById('photo-camera-input');
+  if (inp) { inp.value = ''; inp.click(); }   // 모바일에서 카메라 앱 실행
+}
+function choosePhotoGallery() {
+  closePhotoSourceModal();
+  document.getElementById('modal-photo-perm')?.classList.add('open');  // 권한 안내 먼저
+}
+function closePhotoPermModal(e) {
+  if (!e || e.target.id === 'modal-photo-perm')
+    document.getElementById('modal-photo-perm')?.classList.remove('open');
+}
+function allowPhotoGallery() {
+  closePhotoPermModal();
+  const inp = document.getElementById('photo-input');
+  if (!inp) return;
+  inp.value = '';
+  _photoPickPending = true;
+  // 파일 선택 없이 돌아오면(접근 거부/취소) 안내
+  const onFocus = () => {
+    window.removeEventListener('focus', onFocus);
+    setTimeout(() => {
+      if (_photoPickPending) {
+        _photoPickPending = false;
+        toast('갤러리 접근이 거부되었습니다. 브라우저 설정에서 허용해주세요');
+      }
+    }, 1200);
+  };
+  window.addEventListener('focus', onFocus);
+  inp.click();
+}
+
 function handlePhotoSelect(event) {
-  const file = event.target.files[0];
+  _photoPickPending = false;                 // 파일 도착 → 거부 아님
+  const input = event.target;
+  const file  = input.files && input.files[0];
   if (!file) return;
-  if (!file.type.startsWith('image/')) { toast('이미지 파일만 업로드할 수 있어요'); return; }
+  if (!file.type.startsWith('image/')) { toast('이미지 파일만 업로드할 수 있어요'); input.value = ''; return; }
   if (file.size > MAX_PHOTO_UPLOAD_MB * 1024 * 1024) {
     toast(`사진 파일은 ${MAX_PHOTO_UPLOAD_MB}MB 이하로 업로드해 주세요`);
-    event.target.value = '';
+    input.value = '';
     return;
   }
 
@@ -7715,9 +7943,13 @@ function handlePhotoSelect(event) {
       savePhoto(dataUrl);
       showPhotoPreview(dataUrl);
       flashSaved('photo-saved');
+      toast('📷 사진을 저장했어요');
+      input.value = '';                      // 같은 파일 재선택 가능하도록 초기화 (item 8)
     };
+    img.onerror = () => { toast('이미지를 불러오지 못했어요'); input.value = ''; };
     img.src = e.target.result;
   };
+  reader.onerror = () => { toast('사진을 읽는 중 오류가 발생했어요'); input.value = ''; };
   reader.readAsDataURL(file);
 }
 
@@ -7901,9 +8133,61 @@ function saveCategories(c) { DB.set('todoCats_' + me.id, c); }
 function populateCatSelect(id) {
   const el = document.getElementById(id);
   if (!el) return;
-  const prev = el.value;
-  el.innerHTML = getCategories().map(c => `<option value="${escHtml(c)}">${escHtml(c)}</option>`).join('');
+  const prev = el.value && el.value !== '__addcat__' ? el.value : '';
+  el.innerHTML = getCategories().map(c => `<option value="${escHtml(c)}">${escHtml(c)}</option>`).join('')
+    + `<option value="__addcat__">＋ 새 카테고리 추가</option>`;   // 인라인 추가 옵션
   if (prev && el.querySelector(`option[value="${prev}"]`)) el.value = prev;
+  el.dataset.prevValue = el.value;
+  el.onchange = () => onCatSelectChange(id);
+}
+// 카테고리 셀렉트에서 "＋ 새 카테고리 추가" 선택 시 인라인 입력 표시
+function onCatSelectChange(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (el.value === '__addcat__') {
+    el.value = el.dataset.prevValue || (getCategories()[0] || '');   // 원래 값으로 복귀
+    showInlineCatInput(id);
+  } else {
+    el.dataset.prevValue = el.value;
+  }
+}
+function showInlineCatInput(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  let box = document.getElementById(id + '-newcat');
+  if (!box) {
+    box = document.createElement('div');
+    box.id = id + '-newcat';
+    box.style.cssText = 'display:flex;gap:6px;margin-top:8px';
+    box.innerHTML =
+      `<input type="text" id="${id}-newcat-input" placeholder="새 카테고리 이름"
+         style="flex:1;height:38px;border:1.5px solid var(--gold);border-radius:8px;padding:0 12px;font-size:13px;font-family:inherit;box-sizing:border-box"
+         onkeydown="if(event.key==='Enter'){event.preventDefault();confirmInlineCat('${id}');}">
+       <button type="button" onclick="confirmInlineCat('${id}')" style="height:38px;padding:0 14px;border-radius:8px;border:none;background:var(--black);color:white;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit">추가</button>
+       <button type="button" onclick="cancelInlineCat('${id}')" style="height:38px;padding:0 12px;border-radius:8px;border:1.5px solid var(--border);background:white;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit">취소</button>`;
+    el.parentNode.insertBefore(box, el.nextSibling);
+  }
+  box.style.display = 'flex';
+  const inp = document.getElementById(id + '-newcat-input');
+  if (inp) { inp.value = ''; inp.focus(); }
+}
+function confirmInlineCat(id) {
+  const inp  = document.getElementById(id + '-newcat-input');
+  const name = (inp?.value || '').trim();
+  if (!name) { toast('카테고리 이름을 입력해 주세요'); return; }
+  const cats = getCategories();
+  if (cats.includes(name)) { toast('이미 있는 카테고리예요'); }
+  else { cats.push(name); saveCategories(cats); }   // 카테고리 목록에 추가
+  // 모든 카테고리 셀렉트 갱신 후 새 카테고리 자동 선택
+  ['todo-cat','todo-edit-cat','dtodo-cat'].forEach(sid => { if (document.getElementById(sid)) populateCatSelect(sid); });
+  const el = document.getElementById(id);
+  if (el) { el.value = name; el.dataset.prevValue = name; }
+  cancelInlineCat(id);
+  toast(`＋ "${name}" 카테고리를 추가했어요`);
+}
+function cancelInlineCat(id) {
+  const box = document.getElementById(id + '-newcat');
+  if (box) box.style.display = 'none';
 }
 
 // ── 진행률 색상 — 노란 계열, 밝기로 채워짐 표현 ──
@@ -8446,7 +8730,9 @@ function applySchSettings() {
   if (setDef) saveSchDefault(cfg);
 
   closeSchSettingsModal();
-  buildScheduleRows(data.schedule || {});
+  delete data.schRows;              // 설정 변경 → 새 슬롯으로 재생성
+  DB.set(binderKey(), data);
+  buildScheduleRows(data);
   const slots = generateSchSlots(cfg);
   toast(`✅ 시간표 적용 — ${slots.length}개 슬롯`);
 }
@@ -9789,6 +10075,8 @@ function _resolveMemberForAction(users, userId) {
 }
 
 function approveChurchMember(userId) {
+  // 본인 가입 신청 자가 승인 차단 (보안)
+  if (userId === me.id) { toast('본인의 가입 신청은 승인할 수 없습니다'); return; }
   const users = DB.get('users', []);
   const u = _resolveMemberForAction(users, userId);
   if (!u) return;
@@ -9815,6 +10103,8 @@ function approveChurchMember(userId) {
 }
 
 function rejectChurchMember(userId) {
+  // 본인 가입 신청 자가 거절 차단 (보안)
+  if (userId === me.id) { toast('본인의 가입 신청은 승인할 수 없습니다'); return; }
   const users = DB.get('users', []);
   const u = _resolveMemberForAction(users, userId);
   if (!u) return;
@@ -9981,7 +10271,8 @@ function renderMembersScreenHtml(allUsers) {
       const canNewFamily = isLeader() || hasLeaderPerm('newfamily') || hasLeaderPerm('approve');
       churchPending.forEach(u => {
         const isNewFamily = u.registrationType === 'newfamily';
-        const hasAccess   = isNewFamily ? canNewFamily : canApprove;
+        const isSelf      = u.id === me.id;                       // 본인 신청은 자가 승인 불가
+        const hasAccess   = !isSelf && (isNewFamily ? canNewFamily : canApprove);
         const typeBadge = isNewFamily
           ? `<span style="font-size:11px;background:rgba(39,174,96,0.12);color:#27AE60;
               border-radius:6px;padding:2px 7px;font-weight:700;margin-left:6px">👋 새가족</span>`
@@ -10008,7 +10299,7 @@ function renderMembersScreenHtml(allUsers) {
                 ✕ 거절
               </button>
             </div>` : `<div style="font-size:12px;color:var(--muted);text-align:center;padding:6px 0">
-              승인 권한이 없어요 — 담당 리더에게 문의하세요
+              ${isSelf ? '본인의 가입 신청은 승인할 수 없습니다' : '승인 권한이 없어요 — 담당 리더에게 문의하세요'}
             </div>`}
           </div>`;
       });
@@ -14898,10 +15189,38 @@ function updateBinderShareStatusBtn() {
   }
 }
 
+// ── 리더 공유 항목 선택 (granular) ──
+const BINDER_SHARE_ITEMS   = [['verse','오늘의 말씀'],['qt','QT'],['todos','할일'],['schedule','시간표'],['diary','일기']];
+const BINDER_SHARE_DEFAULT = { verse:true, qt:true, todos:true, schedule:false, diary:false };
+function getBinderShareItems() {
+  return Object.assign({}, BINDER_SHARE_DEFAULT, DB.get('binderShareItems_' + me.id, {}));
+}
+function saveBinderShareItems(items) { DB.set('binderShareItems_' + me.id, items); }
+function toggleBinderShareItem(key) {
+  const items = getBinderShareItems();
+  items[key] = !items[key];
+  saveBinderShareItems(items);
+  renderBinderShareItems();
+  saveBinderNow();   // 공유 항목 변경 즉시 Firestore 반영
+}
+function renderBinderShareItems() {
+  const box = document.getElementById('binder-share-items');
+  if (!box) return;
+  const items = getBinderShareItems();
+  box.innerHTML = BINDER_SHARE_ITEMS.map(([k,label]) => `
+    <label onclick="toggleBinderShareItem('${k}')" style="display:flex;align-items:center;gap:10px;padding:9px 2px;cursor:pointer;font-size:13.5px">
+      <span style="width:22px;height:22px;border-radius:6px;flex-shrink:0;
+        border:1.5px solid ${items[k]?'var(--gold)':'var(--border)'};background:${items[k]?'var(--gold)':'white'};
+        display:flex;align-items:center;justify-content:center;color:var(--dark);font-size:13px;font-weight:900">${items[k]?'✓':''}</span>
+      <span style="font-weight:600">${label}</span>
+    </label>`).join('');
+}
+
 function openBinderSettings() {
   const enabled = getBinderShareEnabled();
   const toggle  = document.getElementById('binder-share-toggle');
   if (toggle) toggle.classList.toggle('on', enabled);
+  renderBinderShareItems();
   document.getElementById('modal-binder-settings').classList.add('open');
 }
 
@@ -15034,82 +15353,62 @@ async function _loadMemberBinder(userId, userName, date) {
     data = DB.get(`binder_${userId}_${date}`, {});
   }
 
-  const qt       = data.qt       || '';
-  const diary    = data.diary    || '';
-  const schedule = data.schedule || '';
-  const todos    = data.todos    || [];
+  // 공유 항목 필터 (레거시 데이터는 전체 공개로 간주)
+  const share    = data.shareItems || { verse:1, qt:1, todos:1, schedule:1, diary:1 };
+  const verse    = (share.verse && data.verse) ? data.verse : '';
+  const qt       = (share.qt    && data.qt)    ? data.qt    : '';
+  const diary    = (share.diary && data.diary) ? data.diary : '';
+  const schRows  = (share.schedule && Array.isArray(data.schRows))
+                     ? data.schRows.filter(r => (r.time||'').trim() || (r.plan||'').trim()) : [];
+  const todos    = (share.todos && Array.isArray(data.todos)) ? data.todos : [];
 
   // 날짜 한국어 포맷
   const dateObj  = new Date(date + 'T00:00:00');
   const dateKr   = dateObj.toLocaleDateString('ko-KR', { year:'numeric', month:'long', day:'numeric', weekday:'long' });
 
-  if (!qt && !diary && !schedule && !todos.length) {
+  if (!verse && !qt && !diary && !schRows.length && !todos.length) {
     body.innerHTML = `<div style="text-align:center;padding:40px 16px;color:var(--muted)">
       <div style="font-size:40px;margin-bottom:12px">📭</div>
       <div style="font-size:14px;font-weight:700;color:var(--black);margin-bottom:6px">${dateKr}</div>
-      <div style="font-size:13px">작성된 바인더가 없어요</div>
+      <div style="font-size:13px">공유된 바인더 내용이 없어요</div>
     </div>`;
     return;
   }
 
+  const card = (icon, title, inner) => `
+    <div style="background:white;border-radius:14px;padding:16px;border:1px solid var(--border)">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+        <span style="font-size:18px">${icon}</span>
+        <span style="font-size:13px;font-weight:800;color:var(--black)">${title}</span>
+      </div>
+      ${inner}
+    </div>`;
+
   let html = `<div style="display:flex;flex-direction:column;gap:12px">`;
 
-  // QT 섹션
-  if (qt) html += `
-    <div style="background:white;border-radius:14px;padding:16px;border:1px solid var(--border)">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
-        <span style="font-size:18px">📖</span>
-        <span style="font-size:13px;font-weight:800;color:var(--black)">오늘의 말씀 (QT)</span>
-      </div>
-      <div style="font-size:14px;color:var(--black);line-height:1.8;white-space:pre-wrap">${escHtml(qt)}</div>
-    </div>`;
+  if (verse) html += card('📖','오늘의 말씀', `<div style="font-size:14px;color:var(--black);line-height:1.8;white-space:pre-wrap">${escHtml(verse)}</div>`);
+  if (qt)    html += card('✍️','QT (묵상)',   `<div style="font-size:14px;color:var(--black);line-height:1.8;white-space:pre-wrap">${escHtml(qt)}</div>`);
 
-  // 할 일 섹션
   if (todos.length) {
-    const done   = todos.filter(t => t.done).length;
-    const total  = todos.length;
-    html += `
-    <div style="background:white;border-radius:14px;padding:16px;border:1px solid var(--border)">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-        <div style="display:flex;align-items:center;gap:8px">
-          <span style="font-size:18px">✅</span>
-          <span style="font-size:13px;font-weight:800;color:var(--black)">할 일 목록</span>
-        </div>
-        <span style="font-size:12px;background:var(--cream2);border-radius:20px;padding:2px 10px;
-                     color:${done===total?'#27AE60':'var(--muted)'}">
-          ${done} / ${total} 완료
-        </span>
-      </div>
-      ${todos.map(t => `
-        <div style="display:flex;align-items:center;gap:10px;padding:6px 0;
-                    border-bottom:1px solid var(--border);font-size:13.5px;
-                    color:${t.done?'var(--muted)':'var(--black)'};
-                    text-decoration:${t.done?'line-through':'none'}">
-          <span style="font-size:16px">${t.done?'☑':'☐'}</span>
-          ${escHtml(t.text||'')}
-        </div>`).join('')}
-    </div>`;
+    const done = todos.filter(t => t.done).length, total = todos.length;
+    html += card('✅', `할 일 목록 <span style="font-size:12px;font-weight:600;color:${done===total?'#27AE60':'var(--muted)'}">(${done}/${total})</span>`,
+      todos.map(t => `
+        <div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--border);font-size:13.5px;
+                    color:${t.done?'var(--muted)':'var(--black)'};text-decoration:${t.done?'line-through':'none'}">
+          <span style="font-size:16px">${t.done?'☑':'☐'}</span>${escHtml(t.text||'')}
+        </div>`).join(''));
   }
 
-  // 시간표 섹션
-  if (schedule) html += `
-    <div style="background:white;border-radius:14px;padding:16px;border:1px solid var(--border)">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
-        <span style="font-size:18px">📅</span>
-        <span style="font-size:13px;font-weight:800;color:var(--black)">시간표</span>
-      </div>
-      <div style="font-size:13.5px;color:var(--black);line-height:1.8;white-space:pre-wrap">${escHtml(schedule)}</div>
-    </div>`;
+  if (schRows.length) {
+    html += card('📅','시간표',
+      `<div style="display:flex;flex-direction:column;gap:2px">${schRows.map(r => `
+        <div style="display:flex;gap:10px;font-size:13px;padding:5px 0;border-bottom:1px solid var(--cream2)">
+          <span style="min-width:78px;color:var(--muted);font-weight:600">${escHtml(r.time||'')}</span>
+          <span style="color:var(--black)">${escHtml(r.plan||'')}</span>
+        </div>`).join('')}</div>`);
+  }
 
-  // 일기 섹션
-  if (diary) html += `
-    <div style="background:white;border-radius:14px;padding:16px;border:1px solid var(--border)">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
-        <span style="font-size:18px">✏️</span>
-        <span style="font-size:13px;font-weight:800;color:var(--black)">일기</span>
-      </div>
-      <div style="font-size:14px;color:var(--black);line-height:1.8;white-space:pre-wrap">${escHtml(diary)}</div>
-    </div>`;
+  if (diary) html += card('📓','일기', `<div style="font-size:14px;color:var(--black);line-height:1.8;white-space:pre-wrap">${escHtml(diary)}</div>`);
 
   html += `</div>`;
   body.innerHTML = html;
