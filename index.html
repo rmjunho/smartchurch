@@ -4887,21 +4887,6 @@
     </div>
   </div>
 
-  <!-- 댓글/답글 모달 -->
-  <div class="modal-backdrop" id="modal-board-comment" onclick="closeBoardCommentModal(event)">
-    <div class="modal-sheet">
-      <div class="modal-title" id="board-comment-modal-title">💬 댓글 달기</div>
-      <div class="form-group">
-        <textarea id="bc-content" class="qt-ta" rows="3"
-          style="font-size:13px;line-height:1.8;resize:none"
-          placeholder="댓글을 입력해 주세요"></textarea>
-      </div>
-      <div class="modal-actions">
-        <button class="btn-cancel" onclick="closeBoardCommentModal()">취소</button>
-        <button class="btn-confirm" onclick="submitBoardComment()">등록</button>
-      </div>
-    </div>
-  </div>
 
   <!-- ============================================
        CREATE MEETING MODAL
@@ -7892,7 +7877,6 @@ function selRecolor() {
 const MAX_PHOTO_UPLOAD_MB = 10;
 
 // ── 사진 소스 선택 (카메라 / 갤러리) + 권한 안내 ──
-let _photoPickPending = false;
 function openPhotoSourceModal() {
   document.getElementById('modal-photo-source')?.classList.add('open');
 }
@@ -7916,25 +7900,10 @@ function closePhotoPermModal(e) {
 function allowPhotoGallery() {
   closePhotoPermModal();
   const inp = document.getElementById('photo-input');
-  if (!inp) return;
-  inp.value = '';
-  _photoPickPending = true;
-  // 파일 선택 없이 돌아오면(접근 거부/취소) 안내
-  const onFocus = () => {
-    window.removeEventListener('focus', onFocus);
-    setTimeout(() => {
-      if (_photoPickPending) {
-        _photoPickPending = false;
-        toast('갤러리 접근이 거부되었습니다. 브라우저 설정에서 허용해주세요');
-      }
-    }, 1200);
-  };
-  window.addEventListener('focus', onFocus);
-  inp.click();
+  if (inp) { inp.value = ''; inp.click(); }
 }
 
 function handlePhotoSelect(event) {
-  _photoPickPending = false;                 // 파일 도착 → 거부 아님
   const input = event.target;
   const file  = input.files && input.files[0];
   if (!file) return;
@@ -8658,12 +8627,9 @@ function deleteTodoFromEdit() {
 // ================================================
 //  시간표 설정 모달
 // ================================================
-let _schManualSlots = [];
-
 function openSchSettingsModal() {
   const custom = getSchForDate();
   const cfg    = custom || getSchDefault();
-  _schManualSlots = (cfg.manualSlots || []).slice();
 
   // 시작 시간 옵션 (0~23)
   const startEl = document.getElementById('sch-start');
@@ -8685,37 +8651,6 @@ function closeSchSettingsModal(e) {
   if (!e || e.target.id === 'modal-sch-settings' || e.type !== 'click') {
     document.getElementById('modal-sch-settings').classList.remove('open');
   }
-}
-
-function toggleSchManual() {
-  const toggle   = document.getElementById('sch-manual-toggle');
-  const isManual = !toggle.classList.contains('on');
-  toggle.classList.toggle('on', isManual);
-  document.getElementById('sch-auto-area').style.display   = isManual ? 'none' : 'block';
-  document.getElementById('sch-manual-area').style.display = isManual ? 'block' : 'none';
-}
-
-function renderSchManualSlots() {
-  document.getElementById('sch-manual-list').innerHTML = _schManualSlots.map((slot, i) => `
-    <div class="subcheck-input-row">
-      <span class="subcheck-input-dot">·</span>
-      <input type="text" class="form-input" style="height:40px;flex:1"
-             placeholder="예: 9:00 ~ 10:30"
-             value="${escHtml(slot)}"
-             oninput="_schManualSlots[${i}]=this.value">
-      <button class="subcheck-remove-btn" onclick="removeManualSlot(${i})">×</button>
-    </div>`).join('');
-}
-
-function addManualSlot() {
-  if (_schManualSlots.length >= 48) { toast('최대 48개까지 추가할 수 있어요'); return; }
-  _schManualSlots.push('');
-  renderSchManualSlots();
-}
-
-function removeManualSlot(idx) {
-  _schManualSlots.splice(idx, 1);
-  renderSchManualSlots();
 }
 
 function applySchSettings() {
@@ -9277,11 +9212,7 @@ function notifPrefOn(type) {
   return DB.get('notif' + type + '_' + me.id, true) !== false;
 }
 function notifTimeLabel(d) {
-  d = d || new Date();
-  const h = d.getHours(), m = d.getMinutes();
-  const ap = h < 12 ? '오전' : '오후';
-  const h12 = h % 12 === 0 ? 12 : h % 12;
-  return `${ap} ${h12}:${String(m).padStart(2,'0')}`;
+  return (d || new Date()).toLocaleTimeString('ko-KR', { hour: 'numeric', minute: '2-digit' });
 }
 // 현재 사용자(me)에게 인앱 알림 추가. notif: {icon, title, body, dedupeId}
 function pushNotif(notif) {
@@ -11529,24 +11460,12 @@ function deleteBoardPost(id) {
 }
 
 // ── 댓글 (Firestore 서브컬렉션 boardPosts/{postId}/comments + 실시간) ──
-let _commentTargetPostId = '';        // (레거시 모달용 — 미사용)
 let _boardCommentUnsub   = null;      // onSnapshot 해제 함수
 let _boardCommentPostId  = '';        // 현재 구독 중인 게시글
 let _boardCommentsCache  = [];        // 현재 게시글 댓글 캐시
 let _editingCommentId    = null;      // 인라인 수정 중인 댓글 id
 
 function commentsCacheKey(postId) { return 'boardComments_' + postId; }
-
-// (레거시 모달 — 현재는 인라인 입력 사용, 마크업 호환 위해 유지)
-function openBoardCommentModal(postId) {
-  _commentTargetPostId = postId;
-  const el = document.getElementById('bc-content'); if (el) el.value = '';
-  document.getElementById('modal-board-comment')?.classList.add('open');
-}
-function closeBoardCommentModal(e) {
-  if (!e || e.target.id === 'modal-board-comment')
-    document.getElementById('modal-board-comment')?.classList.remove('open');
-}
 
 // 게시글 상세 진입 시 댓글 실시간 구독 시작
 function initBoardComments(postId) {
