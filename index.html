@@ -6951,13 +6951,8 @@ function setDrawColor(c, el) {
   if (el) el.classList.add('on');
   refreshToolBtns();
 }
-// 사용자 지정 색상 선택
-function setCustomColor(val) {
-  currentColor = val;
-  if (currentTool === 'select' || currentTool === 'eraser') setDrawTool('pen');
-  renderDrawColors();
-  refreshToolBtns();
-}
+// 사용자 지정 색상 선택 — setDrawColor 재사용 후 팔레트 하이라이트만 갱신
+function setCustomColor(val) { setDrawColor(val); renderDrawColors(); }
 
 function setDrawSize(size, btn) {
   currentSize = size;
