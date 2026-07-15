@@ -26,6 +26,7 @@ window._fb = {
       setUser:    (uid, data) => setDoc(doc(fbDb, 'users', uid), data, { merge: true }),
       getUser:    (uid)       => getDoc(doc(fbDb, 'users', uid)),
       updateUser: (uid, data) => updateDoc(doc(fbDb, 'users', uid), data),
+      deleteUserDoc: (uid)    => deleteDoc(doc(fbDb, 'users', uid)),   // 관리자: 계정 실제 삭제
       // 교회 교인 목록 실시간
       watchChurch: (churchCode, cb) =>
         onSnapshot(query(collection(fbDb, 'users'), where('churchCode','==',churchCode)), cb),
@@ -49,6 +50,8 @@ window._fb = {
       // 교회 상세 정보 (위치, 소개, 목사 프로필)
       setChurchInfo:   (code, data) => setDoc(doc(fbDb, 'churchInfo', code), data, { merge: true }),
       getChurchInfo:   (code)       => getDoc(doc(fbDb, 'churchInfo', code)),
+      getAllChurchInfo: ()          => getDocs(collection(fbDb, 'churchInfo')),   // 관리자: 전체 교회 목록
+      deleteChurchInfo: (code)      => deleteDoc(doc(fbDb, 'churchInfo', code)),
       // 오픈채팅 실시간 메시지
       sendChatMsg: (roomId, msg) =>
         addDoc(collection(fbDb, 'chatRooms', roomId, 'messages'),

@@ -1253,7 +1253,7 @@
           <span class="sm-text">초대 코드 관리</span>
           <span class="sm-arrow">›</span>
         </div>
-        <div class="sm-item" onclick="openSubscreen('event-manage');closeSideMenu()">
+        <div class="sm-item" onclick="openSubscreen('event-browse');closeSideMenu()">
           <span class="sm-icon">📅</span>
           <span class="sm-text">행사 관리</span>
           <span class="sm-arrow">›</span>
@@ -2089,35 +2089,6 @@
 
       <div class="modal-actions" style="margin-top:8px">
         <button class="btn-confirm" style="width:100%" onclick="closeAddFriendModal()">닫기</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ============================================
-       ADD OPEN CHAT MODAL (리더 전용)
-  ============================================= -->
-  <div class="modal-backdrop" id="modal-add-openchat" onclick="closeAddOpenChatModal(event)">
-    <div class="modal-sheet">
-      <div class="modal-title">오픈채팅방 추가 🌐</div>
-      <div class="form-group">
-        <label class="form-label">채팅방 이름</label>
-        <input id="oc-name" type="text" class="form-input" placeholder="예: 청년부 기도방">
-      </div>
-      <div class="form-group">
-        <label class="form-label">카카오톡 오픈채팅 링크</label>
-        <input id="oc-link" type="url" class="form-input" placeholder="https://open.kakao.com/o/...">
-        <div style="font-size:11.5px;color:var(--muted);margin-top:5px">
-          카카오톡 → 오픈채팅 → 방 만들기 → 링크 복사
-        </div>
-      </div>
-      <div class="form-group">
-        <label class="form-label">아이콘 (이모지)</label>
-        <input id="oc-icon" type="text" class="form-input" placeholder="예: 🙏"
-               maxlength="2" style="font-size:24px;text-align:center">
-      </div>
-      <div class="modal-actions">
-        <button class="btn-cancel" onclick="closeAddOpenChatModal()">취소</button>
-        <button class="btn-confirm" onclick="addOpenChat()">추가하기</button>
       </div>
     </div>
   </div>
@@ -5780,7 +5751,29 @@ var SUBSCREEN_TITLES = {
   'church-manage'  : '⛪ 교회/기관 관리',
 };
 
+// ── 서브스크린 히스토리: 뒤로가기 = 내부 화면 한 단계씩 (관리자 패널 등) ──
+var _subStack    = [];     // 열려있는 서브스크린 id 스택
+var _suppressPop = false;  // 프로그램적 history 되감기 시 popstate 1회 무시
+
+window.addEventListener('popstate', function(e) {
+  if (_suppressPop) { _suppressPop = false; return; }
+  var depth = (e.state && e.state.subDepth) || 0;
+  if (depth >= _subStack.length) return;      // 앞으로가기/무관 이동 — 무시
+  _subStack.length = depth;                    // 스택 되감기
+  if (_subStack.length === 0) _closeSubscreenUI();
+  else _renderSubscreen(_subStack[_subStack.length - 1]);
+});
+
 function openSubscreen(id) {
+  // 같은 화면 재렌더(액션 후 새로고침)는 히스토리에 쌓지 않음
+  if (_subStack[_subStack.length - 1] !== id) {
+    _subStack.push(id);
+    try { history.pushState({ subDepth: _subStack.length }, ''); } catch (e) {}
+  }
+  _renderSubscreen(id);
+}
+
+function _renderSubscreen(id) {   // 히스토리는 건드리지 않고 렌더만
   if (id !== 'board-post') stopBoardComments();   // 게시글 상세를 벗어나면 댓글 구독 해제
   const el   = document.getElementById('subscreen');
   const body = document.getElementById('subscreen-body');
@@ -5798,7 +5791,18 @@ function openSubscreen(id) {
   if (MATCH_SUBSCREENS.includes(id)) syncMatchingFromFirestore();
   if (EVENT_SUBSCREENS.includes(id)) syncEventsFromFirestore();
 }
+
 function closeSubscreen() {
+  const depth = _subStack.length;
+  _subStack = [];
+  if (depth) {                     // 쌓인 히스토리 되감기 (popstate는 무시)
+    _suppressPop = true;
+    try { history.go(-depth); } catch (e) { _suppressPop = false; }
+  }
+  _closeSubscreenUI();
+}
+
+function _closeSubscreenUI() {
   stopBoardComments();     // 댓글 실시간 구독 해제
   const el = document.getElementById('subscreen');
   el.classList.remove('open');
@@ -6498,8 +6502,6 @@ function getChatRooms()     { return DB.get('chatRooms_' + me.id, []); }
 function saveChatRooms(l)   { DB.set('chatRooms_' + me.id, l); }
 function getFriends()       { return DB.get('friends_' + me.id, []); }
 function saveFriends(l)     { DB.set('friends_' + me.id, l); }
-function getOpenChats()     { return DB.get('openChats_' + (me.churchCode || me.church || 'default'), []); }
-function saveOpenChats(l)   { DB.set('openChats_' + (me.churchCode || me.church || 'default'), l); }
 
 // ── 내부 탭 전환 ──
 // 하단 채팅 탭 클릭 처리

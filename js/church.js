@@ -621,6 +621,10 @@ function deleteChurch(code) {
   const custom = DB.get('customChurches', {});
   delete custom[code];
   DB.set('customChurches', custom);
+  // Firestore에서도 삭제 — 아니면 목록 동기화 시 재등장 (item 3+4)
+  if (window._fbReady && window._fb) {
+    window._fb.deleteChurchInfo(code).catch(e => console.error('Firestore 교회 삭제 실패:', e));
+  }
   toast(`"${data.name}" 교회가 삭제됐어요`);
   setTimeout(() => openSubscreen('admin-panel'), 150);
 }
@@ -873,11 +877,13 @@ async function loadMembersScreenData() {
     allUsers = me.isAppAdmin ? localAll : localAll.filter(u => u.church === me.church);
   }
 
-  // isAppAdmin 등 로컬 플래그 머지
+  allUsers = allUsers.filter(u => !u.deleted);   // 삭제된 계정 제외
+
+  // 로컬 전용 플래그(isAppAdmin)만 보존 — 최신 Firestore 값이 우선 (이전: 로컬이 원격을 덮어씀)
   const localUsers = DB.get('users', []);
   allUsers = allUsers.map(u => {
     const local = localUsers.find(l => l.id === u.id);
-    return local ? { ...u, ...local } : u;
+    return local ? { ...local, ...u, isAppAdmin: u.isAppAdmin || local.isAppAdmin } : u;
   });
 
   _membersCache = allUsers;   // 승인/거절 핸들러가 대상 사용자를 찾을 수 있도록 캐시
