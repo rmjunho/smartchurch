@@ -315,6 +315,8 @@ function renderAdminPanelHtml(allUsers) {
   const minorPending  = allUsers.filter(u => u.status === 'pending');
   const churchJoinPen = allUsers.filter(u => u.status !== 'pending' && u.churchStatus === 'pending');
   const active        = allUsers.filter(u => u.status === 'active' || !u.status);
+  const thirtyMinAgo  = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+  const onlineNow     = allUsers.filter(u => u.lastActiveAt && u.lastActiveAt > thirtyMinAgo);
   const churches      = [...new Set(allUsers.map(u => u.church).filter(Boolean))];
 
   let html = `<div id="admin-panel-body">
@@ -372,7 +374,7 @@ function renderAdminPanelHtml(allUsers) {
         <div class="ss-card-info"><div class="ss-card-title">전체 사용자</div><div class="ss-card-sub">${allUsers.length}명 등록됨</div></div>
         <span class="sm-arrow">›</span>
       </div>
-      <div class="ss-card-row" onclick="openSubscreen('church-manage')" style="cursor:pointer">
+      <div class="ss-card-row" onclick="document.getElementById('admin-church-section')?.scrollIntoView({behavior:'smooth'})" style="cursor:pointer">
         <div class="ss-card-icon">⛪</div>
         <div class="ss-card-info"><div class="ss-card-title">등록된 교회/기관</div><div class="ss-card-sub">${churches.length}개</div></div>
         <span class="sm-arrow">›</span>
@@ -393,9 +395,9 @@ function renderAdminPanelHtml(allUsers) {
         <span class="ss-card-badge ${churchJoinPen.length > 0 ? 'ss-badge-gold' : 'ss-badge-gray'}">${churchJoinPen.length}</span>
       </div>
       <div class="ss-card-row">
-        <div class="ss-card-icon">✅</div>
-        <div class="ss-card-info"><div class="ss-card-title">활성 사용자</div><div class="ss-card-sub">정상 이용 중</div></div>
-        <span class="ss-card-badge ss-badge-green">${active.length}</span>
+        <div class="ss-card-icon">🟢</div>
+        <div class="ss-card-info"><div class="ss-card-title">현재 접속자</div><div class="ss-card-sub">최근 30분 내 접속</div></div>
+        <span class="ss-card-badge ss-badge-green">${onlineNow.length}</span>
       </div>
     </div>`;
 
@@ -520,7 +522,7 @@ function renderAdminPanelHtml(allUsers) {
   const customChurches = DB.get('customChurches', {});
   const churchCodes = Object.keys(customChurches);
 
-  html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:0 16px;margin:16px 0 10px">
+  html += `<div id="admin-church-section" style="display:flex;justify-content:space-between;align-items:center;padding:0 16px;margin:16px 0 10px">
     <span style="font-size:12px;font-weight:700;color:var(--muted);letter-spacing:0.5px">⛪ 교회·기관 관리 (${churchCodes.length}개)</span>
     <button onclick="openCreateChurchModal()" style="height:30px;padding:0 14px;border-radius:20px;border:none;background:var(--black);color:white;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">+ 새로 만들기</button>
   </div>`;
