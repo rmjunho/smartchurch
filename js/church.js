@@ -1995,7 +1995,7 @@ async function _loadMemberBinder(userId, userName, date) {
 
   let html = `<div style="display:flex;flex-direction:column;gap:12px">`;
 
-  if (verse) html += card('📖','오늘의 말씀', `<div style="font-size:14px;color:var(--black);line-height:1.8;white-space:pre-wrap">${escHtml(verse)}</div>`);
+  if (verse) html += card('📖','말씀 묵상', `<div style="font-size:14px;color:var(--black);line-height:1.8;white-space:pre-wrap">${escHtml(verse)}</div>`);
   if (qt)    html += card('✍️','QT (묵상)',   `<div style="font-size:14px;color:var(--black);line-height:1.8;white-space:pre-wrap">${escHtml(qt)}</div>`);
 
   if (todos.length) {

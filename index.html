@@ -661,7 +661,7 @@
       <!-- Draw mode -->
       <div class="worship-draw" id="worship-draw-wrap">
 
-        <!-- ① 오늘의 말씀 -->
+        <!-- ① 말씀 묵상 -->
         <div class="draw-sec">
           <div class="draw-sec-label"><span class="binder-sec-icon">📖</span>말씀 묵상</div>
           <div class="draw-cell-wrap" id="dcell-qt-wrap">
@@ -4038,7 +4038,7 @@ function clearActiveCanvas() {
   saveDrawingFor(key);
 
   // 어떤 칸이 지워졌는지 레이블로 알려주기
-  const KEY_LABELS = { qt: '오늘의 말씀', schedule: '시간표', diary: '일기' };
+  const KEY_LABELS = { qt: '말씀 묵상', schedule: '시간표', diary: '일기' };
   let label = KEY_LABELS[key];
   if (!label && key.startsWith('tdraw_cat_')) {
     label = 'Todo — ' + key.replace('tdraw_cat_', '');
@@ -4469,14 +4469,14 @@ function saveDrawCatEdit() {
   toast(`카테고리를 "${newName}"으로 변경했어요`);
 }
 
-// ── 오늘의 말씀 기본값 저장/불러오기 ──
-// 오늘의 말씀 칸 크기만 기본값으로 저장 (글씨 내용 X)
+// ── 말씀 묵상 기본값 저장/불러오기 ──
+// 말씀 묵상 칸 크기만 기본값으로 저장 (글씨 내용 X)
 function setQtDrawDefault() {
   if (!me) return;
   const wrap = document.getElementById('dcell-qt-wrap');
   if (!wrap) return;
   saveDrawSizeDefault('qt', wrap.offsetHeight);
-  toast('✅ 오늘의 말씀 칸 크기를 기본값으로 저장했어요 — 다음 날부터 자동 적용돼요');
+  toast('✅ 말씀 묵상 칸 크기를 기본값으로 저장했어요 — 다음 날부터 자동 적용돼요');
 }
 
 // 일기 칸 크기만 기본값으로 저장 (글씨 내용 X)
@@ -7747,7 +7747,7 @@ function updateBinderShareStatusBtn() {
 }
 
 // ── 리더 공유 항목 선택 (granular) ──
-var BINDER_SHARE_ITEMS   = [['verse','오늘의 말씀'],['qt','QT'],['todos','할일'],['schedule','시간표'],['diary','일기']];
+var BINDER_SHARE_ITEMS   = [['verse','말씀 묵상'],['qt','QT'],['todos','할일'],['schedule','시간표'],['diary','일기']];
 var BINDER_SHARE_DEFAULT = { verse:true, qt:true, todos:true, schedule:false, diary:false };
 function getBinderShareItems() {
   return Object.assign({}, BINDER_SHARE_DEFAULT, DB.get('binderShareItems_' + me.id, {}));
