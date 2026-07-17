@@ -930,6 +930,103 @@
     }
     .date-cal-btn:active { color: white; background: rgba(255,255,255,0.1); }
 
+    /* ── Calendar Strip (주간 날짜 선택) ── */
+    .cal-strip-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 16px 0;
+      background: var(--dark);
+    }
+    .cal-strip-month {
+      font-size: 13px; font-weight: 700; color: rgba(255,255,255,0.7);
+    }
+    .cal-strip {
+      display: flex; align-items: center; gap: 2px;
+      padding: 6px 8px 10px; background: var(--dark);
+    }
+    .cal-strip-arrow {
+      background: none; border: none; color: rgba(255,255,255,0.5);
+      font-size: 20px; cursor: pointer; padding: 4px 6px; border-radius: 8px;
+      line-height: 1; flex-shrink: 0;
+    }
+    .cal-strip-arrow:active { color: white; background: rgba(255,255,255,0.1); }
+    .cal-strip-days {
+      display: flex; flex: 1; justify-content: space-around;
+    }
+    .cal-strip-day {
+      text-align: center; cursor: pointer; padding: 4px 0;
+      min-width: 38px; border-radius: 12px; transition: background 0.15s;
+    }
+    .cal-strip-day:active { background: rgba(255,255,255,0.08); }
+    .cal-strip-day.selected {
+      background: var(--gold);
+    }
+    .cal-strip-day.today:not(.selected) {
+      border: 1.5px solid var(--gold);
+    }
+    .cal-strip-dow {
+      font-size: 10.5px; font-weight: 500; color: rgba(255,255,255,0.4);
+      margin-bottom: 3px;
+    }
+    .cal-strip-num {
+      font-size: 14px; font-weight: 700; color: rgba(255,255,255,0.75);
+    }
+    .cal-strip-day.selected .cal-strip-dow,
+    .cal-strip-day.selected .cal-strip-num { color: white; }
+    .cal-strip-day.future { opacity: 0.25; pointer-events: none; }
+    .cal-strip-day.sunday .cal-strip-dow,
+    .cal-strip-day.sunday .cal-strip-num { color: #E8665A; }
+    .cal-strip-day.sunday.selected .cal-strip-dow,
+    .cal-strip-day.sunday.selected .cal-strip-num { color: white; }
+
+    /* ── Accordion (리더 나눔 뷰) ── */
+    .acc-card {
+      background: white; border-radius: 14px; border: 1px solid var(--border);
+      overflow: hidden; margin-bottom: 10px;
+    }
+    .acc-hd {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 16px; cursor: pointer; user-select: none;
+      transition: background 0.15s;
+    }
+    .acc-hd:active { background: var(--cream2); }
+    .acc-hd-left {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 13px; font-weight: 800; color: var(--black);
+    }
+    .acc-hd-left span:first-child { font-size: 18px; }
+    .acc-chev {
+      font-size: 12px; color: var(--muted); transition: transform 0.2s;
+    }
+    .acc-hd.open .acc-chev { transform: rotate(180deg); }
+    .acc-body {
+      padding: 0 16px 14px; display: none;
+      font-size: 14px; color: var(--black); line-height: 1.8;
+    }
+    .acc-hd.open + .acc-body { display: block; }
+
+    /* ── Community binder (교인 묵상 나눔) ── */
+    .community-binder-wrap { display: none; }
+    .community-binder-wrap.on { display: block; }
+    .comm-user-card {
+      background: white; border-radius: 16px; border: 1px solid var(--border);
+      margin-bottom: 14px; overflow: hidden;
+    }
+    .comm-user-hd {
+      display: flex; align-items: center; gap: 10px;
+      padding: 14px 16px; cursor: pointer; user-select: none;
+      border-bottom: 1px solid var(--border); transition: background 0.15s;
+    }
+    .comm-user-hd:active { background: var(--cream2); }
+    .comm-user-avatar {
+      width: 36px; height: 36px; border-radius: 50%;
+      background: var(--cream2); display: flex; align-items: center;
+      justify-content: center; font-size: 16px; flex-shrink: 0;
+    }
+    .comm-user-info { flex: 1; }
+    .comm-user-name { font-size: 13.5px; font-weight: 800; color: var(--black); }
+    .comm-user-sub { font-size: 11.5px; color: var(--muted); margin-top: 1px; }
+    .comm-user-body { padding: 12px 16px; }
+
     .mode-bar {
       background: var(--cream);
       padding: 14px 20px 12px;

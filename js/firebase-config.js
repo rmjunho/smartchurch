@@ -47,6 +47,8 @@ window._fb = {
       // 바인더 공유 (리더 열람용)
       setBinderEntry:  (key, data) => setDoc(doc(fbDb, 'binderEntries', key), data, { merge: true }),
       getBinderEntry:  (key)       => getDoc(doc(fbDb, 'binderEntries', key)),
+      getBinderEntriesByDate: (date) =>
+        getDocs(query(collection(fbDb, 'binderEntries'), where('date', '==', date))),
       // 교회 상세 정보 (위치, 소개, 목사 프로필)
       setChurchInfo:   (code, data) => setDoc(doc(fbDb, 'churchInfo', code), data, { merge: true }),
       getChurchInfo:   (code)       => getDoc(doc(fbDb, 'churchInfo', code)),

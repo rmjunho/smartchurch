@@ -1886,34 +1886,28 @@ async function openMemberBinder(userId, userName) {
   openSubscreen('member-binder');
 }
 
+var _mbCalBase = null;
+
 function renderMemberBinderScreen() {
   if (!_viewingMemberId) return `<div class="ss-empty"><div class="ss-empty-title">교인을 선택해주세요</div></div>`;
   if (!_viewingDate) _viewingDate = todayDateKey();
-  setTimeout(() => _loadMemberBinder(_viewingMemberId, _viewingMemberName, _viewingDate), 80);
+  _mbCalBase = null;
+  setTimeout(() => {
+    renderMbCalStrip();
+    _loadMemberBinder(_viewingMemberId, _viewingMemberName, _viewingDate);
+  }, 80);
   return `
-    <!-- 날짜 네비게이터 -->
-    <div style="display:flex;align-items:center;justify-content:space-between;
-                padding:12px 16px;background:var(--cream);border-bottom:1px solid var(--border);
-                position:sticky;top:0;z-index:5">
-      <button onclick="navigateMemberBinder(-1)"
-        style="width:38px;height:38px;border-radius:50%;border:1.5px solid var(--border);
-               background:white;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center">
-        ←
-      </button>
-      <div style="text-align:center">
-        <div style="font-size:13px;font-weight:800;color:var(--black)" id="mb-date-display">${_viewingDate}</div>
-        <div style="font-size:11.5px;color:var(--muted);margin-top:1px">
-          ${escHtml(_viewingMemberName)}님의 삶의 예배
-        </div>
+    <!-- 날짜 네비게이터 (캘린더 스트립) -->
+    <div style="background:var(--dark);position:sticky;top:0;z-index:5">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px 0">
+        <span style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.7)" id="mb-cal-month"></span>
+        <span style="font-size:12px;color:rgba(255,255,255,0.5)">${escHtml(_viewingMemberName)}님</span>
       </div>
-      <button onclick="navigateMemberBinder(1)"
-        id="mb-next-btn"
-        style="width:38px;height:38px;border-radius:50%;border:1.5px solid var(--border);
-               background:white;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;
-               opacity:${_viewingDate >= todayDateKey() ? '0.3' : '1'}"
-        ${_viewingDate >= todayDateKey() ? 'disabled' : ''}>
-        →
-      </button>
+      <div class="cal-strip">
+        <button class="cal-strip-arrow" onclick="shiftMbCalStrip(-7)">‹</button>
+        <div class="cal-strip-days" id="mb-cal-strip-days"></div>
+        <button class="cal-strip-arrow" onclick="shiftMbCalStrip(7)">›</button>
+      </div>
     </div>
     <!-- 바인더 내용 -->
     <div id="member-binder-body" style="padding:16px">
@@ -1921,36 +1915,66 @@ function renderMemberBinderScreen() {
         <div style="font-size:28px;margin-bottom:12px">🔄</div>
         <div style="font-size:13px">바인더 불러오는 중...</div>
       </div>
-    </div>
-    <div style="font-size:11.5px;color:var(--muted);text-align:center;padding:12px 16px 24px;line-height:1.6">
-      본인이 공유 허용한 텍스트 바인더만 열람 가능해요
     </div>`;
 }
 
-function navigateMemberBinder(dir) {
-  const d     = new Date(_viewingDate);
-  d.setDate(d.getDate() + dir);
-  const next  = d.toISOString().split('T')[0];
+function renderMbCalStrip() {
+  const container = document.getElementById('mb-cal-strip-days');
+  if (!container) return;
+  const sel = new Date(_viewingDate + 'T00:00:00');
+  const weekStart = _mbCalBase ? new Date(_mbCalBase) : new Date(sel);
+  if (!_mbCalBase) weekStart.setDate(sel.getDate() - sel.getDay());
   const today = todayDateKey();
-  if (next > today) return; // 미래 날짜 제한
-  _viewingDate = next;
-
-  // 날짜 표시 업데이트
-  const dateEl = document.getElementById('mb-date-display');
-  if (dateEl) dateEl.textContent = _viewingDate;
-  // 다음 버튼 비활성화
-  const nextBtn = document.getElementById('mb-next-btn');
-  if (nextBtn) {
-    nextBtn.style.opacity = _viewingDate >= today ? '0.3' : '1';
-    nextBtn.disabled = _viewingDate >= today;
+  const DOW = ['일','월','화','수','목','금','토'];
+  let html = '';
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(weekStart);
+    d.setDate(weekStart.getDate() + i);
+    const dk = d.toISOString().split('T')[0];
+    const isSun = d.getDay() === 0;
+    let cls = 'cal-strip-day';
+    if (dk === _viewingDate) cls += ' selected';
+    if (dk === today) cls += ' today';
+    if (dk > today) cls += ' future';
+    if (isSun) cls += ' sunday';
+    html += `<div class="${cls}" onclick="goToMbDate('${dk}')">
+      <div class="cal-strip-dow">${DOW[d.getDay()]}</div>
+      <div class="cal-strip-num">${d.getDate()}</div>
+    </div>`;
   }
-  // 바인더 로드
+  container.innerHTML = html;
+  const mEl = document.getElementById('mb-cal-month');
+  if (mEl) mEl.textContent = `${sel.getFullYear()}년 ${sel.getMonth()+1}월`;
+}
+
+function shiftMbCalStrip(days) {
+  if (!_mbCalBase) {
+    const sel = new Date(_viewingDate + 'T00:00:00');
+    _mbCalBase = new Date(sel);
+    _mbCalBase.setDate(sel.getDate() - sel.getDay());
+  }
+  _mbCalBase.setDate(_mbCalBase.getDate() + days);
+  renderMbCalStrip();
+}
+
+function goToMbDate(dk) {
+  if (dk > todayDateKey()) return;
+  _viewingDate = dk;
+  renderMbCalStrip();
   const body = document.getElementById('member-binder-body');
   if (body) body.innerHTML = `<div style="text-align:center;padding:40px 16px;color:var(--muted)">
     <div style="font-size:28px;margin-bottom:12px">🔄</div>
     <div style="font-size:13px">불러오는 중...</div>
   </div>`;
   _loadMemberBinder(_viewingMemberId, _viewingMemberName, _viewingDate);
+}
+
+function navigateMemberBinder(dir) {
+  goToMbDate((() => {
+    const d = new Date(_viewingDate + 'T00:00:00');
+    d.setDate(d.getDate() + dir);
+    return d.toISOString().split('T')[0];
+  })());
 }
 
 async function _loadMemberBinder(userId, userName, date) {
@@ -1970,7 +1994,6 @@ async function _loadMemberBinder(userId, userName, date) {
     data = DB.get(`binder_${userId}_${date}`, {});
   }
 
-  // 공유 항목 필터 (레거시 데이터는 전체 공개로 간주)
   const share    = data.shareItems || { verse:1, qt:1, todos:1, schedule:1, diary:1 };
   const verse    = (share.verse && data.verse) ? data.verse : '';
   const qt       = (share.qt    && data.qt)    ? data.qt    : '';
@@ -1978,56 +2001,46 @@ async function _loadMemberBinder(userId, userName, date) {
   const schRows  = (share.schedule && Array.isArray(data.schRows))
                      ? data.schRows.filter(r => (r.time||'').trim() || (r.plan||'').trim()) : [];
   const todos    = (share.todos && Array.isArray(data.todos)) ? data.todos : [];
+  const drawings = data.drawings || {};
 
-  // 날짜 한국어 포맷
-  const dateObj  = new Date(date + 'T00:00:00');
-  const dateKr   = dateObj.toLocaleDateString('ko-KR', { year:'numeric', month:'long', day:'numeric', weekday:'long' });
+  const hasText = verse || qt || diary || schRows.length || todos.length;
+  const hasDrawing = drawings.qt || drawings.schedule || drawings.diary;
 
-  if (!verse && !qt && !diary && !schRows.length && !todos.length) {
+  if (!hasText && !hasDrawing) {
     body.innerHTML = `<div style="text-align:center;padding:40px 16px;color:var(--muted)">
       <div style="font-size:40px;margin-bottom:12px">📭</div>
-      <div style="font-size:14px;font-weight:700;color:var(--black);margin-bottom:6px">${dateKr}</div>
       <div style="font-size:13px">공유된 바인더 내용이 없어요</div>
     </div>`;
     return;
   }
 
-  const card = (icon, title, inner) => `
-    <div style="background:white;border-radius:14px;padding:16px;border:1px solid var(--border)">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
-        <span style="font-size:18px">${icon}</span>
-        <span style="font-size:13px;font-weight:800;color:var(--black)">${title}</span>
-      </div>
-      ${inner}
-    </div>`;
+  let html = '<div style="display:flex;flex-direction:column;gap:10px">';
 
-  let html = `<div style="display:flex;flex-direction:column;gap:12px">`;
-
-  if (verse) html += card('📖','말씀 묵상', `<div style="font-size:14px;color:var(--black);line-height:1.8;white-space:pre-wrap">${escHtml(verse)}</div>`);
-  if (qt)    html += card('✍️','QT (묵상)',   `<div style="font-size:14px;color:var(--black);line-height:1.8;white-space:pre-wrap">${escHtml(qt)}</div>`);
+  if (verse) html += accSection('📖','말씀 묵상', `<div style="font-size:14px;line-height:1.8;white-space:pre-wrap">${escHtml(verse)}</div>`);
+  if (qt) html += accSection('✍️','QT (묵상)', `<div style="font-size:14px;line-height:1.8;white-space:pre-wrap">${escHtml(qt)}</div>`);
 
   if (todos.length) {
-    const done = todos.filter(t => t.done).length, total = todos.length;
-    html += card('✅', `할 일 목록 <span style="font-size:12px;font-weight:600;color:${done===total?'#27AE60':'var(--muted)'}">(${done}/${total})</span>`,
-      todos.map(t => `
-        <div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--border);font-size:13.5px;
-                    color:${t.done?'var(--muted)':'var(--black)'};text-decoration:${t.done?'line-through':'none'}">
-          <span style="font-size:16px">${t.done?'☑':'☐'}</span>${escHtml(t.text||'')}
-        </div>`).join(''));
+    const done = todos.filter(t => t.done).length;
+    html += accSection('✅', `할 일 (${done}/${todos.length})`,
+      todos.map(t => `<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--border);font-size:13.5px;
+        color:${t.done?'var(--muted)':'var(--black)'};text-decoration:${t.done?'line-through':'none'}">
+        <span style="font-size:16px">${t.done?'☑':'☐'}</span>${escHtml(t.text||'')}</div>`).join(''));
   }
 
   if (schRows.length) {
-    html += card('📅','시간표',
-      `<div style="display:flex;flex-direction:column;gap:2px">${schRows.map(r => `
-        <div style="display:flex;gap:10px;font-size:13px;padding:5px 0;border-bottom:1px solid var(--cream2)">
-          <span style="min-width:78px;color:var(--muted);font-weight:600">${escHtml(r.time||'')}</span>
-          <span style="color:var(--black)">${escHtml(r.plan||'')}</span>
-        </div>`).join('')}</div>`);
+    html += accSection('📅','시간표',
+      schRows.map(r => `<div style="display:flex;gap:10px;font-size:13px;padding:5px 0;border-bottom:1px solid var(--cream2)">
+        <span style="min-width:78px;color:var(--muted);font-weight:600">${escHtml(r.time||'')}</span>
+        <span>${escHtml(r.plan||'')}</span></div>`).join(''));
   }
 
-  if (diary) html += card('📓','일기', `<div style="font-size:14px;color:var(--black);line-height:1.8;white-space:pre-wrap">${escHtml(diary)}</div>`);
+  if (diary) html += accSection('📓','일기', `<div style="font-size:14px;line-height:1.8;white-space:pre-wrap">${escHtml(diary)}</div>`);
 
-  html += `</div>`;
+  if (drawings.qt) html += accSection('🖌️','QT 손글씨', `<img src="${drawings.qt}" style="width:100%;border-radius:10px">`);
+  if (drawings.schedule) html += accSection('🖌️','시간표 손글씨', `<img src="${drawings.schedule}" style="width:100%;border-radius:10px">`);
+  if (drawings.diary) html += accSection('🖌️','일기 손글씨', `<img src="${drawings.diary}" style="width:100%;border-radius:10px">`);
+
+  html += '</div>';
   body.innerHTML = html;
 }
 

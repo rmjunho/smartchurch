@@ -514,26 +514,32 @@
           <div class="page-hero-sub">너희 몸을 하나님이 기뻐하시는 거룩한 산 제물로 드리라<br>이는 너희가 드릴 영적 예배니라</div>
         </div>
       </div>
-      <div class="date-nav">
-        <button class="date-nav-btn" onclick="shiftDate(-1)">‹</button>
-        <span class="date-nav-label">
-          <span class="date-seg" onclick="openCalendar('years')" id="dseg-year"></span>년
-          <span class="date-seg" onclick="openCalendar('months')" id="dseg-month"></span>월
-          <span class="date-seg" onclick="openCalendar('days')" id="dseg-day"></span>일
-        </span>
-        <button class="date-nav-btn" onclick="shiftDate(1)">›</button>
-        <button class="date-cal-btn" onclick="openCalendar('days')" aria-label="달력 열기">
-          <svg width="19" height="19" viewBox="0 0 24 24" fill="none">
-            <rect x="3" y="5" width="18" height="16" rx="2" stroke="currentColor" stroke-width="1.8"/>
-            <path d="M3 9.5h18" stroke="currentColor" stroke-width="1.8"/>
-            <path d="M8 3v4M16 3v4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-          </svg>
-        </button>
+      <div class="date-nav" style="padding:0">
+        <div class="cal-strip-header">
+          <span class="cal-strip-month" id="cal-strip-month"></span>
+          <span style="display:none" id="dseg-year"></span>
+          <span style="display:none" id="dseg-month"></span>
+          <span style="display:none" id="dseg-day"></span>
+          <button class="date-cal-btn" onclick="openCalendar('days')" aria-label="달력 열기"
+            style="position:static;margin-left:0">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
+              <rect x="3" y="5" width="18" height="16" rx="2" stroke="currentColor" stroke-width="1.8"/>
+              <path d="M3 9.5h18" stroke="currentColor" stroke-width="1.8"/>
+              <path d="M8 3v4M16 3v4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            </svg>
+          </button>
+        </div>
+        <div class="cal-strip">
+          <button class="cal-strip-arrow" onclick="shiftCalStrip(-7)">‹</button>
+          <div class="cal-strip-days" id="cal-strip-days"></div>
+          <button class="cal-strip-arrow" onclick="shiftCalStrip(7)">›</button>
+        </div>
       </div>
       <div class="mode-bar" style="display:flex;align-items:center">
         <button id="mode-text" class="mode-chip on" onclick="setMode('text')">텍스트형</button>
         <button id="mode-draw" class="mode-chip" onclick="setMode('draw')">드로잉형</button>
         <button id="mode-upload" class="mode-chip" onclick="setMode('upload')">업로드형</button>
+        <button id="mode-share" class="mode-chip" onclick="setMode('share')" style="display:none">📤 나눔</button>
         <button onclick="openBinderSettings()"
           style="margin-left:auto;background:none;border:1.5px solid var(--border);border-radius:20px;
                  padding:5px 11px;font-size:12px;font-weight:600;color:var(--muted);cursor:pointer;
@@ -808,6 +814,17 @@
                   placeholder="사진에 대한 짧은 기록을 남겨보세요 (선택)"
                   oninput="autoSave('photo');autoGrow(this)" style="margin-top:14px"></textarea>
         <span class="binder-saved" id="photo-saved">저장됨 ✓</span>
+      </div>
+
+      <!-- Community binder (교인 묵상 나눔 — 리더 전용) -->
+      <div class="community-binder-wrap" id="worship-share-wrap">
+        <div style="padding:16px" id="community-binder-body">
+          <div style="text-align:center;padding:40px 16px;color:var(--muted)">
+            <div style="font-size:32px;margin-bottom:10px">📖</div>
+            <div style="font-size:14px;font-weight:700;color:var(--black)">교인 묵상 나눔</div>
+            <div style="font-size:12.5px;margin-top:6px">날짜를 선택하면 교인들의 공유된 묵상을 볼 수 있어요</div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -3274,6 +3291,7 @@ function bootApp() {
 
   // 바인더 공유 상태 버튼 업데이트
   updateBinderShareStatusBtn();
+  showShareModeIfLeader();
 
   // 프로필 표시 업데이트
   updateProfileDisplay();
@@ -3347,15 +3365,19 @@ function updateDateSegments() {
   document.getElementById('dseg-year').textContent  = viewDate.getFullYear();
   document.getElementById('dseg-month').textContent = viewDate.getMonth() + 1;
   document.getElementById('dseg-day').textContent   = viewDate.getDate();
+  renderCalStrip(dateKey(), 'cal-strip-days');
+  const mEl = document.getElementById('cal-strip-month');
+  if (mEl) mEl.textContent = `${viewDate.getFullYear()}년 ${viewDate.getMonth()+1}월`;
 }
 
 function shiftDate(d) {
-  saveBinderNow(); // 날짜 이동 전 즉시 저장
+  saveBinderNow();
   viewDate = new Date(viewDate);
   viewDate.setDate(viewDate.getDate() + d);
   updateDateSegments();
   loadBinder();
   initCanvas();
+  if (_currentWorshipMode === 'share') loadCommunityBinders();
 }
 
 function goToDate(newDate) {
@@ -3364,17 +3386,66 @@ function goToDate(newDate) {
   updateDateSegments();
   loadBinder();
   initCanvas();
+  if (_currentWorshipMode === 'share') loadCommunityBinders();
 }
 
+var _calStripBase = null;
+var DOW_KR = ['일','월','화','수','목','금','토'];
+
+function renderCalStrip(selectedDate, containerId) {
+  const container = document.getElementById(containerId || 'cal-strip-days');
+  if (!container) return;
+  const sel = new Date(selectedDate + 'T00:00:00');
+  const day = sel.getDay();
+  const weekStart = _calStripBase ? new Date(_calStripBase) : new Date(sel);
+  if (!_calStripBase) weekStart.setDate(sel.getDate() - day);
+  const today = todayDateKey();
+  let html = '';
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(weekStart);
+    d.setDate(weekStart.getDate() + i);
+    const dk = d.toISOString().split('T')[0];
+    const isSun = d.getDay() === 0;
+    let cls = 'cal-strip-day';
+    if (dk === selectedDate) cls += ' selected';
+    if (dk === today) cls += ' today';
+    if (dk > today) cls += ' future';
+    if (isSun) cls += ' sunday';
+    html += `<div class="${cls}" onclick="goToDate('${dk}')">
+      <div class="cal-strip-dow">${DOW_KR[d.getDay()]}</div>
+      <div class="cal-strip-num">${d.getDate()}</div>
+    </div>`;
+  }
+  container.innerHTML = html;
+}
+
+function shiftCalStrip(days) {
+  const sel = new Date(dateKey() + 'T00:00:00');
+  if (!_calStripBase) {
+    _calStripBase = new Date(sel);
+    _calStripBase.setDate(sel.getDate() - sel.getDay());
+  }
+  _calStripBase.setDate(_calStripBase.getDate() + days);
+  renderCalStrip(dateKey(), 'cal-strip-days');
+}
+
+var _currentWorshipMode = 'text';
+
 function setMode(m) {
+  _currentWorshipMode = m;
   document.getElementById('mode-text').classList.toggle('on', m === 'text');
   document.getElementById('mode-draw').classList.toggle('on', m === 'draw');
   document.getElementById('mode-upload').classList.toggle('on', m === 'upload');
+  document.getElementById('mode-share')?.classList.toggle('on', m === 'share');
   document.getElementById('worship-text-wrap').classList.toggle('off', m !== 'text');
   document.getElementById('worship-draw-wrap').classList.toggle('on',  m === 'draw');
   document.getElementById('worship-upload-wrap').classList.toggle('on', m === 'upload');
+  document.getElementById('worship-share-wrap')?.classList.toggle('on', m === 'share');
+  const shareBtn = document.getElementById('binder-share-status-btn');
+  if (shareBtn) shareBtn.style.display = m === 'share' ? 'none' : '';
   updateFloatToolbarVisibility();
   if (m === 'draw') setTimeout(renderDrawTodoSection, 60);
+  if (m === 'share') loadCommunityBinders();
 }
 
 // ================================================
@@ -3562,17 +3633,25 @@ function saveBinderNow() {
   if (me.binderShareEnabled && window._fbReady && window._fb) {
     const items   = getBinderShareItems();
     const qtText  = [merged.meditation, merged.application, merged.prayer].filter(Boolean).join('\n\n');
+    const drw     = merged.drawings || {};
     const firestoreData = {
       userId:     me.id,
       userName:   me.name,
       church:     me.church || '',
+      churchCode: me.churchCode || '',
       date:       dateKey(),
-      shareItems: items,                                       // 리더 열람 필터용
+      shareItems: items,
       verse:      items.verse    ? (merged.verse || '')  : '',
       qt:         items.qt       ? qtText                : '',
       diary:      items.diary    ? (merged.diary || '')  : '',
       schRows:    items.schedule ? (merged.schRows || []): [],
       todos:      items.todos    ? (merged.todos || []).map(t => ({ text: t.text || '', done: !!t.done })) : [],
+      drawings:   {
+        qt:       items.verse ? (drw.qt || '')       : '',
+        schedule: items.schedule ? (drw.schedule || '') : '',
+        diary:    items.diary ? (drw.diary || '')     : '',
+      },
+      hasDrawings: !!(drw.qt || drw.schedule || drw.diary),
       updatedAt:  new Date().toISOString()
     };
     window._fb.setBinderEntry(`${me.id}_${dateKey()}`, firestoreData).catch(() => {});
@@ -7812,6 +7891,107 @@ function toggleBinderShare() {
   const toggle = document.getElementById('binder-share-toggle');
   if (toggle) toggle.classList.toggle('on', !current);
   toast(!current ? '📤 리더에게 공유됩니다' : '🔒 비공개로 변경됐어요');
+}
+
+// ── 리더: 교인 묵상 나눔 (커뮤니티 바인더) ──
+function showShareModeIfLeader() {
+  const btn = document.getElementById('mode-share');
+  if (btn) btn.style.display = (typeof isLeader === 'function' && isLeader()) ? '' : 'none';
+}
+
+var _communityCache = {};
+
+async function loadCommunityBinders() {
+  const body = document.getElementById('community-binder-body');
+  if (!body || !me) return;
+
+  body.innerHTML = `<div style="text-align:center;padding:40px 16px;color:var(--muted)">
+    <div style="font-size:28px;margin-bottom:12px">🔄</div>
+    <div style="font-size:13px">교인 묵상 불러오는 중...</div>
+  </div>`;
+
+  const dk = dateKey();
+  let entries = [];
+  try {
+    if (window._fbReady && window._fb) {
+      const snap = await window._fb.getBinderEntriesByDate(dk);
+      snap.forEach(d => {
+        const data = d.data();
+        if (data.userId !== me.id && data.church === me.church) entries.push(data);
+      });
+    }
+  } catch(e) { console.warn('교인 묵상 로드 실패:', e); }
+
+  if (!entries.length) {
+    const dateObj = new Date(dk + 'T00:00:00');
+    const dateKr  = dateObj.toLocaleDateString('ko-KR', { month:'long', day:'numeric', weekday:'short' });
+    body.innerHTML = `<div style="text-align:center;padding:40px 16px;color:var(--muted)">
+      <div style="font-size:40px;margin-bottom:12px">📭</div>
+      <div style="font-size:14px;font-weight:700;color:var(--black);margin-bottom:6px">${dateKr}</div>
+      <div style="font-size:13px">아직 공유된 묵상이 없어요</div>
+    </div>`;
+    return;
+  }
+
+  body.innerHTML = entries.map(e => renderCommunityEntry(e)).join('');
+}
+
+function renderCommunityEntry(e) {
+  const share = e.shareItems || { verse:1, qt:1, todos:1, schedule:1, diary:1 };
+  const drw   = e.drawings || {};
+  const hasText = !!(e.verse || e.qt || e.diary || (e.todos||[]).length || (e.schRows||[]).length);
+  const hasDraw = !!(drw.qt || drw.schedule || drw.diary);
+
+  if (!hasText && !hasDraw) return '';
+
+  let sections = '';
+
+  if (e.verse) sections += accSection('📖', '말씀 묵상',
+    `<div style="white-space:pre-wrap;line-height:1.8">${escHtml(e.verse)}</div>`);
+  if (drw.qt) sections += accSection('🎨', '말씀 묵상 (드로잉)',
+    `<img src="${drw.qt}" style="width:100%;border-radius:8px">`);
+  if (e.qt) sections += accSection('✍️', 'QT (묵상)',
+    `<div style="white-space:pre-wrap;line-height:1.8">${escHtml(e.qt)}</div>`);
+  if ((e.todos||[]).length) {
+    const done = e.todos.filter(t => t.done).length;
+    sections += accSection('✅', `할 일 (${done}/${e.todos.length})`,
+      e.todos.map(t => `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;
+        color:${t.done?'var(--muted)':'var(--black)'};text-decoration:${t.done?'line-through':'none'};font-size:13px">
+        <span>${t.done?'☑':'☐'}</span>${escHtml(t.text||'')}</div>`).join(''));
+  }
+  if ((e.schRows||[]).length) sections += accSection('📅', '시간표',
+    e.schRows.map(r => `<div style="display:flex;gap:10px;font-size:13px;padding:4px 0">
+      <span style="min-width:78px;color:var(--muted);font-weight:600">${escHtml(r.time||'')}</span>
+      <span>${escHtml(r.plan||'')}</span></div>`).join(''));
+  if (drw.schedule) sections += accSection('🎨', '시간표 (드로잉)',
+    `<img src="${drw.schedule}" style="width:100%;border-radius:8px">`);
+  if (e.diary) sections += accSection('📓', '일기',
+    `<div style="white-space:pre-wrap;line-height:1.8">${escHtml(e.diary)}</div>`);
+  if (drw.diary) sections += accSection('🎨', '일기 (드로잉)',
+    `<img src="${drw.diary}" style="width:100%;border-radius:8px">`);
+
+  const role = e.userRole || '';
+  return `<div class="comm-user-card">
+    <div class="comm-user-hd" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none';this.querySelector('.acc-chev').classList.toggle('open')">
+      <div class="comm-user-avatar">👤</div>
+      <div class="comm-user-info">
+        <div class="comm-user-name">${escHtml(e.userName||'')}</div>
+        <div class="comm-user-sub">${hasText?'텍스트':''}${hasText&&hasDraw?' · ':''}${hasDraw?'드로잉':''}</div>
+      </div>
+      <span class="acc-chev">▼</span>
+    </div>
+    <div class="comm-user-body" style="display:none">${sections}</div>
+  </div>`;
+}
+
+function accSection(icon, title, inner) {
+  return `<div class="acc-card">
+    <div class="acc-hd" onclick="this.classList.toggle('open')">
+      <div class="acc-hd-left"><span>${icon}</span><span>${title}</span></div>
+      <span class="acc-chev">▼</span>
+    </div>
+    <div class="acc-body">${inner}</div>
+  </div>`;
 }
 
 // ── 리더: 교인 바인더 열람 ──
