@@ -965,6 +965,8 @@
           <div style="text-align:center;padding:20px;color:var(--muted);font-size:13px">🔄 불러오는 중...</div>
         </div>
         <div class="openchat-input-bar">
+          <input type="file" id="room-panel-img-input" accept="image/*" style="display:none" onchange="sendChatImage('room',event)">
+          <button class="openchat-attach-btn" id="room-panel-attach-btn" title="사진 보내기" onclick="document.getElementById('room-panel-img-input').click()">🖼️</button>
           <textarea class="openchat-input" id="room-panel-input"
             placeholder="메시지를 입력해 주세요..."
             rows="1" autocomplete="off" autocorrect="off" autocapitalize="off"
@@ -1005,6 +1007,8 @@
             <div style="text-align:center;padding:20px;color:var(--muted);font-size:13px">🔄 메시지 불러오는 중...</div>
           </div>
           <div class="openchat-input-bar">
+            <input type="file" id="openchat-img-input" accept="image/*" style="display:none" onchange="sendChatImage('open',event)">
+            <button class="openchat-attach-btn" id="openchat-attach-btn" title="사진 보내기" onclick="document.getElementById('openchat-img-input').click()">🖼️</button>
             <textarea class="openchat-input" id="openchat-input"
               placeholder="메시지를 입력해 주세요..."
               rows="1" autocomplete="off" autocorrect="off" autocapitalize="off"
@@ -2979,6 +2983,8 @@ async function doLogin() {
         DB.set('users', users);
         DB.setSession(uid);
         me = fbUser;
+        // 내 사진 캐시 하이드레이트 (다른 기기에서 바꾼 사진 반영)
+        if (fbUser.photoURL) { _photoCache[uid] = fbUser.photoURL; DB.set('profilePhoto_' + uid, fbUser.photoURL); }
 
         hideLoadingOverlay();
         if (fbUser.status === 'rejected') {
@@ -6118,7 +6124,7 @@ function renderAppSettings() {
   const notifEvent     = DB.get('notifEvent_'     + me.id, true);
   const notifBoard     = DB.get('notifBoard_'     + me.id, true);
   const fontSize       = DB.get('fontSize_'       + me.id, 'md');
-  const photoSrc       = DB.get('profilePhoto_' + me.id, '');
+  const photoSrc       = getMyPhoto() || '';
   const FONT_LABELS    = { sm:'작게', md:'보통', lg:'크게' };
 
   function toggleRow(key, label, sub, val) {
@@ -6988,14 +6994,19 @@ function _renderRoomMsgs(msgs) {
       html += `<div class="openchat-date-divider"><span>${dateStr}</span></div>`;
       lastDate = dateStr;
     }
-    const avatarHtml = msg.senderPhoto
-      ? `<img src="${msg.senderPhoto}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`
+    const photo = (msg.senderId !== 'system' && getUserPhoto(msg.senderId)) || msg.senderPhoto;
+    const avatarHtml = photo
+      ? `<img src="${photo}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`
       : '👤';
+    const isImg = msg.type === 'image' && msg.imageUrl;
+    const bubbleInner = isImg
+      ? `<img class="chat-img" src="${msg.imageUrl}" alt="사진" onclick="openImageLightbox(this.src)">`
+      : escHtml(msg.text);
     html += `<div class="chat-bubble-wrap ${isMine ? 'mine' : ''}">
       ${!isMine ? `<div class="chat-avatar">${avatarHtml}</div>` : ''}
       <div class="chat-bubble-col">
         ${!isMine ? `<div class="chat-sender">${escHtml(msg.senderName)}</div>` : ''}
-        <div class="chat-bubble">${escHtml(msg.text)}</div>
+        <div class="chat-bubble${isImg ? ' img' : ''}">${bubbleInner}</div>
         <div class="chat-time">${timeStr}</div>
       </div>
     </div>`;
@@ -7021,7 +7032,7 @@ async function sendRoomMsg() {
       senderId:    me.id,
       senderName:  me.name,
       senderRole:  me.role || '성도',
-      senderPhoto: DB.get('profilePhoto_' + me.id, null) || null
+      senderPhoto: getMyPhoto()
     });
     // 채팅방 lastMessage + lastSenderId 업데이트
     window._fb.updateChatRoom(_currentRoomId, {
@@ -7037,6 +7048,77 @@ async function sendRoomMsg() {
     if (btn) btn.disabled = false;
     input.focus();
   }
+}
+
+// ── 채팅 이미지 전송 (DM/그룹/오픈채팅 공통) ──
+// kind: 'room'(DM·그룹) | 'open'(오픈채팅)
+async function sendChatImage(kind, event) {
+  const file = event.target.files[0];
+  event.target.value = '';   // 같은 파일 재선택 가능
+  if (!file) return;
+  if (!file.type.startsWith('image/')) { toast('이미지 파일만 보낼 수 있어요'); return; }
+  if (file.size > 5 * 1024 * 1024) { toast('이미지 크기는 5MB 이하여야 합니다.'); return; }
+  if (!window._fbReady || !window._fb) { toast('연결 중입니다. 잠시 후 시도해 주세요'); return; }
+
+  // 대상 방 결정
+  let roomId;
+  if (kind === 'open') {
+    if (!me.church || !me.churchCode) { toast('교회에 가입해야 채팅할 수 있어요'); return; }
+    if (me.churchStatus === 'pending') { toast('교회 가입 승인 후 메시지를 보낼 수 있어요'); return; }
+    roomId = `${me.churchCode}_open`;
+  } else {
+    if (!_currentRoomId) return;
+    roomId = _currentRoomId;
+  }
+
+  const msgsEl   = document.getElementById(kind === 'open' ? 'openchat-msgs' : 'room-panel-msgs');
+  const attachBtn = document.getElementById(kind === 'open' ? 'openchat-attach-btn' : 'room-panel-attach-btn');
+  if (attachBtn) attachBtn.disabled = true;
+  // 업로드 스피너 (다음 스냅샷 렌더 시 자동 교체됨)
+  let spin = null;
+  if (msgsEl) {
+    spin = document.createElement('div');
+    spin.innerHTML = `<div class="chat-bubble-wrap mine"><div class="chat-bubble-col">
+      <div class="chat-bubble" style="opacity:.7">📤 사진 업로드 중…</div></div></div>`;
+    msgsEl.appendChild(spin);
+    msgsEl.scrollTop = msgsEl.scrollHeight;
+  }
+
+  try {
+    const raw      = await _readFileAsDataUrl(file);
+    const imageUrl = await _fitImageForFirestore(raw);
+    await window._fb.sendChatMsg(roomId, {
+      type:        'image',
+      imageUrl,
+      text:        '',
+      senderId:    me.id,
+      senderName:  me.name,
+      senderRole:  me.role || '성도',
+      senderPhoto: getMyPhoto()
+    });
+    const meta = { lastMessage: '📷 사진', lastMessageAt: new Date().toISOString(), lastSenderId: me.id };
+    if (kind === 'open') window._fb.ensureChatRoom(roomId, meta).catch(() => {});
+    else                 window._fb.updateChatRoom(roomId, meta).catch(() => {});
+  } catch(e) {
+    console.error('이미지 전송 실패:', e);
+    toast('사진 전송 실패. 다시 시도해 주세요');
+    if (spin && spin.parentNode) spin.parentNode.removeChild(spin);
+  } finally {
+    if (attachBtn) attachBtn.disabled = false;
+  }
+}
+
+// ── 이미지 전체화면 뷰어 ──
+function openImageLightbox(src) {
+  let ov = document.getElementById('img-lightbox');
+  if (!ov) {
+    ov = document.createElement('div');
+    ov.id = 'img-lightbox';
+    ov.onclick = () => { ov.style.display = 'none'; ov.innerHTML = ''; };
+    document.body.appendChild(ov);
+  }
+  ov.innerHTML = `<img src="${src}" alt="이미지">`;
+  ov.style.display = 'flex';
 }
 
 function closeChatRoomPanel() {
@@ -7062,7 +7144,7 @@ function renderFriendsList() {
     return;
   }
   el.innerHTML = friends.map(f => {
-    const photo = DB.get('profilePhoto_' + f.userId, null);
+    const photo = getUserPhoto(f.userId);
     const avatarHtml = photo
       ? `<img src="${photo}" alt="${escHtml(f.name)}">`
       : '👤';
@@ -7276,7 +7358,8 @@ async function searchByFriendCode() {
       return;
     }
     const alreadyFriend = getFriends().find(f => f.userId === found.id);
-    const photo  = found.photoURL || null;
+    _cacheUserPhotos([found]);
+    const photo  = getUserPhoto(found);
     el.innerHTML = `<div class="friend-item">
       <div class="friend-avatar">${photo ? `<img src="${photo}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">` : '👤'}</div>
       <div style="flex:1;min-width:0">
@@ -7332,7 +7415,7 @@ function renderFriendSearch() {
     }
 
     el.innerHTML = combined.map(u => {
-      const photo = DB.get('profilePhoto_' + u.id, null);
+      const photo = getUserPhoto(u);
       const isPublicBadge = u.profilePublic && u.church !== me.church
         ? `<span style="font-size:10px;background:rgba(39,174,96,0.1);color:#27AE60;
             border-radius:6px;padding:1px 6px;font-weight:700">🌐 공개</span>` : '';
@@ -7538,15 +7621,20 @@ function _renderOpenChatMsgs(msgs) {
       lastDate = dateStr;
     }
 
-    const avatarHtml = msg.senderPhoto
-      ? `<img src="${msg.senderPhoto}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`
+    const photo = (msg.senderId !== 'system' && getUserPhoto(msg.senderId)) || msg.senderPhoto;
+    const avatarHtml = photo
+      ? `<img src="${photo}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`
       : '👤';
+    const isImg = msg.type === 'image' && msg.imageUrl;
+    const bubbleInner = isImg
+      ? `<img class="chat-img" src="${msg.imageUrl}" alt="사진" onclick="openImageLightbox(this.src)">`
+      : escHtml(msg.text);
 
     html += `<div class="chat-bubble-wrap ${isMine ? 'mine' : ''}">
       ${!isMine ? `<div class="chat-avatar">${avatarHtml}</div>` : ''}
       <div class="chat-bubble-col">
         ${!isMine ? `<div class="chat-sender">${escHtml(msg.senderName)} · ${escHtml(msg.senderRole||'성도')}</div>` : ''}
-        <div class="chat-bubble">${escHtml(msg.text)}</div>
+        <div class="chat-bubble${isImg ? ' img' : ''}">${bubbleInner}</div>
         <div class="chat-time">${timeStr}</div>
       </div>
     </div>`;
@@ -7576,7 +7664,7 @@ async function sendOpenChatMsg() {
       senderId:    me.id,
       senderName:  me.name,
       senderRole:  me.role || '성도',
-      senderPhoto: DB.get('profilePhoto_' + me.id, null) || null
+      senderPhoto: getMyPhoto()
     });
     // 오픈채팅방 lastMessage 업데이트
     window._fb.ensureChatRoom(`${me.churchCode}_open`, {
@@ -7605,8 +7693,62 @@ function initChatTab() {
 }
 var _editPhotoBase64 = null; // 새로 선택한 사진 임시 저장
 
-function getProfilePhoto() { return DB.get('profilePhoto_' + me.id, null); }
-function saveProfilePhoto(b64) { DB.set('profilePhoto_' + me.id, b64); }
+function getProfilePhoto() { return getUserPhoto(me.id); }
+function saveProfilePhoto(b64) { DB.set('profilePhoto_' + me.id, b64); _photoCache[me.id] = b64; }
+
+// ── 프로필 사진 공용 접근자 (전 앱 일관 표시) ──
+// 우선순위: 사용자 객체의 photoURL(Firestore 최신) → _photoCache → localStorage
+var _photoCache = {};   // { uid: dataUrl } — Firestore photoURL 런타임 캐시
+function getUserPhoto(userOrId) {
+  if (userOrId && typeof userOrId === 'object') {
+    return userOrId.photoURL || _photoCache[userOrId.id] || DB.get('profilePhoto_' + userOrId.id, null) || null;
+  }
+  return _photoCache[userOrId] || DB.get('profilePhoto_' + userOrId, null) || null;
+}
+function getMyPhoto() { return getUserPhoto(me.id); }
+// Firestore 사용자 배열에서 photoURL 을 캐시에 심음 → id만 있는 렌더에서도 사진 표시
+function _cacheUserPhotos(arr) {
+  (arr || []).forEach(u => { if (u && u.id && u.photoURL) _photoCache[u.id] = u.photoURL; });
+}
+
+// ── 이미지 base64 유틸 (Firebase Storage 미사용 → Firestore 문서에 압축본 저장) ──
+function _readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = e => resolve(e.target.result);
+    r.onerror = reject;
+    r.readAsDataURL(file);
+  });
+}
+function _compressImageDataUrl(dataUrl, maxDim, quality) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      let w = img.width, h = img.height;
+      if (w > maxDim || h > maxDim) {
+        if (w >= h) { h = Math.round(h * maxDim / w); w = maxDim; }
+        else        { w = Math.round(w * maxDim / h); h = maxDim; }
+      }
+      const c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      c.getContext('2d').drawImage(img, 0, 0, w, h);
+      resolve(c.toDataURL('image/jpeg', quality));
+    };
+    img.onerror = reject;
+    img.src = dataUrl;
+  });
+}
+// Firestore 문서 크기 제한(1MB) 안에 들어가도록 반복 축소 (목표 base64 < 700KB)
+async function _fitImageForFirestore(dataUrl) {
+  let out = await _compressImageDataUrl(dataUrl, 1000, 0.6);
+  let dim = 800, q = 0.55;
+  for (let i = 0; i < 5 && out.length > 700 * 1024; i++) {
+    out = await _compressImageDataUrl(dataUrl, dim, q);
+    dim = Math.round(dim * 0.8);
+    q = Math.max(0.4, q - 0.05);
+  }
+  return out;
+}
 
 function updateProfileAvatarDisplay() {
   const photo = getProfilePhoto();
@@ -7762,8 +7904,15 @@ function saveProfileEdit() {
     : (document.getElementById('edit-role').value || getDefaultRole(orgType));
   if (!name) { toast('이름을 입력해 주세요'); return; }
 
-  // 사진 저장
-  if (_editPhotoBase64) saveProfilePhoto(_editPhotoBase64);
+  // 사진 저장: 로컬(원본) + Firestore(압축본 photoURL) → 전 기기·타 사용자 공유
+  if (_editPhotoBase64) {
+    saveProfilePhoto(_editPhotoBase64);
+    const rawPhoto = _editPhotoBase64;
+    _fitImageForFirestore(rawPhoto).then(small => {
+      _photoCache[me.id] = small;
+      if (window._fbReady && window._fb) window._fb.updateUser(me.id, { photoURL: small }).catch(() => {});
+    }).catch(() => {});
+  }
 
   // 사용자 데이터 업데이트
   const users = DB.get('users', []);

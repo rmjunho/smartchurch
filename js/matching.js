@@ -100,11 +100,61 @@ function respondMatchReq(reqId, accept) {
       DB.set(matchProfilesKey(), profiles);
       if (window._fbReady && window._fb) window._fb.setMatchProfileDoc(p.id, { status: 'matched' }).catch(() => {});
     }
-    // 수락 시 두 사람의 1:1 DM 채팅방 자동 생성 (item 6)
-    createMatchDMRoom(req);
+    // 수락 시 채팅방 자동 생성: 2명 → 1:1 DM, 3명 이상 → 그룹 채팅
+    createMatchChatRoom(req);
   }
   toast(accept ? '✅ 수락했어요! 연결이 됐어요 🤝' : '거절했어요');
   openSubscreen('match-inbox');
+}
+
+// 수락된 인원수에 따라 1:1 DM 또는 그룹 채팅방으로 라우팅
+function createMatchChatRoom(req) {
+  if (!req) return;
+  const reqs = DB.get(matchReqsKey(), []);
+  // 같은 프로필에 수락된 모든 요청 → 그룹 구성원 판단
+  const accepted = reqs.filter(r => r.profileId === req.profileId && r.status === 'accepted');
+  // 프로필 소유자(toId=수락자=me) + 수락된 요청자(fromId)들
+  const ownerId = req.toId;
+  const memberMap = new Map();
+  memberMap.set(ownerId, ownerId === me.id ? (me.name || '방장') : '방장');
+  accepted.forEach(r => { if (r.fromId) memberMap.set(r.fromId, r.fromName || '멤버'); });
+
+  if (memberMap.size >= 3) _createMatchGroupRoom(req, memberMap);
+  else                     createMatchDMRoom(req);
+}
+
+function _createMatchGroupRoom(req, memberMap) {
+  const roomId      = 'match_' + req.profileId;   // 프로필당 하나의 그룹방 (결정적 ID)
+  const memberIds   = [...memberMap.keys()];
+  const memberNames = [...memberMap.values()];
+  const roomName    = matchTypeLabel(req.type) + ' 그룹';
+  const rooms = getChatRooms();
+  const existing = rooms.find(r => r.id === roomId);
+  const room = {
+    id:            roomId,
+    type:          'group',
+    name:          roomName,
+    emoji:         '🤝',
+    members:       memberIds,        // 전체 멤버 UID → 각자 listenMyRooms 로 방 수신
+    memberNames,
+    createdBy:     req.toId,
+    createdAt:     existing?.createdAt || new Date().toISOString(),
+    lastMessage:   `🤝 ${roomName}이 만들어졌어요`,
+    lastMessageAt: new Date().toISOString(),
+    lastSenderId:  'system',
+    fromMatch:     true
+  };
+  if (existing) Object.assign(existing, room); else rooms.push(room);
+  saveChatRooms(rooms);
+  if (window._fbReady && window._fb) {
+    // 전체 멤버 배열로 덮어써 새로 합류한 멤버도 방을 받도록 함
+    window._fb.ensureChatRoom(roomId, room).catch(() => {});
+    window._fb.sendChatMsg(roomId, {
+      text: `🤝 ${roomName}에 ${memberIds.length}명이 모였어요! 반갑게 인사 나눠보세요 😊`,
+      senderId: 'system', senderName: '스마트처치', senderRole: '', senderPhoto: null
+    }).catch(() => {});
+  }
+  toast(`💬 ${roomName} 채팅방이 열렸어요! (${memberIds.length}명)`);
 }
 
 function createMatchDMRoom(req) {

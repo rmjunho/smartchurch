@@ -769,6 +769,26 @@
       flex-shrink:0; transition: opacity 0.15s;
     }
     .openchat-send-btn:disabled { opacity:0.4; cursor:default; }
+    .openchat-attach-btn {
+      width:40px; height:40px; border-radius:50%; border:none;
+      background:var(--cream2); color:var(--black); font-size:18px;
+      cursor:pointer; display:flex; align-items:center; justify-content:center;
+      flex-shrink:0; transition: opacity 0.15s;
+    }
+    .openchat-attach-btn:disabled { opacity:0.4; cursor:default; }
+    /* 채팅 이미지 메시지 */
+    .chat-bubble.img { background:none; padding:0; box-shadow:none; }
+    .chat-bubble-wrap.mine .chat-bubble.img { background:none; }
+    .chat-img {
+      max-width:200px; width:auto; height:auto; border-radius:12px;
+      cursor:pointer; display:block; box-shadow:0 1px 4px rgba(0,0,0,0.12);
+    }
+    #img-lightbox {
+      position:fixed; inset:0; z-index:9999; display:none;
+      align-items:center; justify-content:center;
+      background:rgba(0,0,0,0.88); padding:24px; cursor:zoom-out;
+    }
+    #img-lightbox img { max-width:96%; max-height:96%; border-radius:10px; }
     .openchat-empty {
       flex:1; display:flex; flex-direction:column; align-items:center;
       justify-content:center; color:var(--muted); gap:8px;

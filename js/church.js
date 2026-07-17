@@ -899,6 +899,7 @@ async function loadMembersScreenData() {
   });
 
   _membersCache = allUsers;   // 승인/거절 핸들러가 대상 사용자를 찾을 수 있도록 캐시
+  if (typeof _cacheUserPhotos === 'function') _cacheUserPhotos(allUsers);
   body.outerHTML = renderMembersScreenHtml(allUsers);
 }
 
@@ -1544,7 +1545,7 @@ async function loadMyChurchData() {
     html += `<div style="padding:14px;text-align:center;color:var(--muted);font-size:13px">교인이 없어요</div>`;
   } else {
     members.slice(0, 4).forEach(u => {
-      const photo = DB.get('profilePhoto_'+u.id, null);
+      const photo = getUserPhoto(u);
       const isMe  = u.id === me.id;
       html += `
         <div class="ss-card-row">
@@ -1592,7 +1593,7 @@ function renderChurchMembers() {
       return;
     }
     el.innerHTML = show.map(u => {
-      const photo = DB.get('profilePhoto_' + u.id, null);
+      const photo = getUserPhoto(u);
       const isMe  = u.id === me.id;
       const avatar= photo
         ? `<img src="${photo}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`
@@ -1634,6 +1635,7 @@ async function _loadChurchMembers() {
       u.churchStatus !== 'pending'
     );
   }
+  if (typeof _cacheUserPhotos === 'function') _cacheUserPhotos(members);
   return members;
 }
 
