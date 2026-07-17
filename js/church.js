@@ -896,8 +896,8 @@ function renderMembersScreenHtml(allUsers) {
   const pending       = [...churchPending, ...minorPending];
   const active        = allUsers.filter(u =>
     u.status !== 'pending' && u.status !== 'rejected' && u.churchStatus !== 'pending');
-  const roles = ['목사','전도사','선교사','장로','권사','집사','간사','성도',
-                 '기관장','관리자','직원','기관 관계자','기타'];
+  const orgType = getOrgTypeForChurch(me.churchCode);
+  const roles = (ORG_ROLES[orgType] || ORG_ROLES.church).map(r => r.value);
 
   // 탭 헤더
   let html = `
@@ -921,7 +921,8 @@ function renderMembersScreenHtml(allUsers) {
     html += `<div class="ss-empty"><div class="ss-empty-icon">👥</div><div class="ss-empty-title">등록된 교인이 없어요</div></div>`;
   } else {
     roles.concat(['기타']).forEach(role => {
-      const group = active.filter(u => (u.role||'성도') === role || (role==='기타' && !roles.includes(u.role||'성도')));
+      const defRole = getDefaultRole(orgType);
+      const group = active.filter(u => (u.role||defRole) === role || (role==='기타' && !roles.includes(u.role||defRole)));
       if (!group.length) return;
     html += `<div class="ss-section-title">${role} (${group.length}명)</div>
       <div class="ss-card">${group.map(u => {
@@ -1077,7 +1078,8 @@ function joinMeeting() {
 
 function getChurchName(code) {
   if (!code) return null;
-  if (OB_CHURCHES[code]) return OB_CHURCHES[code];
+  const ob = OB_CHURCHES[code];
+  if (ob) return typeof ob === 'string' ? ob : ob.name;
   const c = DB.get('customChurches', {})[code];
   if (!c) return null;
   return typeof c === 'string' ? c : (c.name || null);
@@ -1085,7 +1087,13 @@ function getChurchName(code) {
 
 function getChurchData(code) {
   if (!code) return null;
-  if (OB_CHURCHES[code]) return { name: OB_CHURCHES[code], code, type: 'church', emoji: '⛪', readonly: true };
+  const ob = OB_CHURCHES[code];
+  if (ob) {
+    const name = typeof ob === 'string' ? ob : ob.name;
+    const type = (typeof ob === 'object' && ob.type) || 'church';
+    const emoji = (CHURCH_TYPES.find(t => t.value === type) || CHURCH_TYPES[0]).emoji;
+    return { name, code, type, emoji, readonly: true };
+  }
   const c = DB.get('customChurches', {})[code];
   if (!c) return null;
   if (typeof c === 'string') return { name: c, code, type: 'church', emoji: '⛪' };
@@ -2253,7 +2261,7 @@ async function obEnterWithInviteCode() {
   me.church          = entry.church;
   me.churchCode      = entry.churchCode || '';
   me.churchStatus    = 'active';
-  me.orgType         = me.orgType || entry.orgType || 'church';
+  me.orgType         = me.orgType || entry.orgType || getOrgTypeForChurch(entry.churchCode) || 'church';
   DB.saveUser(me);
 
   // 사용 기록
@@ -2271,7 +2279,7 @@ function obRegisterNewChurch() {
   const name  = (document.getElementById('ob-new-church-name')?.value || '').trim();
   if (code.length < 4)   { toast('코드를 4자 이상 입력해 주세요 (예: JOYFUL)'); return; }
   if (!name)              { toast('교회/기관 이름을 입력해 주세요'); return; }
-  if (OB_CHURCHES[code]) { toast(`이미 등록된 코드예요 (${OB_CHURCHES[code]})`); return; }
+  if (OB_CHURCHES[code]) { toast(`이미 등록된 코드예요 (${getChurchName(code)})`); return; }
   const custom  = DB.get('customChurches', {});
   const existingName = getChurchName(code);
   if (existingName) { toast(`이미 ${existingName}이(가) 사용 중인 코드예요`); return; }
@@ -2305,12 +2313,15 @@ function obConnectChurch() {
   const code = document.getElementById('ob-code').value.toUpperCase();
   const found = getChurchName(code);
 
+  // 교회 코드가 유효하면 해당 교회의 orgType을 적용
+  const resolvedOrgType = (code && found) ? getOrgTypeForChurch(code) : _obOrgType;
+
   // 유형/직분 저장
-  const selectedRole = _obOrgType === 'personal'
+  const selectedRole = resolvedOrgType === 'personal'
     ? '개인'
-    : (document.getElementById('ob-role-select')?.value || '성도');
+    : (document.getElementById('ob-role-select')?.value || getDefaultRole(resolvedOrgType));
   me.role    = selectedRole;
-  me.orgType = _obOrgType;
+  me.orgType = resolvedOrgType;
 
   if (code && found) {
     obData.churchName  = found;
@@ -2342,7 +2353,9 @@ function changeChurchCode() {
   if (churchName === me.church) { toast('이미 소속된 교회예요'); return; }
 
   const wasPersonal = me.orgType === 'personal';
-  if (wasPersonal) { me.orgType = 'church'; me.role = '성도'; }
+  const newOrgType = getOrgTypeForChurch(code);
+  const newDefRole = getDefaultRole(newOrgType);
+  if (wasPersonal) { me.orgType = newOrgType; me.role = newDefRole; }
 
   const users = DB.get('users', []);
   const u = users.find(x => x.id === me.id);
@@ -2351,7 +2364,7 @@ function changeChurchCode() {
     u.churchCode       = code;
     u.churchStatus     = me.isAppAdmin ? 'active' : 'pending';
     u.registrationType = wasPersonal ? 'newfamily' : 'regular';
-    if (wasPersonal) { u.orgType = 'church'; u.role = '성도'; }
+    if (wasPersonal) { u.orgType = newOrgType; u.role = newDefRole; }
     DB.set('users', users);
     me.church           = churchName;
     me.churchCode       = code;
@@ -2361,7 +2374,7 @@ function changeChurchCode() {
 
   if (window._fbReady && window._fb) {
     const update = { church: me.church, churchCode: me.churchCode, churchStatus: me.churchStatus, registrationType: me.registrationType };
-    if (wasPersonal) { update.orgType = 'church'; update.role = '성도'; }
+    if (wasPersonal) { update.orgType = newOrgType; update.role = newDefRole; }
     window._fb.updateUser(me.id, update).catch(() => {});
   }
 

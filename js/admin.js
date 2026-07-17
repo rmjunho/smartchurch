@@ -404,7 +404,9 @@ function renderAdminPanelHtml(allUsers) {
   // ── 관리자 전용: 현재 소속 + 자유 이동 ──
   const allCustom  = DB.get('customChurches', {});
   const allCodes   = Object.keys(allCustom);
-  const ALL_CHURCHES = { ...OB_CHURCHES, ...Object.fromEntries(allCodes.map(c => {
+  const ALL_CHURCHES = { ...Object.fromEntries(Object.entries(OB_CHURCHES).map(([c, v]) =>
+    [c, typeof v === 'string' ? v : v.name]
+  )), ...Object.fromEntries(allCodes.map(c => {
     const d = allCustom[c]; return [c, typeof d === 'string' ? d : d.name];
   })) };
   const currentChurchName = me.church || '소속 없음';

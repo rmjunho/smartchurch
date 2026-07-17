@@ -2720,26 +2720,40 @@ function showErr(id, msg) {
 // ── 소속 유형 & 직분 ──
 var ORG_ROLES = {
   church: [
-    { value:'목사',    label:'목사 👑',    leader:true  },
-    { value:'전도사',  label:'전도사 👑',  leader:true  },
-    { value:'선교사',  label:'선교사 👑',  leader:true  },
-    { value:'장로',    label:'장로',        leader:false },
-    { value:'권사',    label:'권사',        leader:false },
-    { value:'집사',    label:'집사',        leader:false },
-    { value:'간사',    label:'간사',        leader:false },
-    { value:'성도',    label:'성도',        leader:false },
+    { value:'담임목사', label:'담임목사 👑', leader:true  },
+    { value:'부목사',   label:'부목사 👑',   leader:true  },
+    { value:'전도사',   label:'전도사 👑',   leader:true  },
+    { value:'장로',     label:'장로',         leader:false },
+    { value:'권사',     label:'권사',         leader:false },
+    { value:'집사',     label:'집사',         leader:false },
+    { value:'성도',     label:'성도',         leader:false },
   ],
   org: [
-    { value:'기관장',    label:'기관장 👑',    leader:true  },
-    { value:'관리자',    label:'관리자 👑',    leader:true  },
-    { value:'직원',      label:'직원',          leader:false },
-    { value:'기관 관계자', label:'기관 관계자', leader:false },
-    { value:'기타',      label:'기타',          leader:false },
+    { value:'원장',   label:'원장 👑',   leader:true  },
+    { value:'부원장', label:'부원장 👑', leader:true  },
+    { value:'관리자', label:'관리자 👑', leader:true  },
+    { value:'간사',   label:'간사',       leader:false },
+    { value:'회원',   label:'회원',       leader:false },
   ],
   personal: [
     { value:'개인', label:'개인', leader:false },
   ]
 };
+
+function getDefaultRole(orgType) {
+  if (orgType === 'org') return '회원';
+  if (orgType === 'personal') return '개인';
+  return '성도';
+}
+
+function getOrgTypeForChurch(code) {
+  if (!code) return 'church';
+  const ob = OB_CHURCHES[code];
+  if (ob) return ob.type || 'church';
+  const c = DB.get('customChurches', {})[code];
+  if (c && typeof c === 'object' && c.type) return c.type === 'church' ? 'church' : 'org';
+  return 'church';
+}
 
 var _regOrgType = 'church';
 
@@ -2992,8 +3006,8 @@ async function doRegister() {
   const pw    = document.getElementById('r-pw').value;
   const pw2   = document.getElementById('r-pw2').value;
   // 유형/직분은 온보딩 ob2에서 선택 → 가입 시 기본값
-  const role  = '성도';
-  const orgType = 'church';
+  const orgType = _regOrgType || 'church';
+  const role  = getDefaultRole(orgType);
 
   clearErrors('r-name-err','r-birth-err','r-email-err','r-pw-err','r-pw2-err');
   let ok = true;
@@ -5603,6 +5617,10 @@ function saveAppointLeader() {
   u.leaderPerms       = perms;
   DB.set('users', users);
 
+  if (window._fbReady && window._fb) {
+    window._fb.updateUser(u.id, { isAppointedLeader: u.isAppointedLeader, leaderPerms: u.leaderPerms }).catch(() => {});
+  }
+
   closeAppointModal();
   const cur = document.getElementById('subscreen')?.dataset?.current;
   if (cur) setTimeout(() => openSubscreen(cur), 150);
@@ -6241,8 +6259,8 @@ var CHALLENGE_CATEGORIES = ['신앙/말씀&기도', '전도', '생활/건강', '
 var CHALLENGE_CATALOG = [];
 
 var LEADER_ROLES = {
-  church:   ['목사','전도사','선교사'],
-  org:      ['기관장','관리자'],
+  church:   ['담임목사','부목사','전도사'],
+  org:      ['원장','부원장','관리자'],
   personal: []
 };
 
@@ -6479,8 +6497,8 @@ function startApp() {
 //  ONBOARDING
 // ================================================
 var OB_CHURCHES = {
-  'AK0001': 'AK 훈련센터',
-  'SC0001': '스마트처치',
+  'AK0001': { name: 'AK 훈련센터', type: 'org' },
+  'SC0001': { name: '스마트처치', type: 'church' },
 };
 
 // ── 교회/기관 타입 ──
@@ -7430,7 +7448,7 @@ function setEditOrgType(type) {
   // 직분 목록 업데이트
   const sel = document.getElementById('edit-role');
   if (sel && type !== 'personal') {
-    const curRole = sel.value || me.role || '성도';
+    const curRole = sel.value || me.role || getDefaultRole(type);
     sel.innerHTML = ORG_ROLES[type].map(r =>
       `<option value="${r.value}"${r.value === curRole ? ' selected' : ''}>${r.label}</option>`).join('');
   }
@@ -7554,7 +7572,7 @@ function saveProfileEdit() {
   const orgType = _editOrgType || me.orgType || 'church';
   const role    = orgType === 'personal'
     ? '개인'
-    : (document.getElementById('edit-role').value || '성도');
+    : (document.getElementById('edit-role').value || getDefaultRole(orgType));
   if (!name) { toast('이름을 입력해 주세요'); return; }
 
   // 사진 저장
