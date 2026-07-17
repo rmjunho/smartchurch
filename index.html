@@ -1428,8 +1428,27 @@
   <div class="modal-backdrop" id="modal-todo-settings" onclick="closeTodoSettingsModal(event)">
     <div class="modal-sheet">
       <div class="modal-title">Todo List 설정 ⚙</div>
+
+      <!-- 할 일 지속 활성화 -->
+      <div class="settings-section-label">할 일 지속 활성화</div>
+      <div class="settings-section-desc">켜면 완료된 할 일도 다음 날로 이월돼요</div>
+      <label class="ts-toggle-row" style="margin-bottom:16px">
+        <span style="font-size:13.5px;font-weight:600;color:var(--black)">완료 항목 이월</span>
+        <input type="checkbox" id="ts-keep-done" class="ts-toggle-cb" onchange="setTodoKeepDone(this.checked)">
+        <span class="ts-toggle-slider"></span>
+      </label>
+
+      <!-- 카테고리 제목 정렬 -->
+      <div class="settings-section-label">카테고리 제목 정렬</div>
+      <div class="settings-section-desc">카테고리 헤더의 텍스트 정렬을 변경해요</div>
+      <div class="ts-align-row" style="margin-bottom:18px">
+        <button class="ts-align-btn" id="ts-align-right" onclick="setTodoCatAlign('right')">오른쪽</button>
+        <button class="ts-align-btn" id="ts-align-left"  onclick="setTodoCatAlign('left')">왼쪽</button>
+      </div>
+
+      <!-- 카테고리 관리 -->
       <div class="settings-section-label">카테고리 관리</div>
-      <div class="settings-section-desc">카테고리를 추가하거나 삭제할 수 있어요</div>
+      <div class="settings-section-desc">카테고리를 추가·삭제·순서 변경할 수 있어요</div>
       <div id="settings-cat-list"></div>
       <div class="settings-cat-add-row">
         <input id="settings-new-cat" class="form-input" style="flex:1;height:44px"
@@ -4341,10 +4360,38 @@ function renderDrawTodoSection() {
   const invStates = DB.get('drawInv_' + me.id, {});
   const ckPath = `<path d="M1 4L3.5 7L9 1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`;
 
-  wrap.innerHTML = cards.map(c => {
+  const align = getTodoCatAlign();
+  const cats = getCategories();
+  let html = '';
+  cats.forEach(cat => {
+    const group = cards.filter(c => c.cat === cat);
+    if (!group.length) return;
+    html += `<div class="todo-category-title" style="text-align:${align};color:white">${escHtml(cat)}</div>`;
+    group.forEach(c => {
+      const inv = !!invStates[c.id];
+      const ckSvg = `<svg width="10" height="8" viewBox="0 0 10 8" fill="none">${ckPath.replace('stroke-', 'stroke="' + (inv?'#1A1A1A':'white') + '" stroke-')}</svg>`;
+      html += `
+        <div class="draw-todo-card${inv?' card-inv':''}" id="dtcard-${c.id}">
+          <div class="draw-todo-card-hd">
+            <div class="draw-card-cb${inv?' inv':''}" onclick="toggleDrawCardInvert('${c.id}')">${inv?ckSvg:''}</div>
+            <span style="flex:1"></span>
+            <button class="draw-todo-card-edit" onclick="openDrawTodoEditModal(event,'${c.id}')" title="카테고리 수정">✎</button>
+            <button class="draw-todo-card-del" onclick="deleteDrawTodoCard(event,'${c.id}')">×</button>
+          </div>
+          <div class="draw-todo-canvas-wrap" id="dtcw-${c.id}">
+            <canvas id="dtc-${c.id}" class="draw-todo-canvas"></canvas>
+            <canvas id="dts-${c.id}" class="draw-sel-canvas"></canvas>
+            <div class="draw-resize-grip" onpointerdown="startDrawCardResize(event,'${c.id}')"></div>
+          </div>
+        </div>`;
+    });
+  });
+  // uncategorized cards
+  const knownCats = new Set(cats);
+  cards.filter(c => !knownCats.has(c.cat)).forEach(c => {
     const inv = !!invStates[c.id];
     const ckSvg = `<svg width="10" height="8" viewBox="0 0 10 8" fill="none">${ckPath.replace('stroke-', 'stroke="' + (inv?'#1A1A1A':'white') + '" stroke-')}</svg>`;
-    return `
+    html += `
       <div class="draw-todo-card${inv?' card-inv':''}" id="dtcard-${c.id}">
         <div class="draw-todo-card-hd">
           <div class="draw-card-cb${inv?' inv':''}" onclick="toggleDrawCardInvert('${c.id}')">${inv?ckSvg:''}</div>
@@ -4359,7 +4406,8 @@ function renderDrawTodoSection() {
           <div class="draw-resize-grip" onpointerdown="startDrawCardResize(event,'${c.id}')"></div>
         </div>
       </div>`;
-  }).join('');
+  });
+  wrap.innerHTML = html;
 
   cards.forEach(c => initDrawCard(c.id));
 }
@@ -4598,26 +4646,26 @@ function saveDayTodos(todos) {
 function carryOverTodosIfNeeded() {
   if (!me) return;
   const todayData = DB.get(binderKey(), {});
-  if (todayData.todos !== undefined) return; // 이미 오늘 목록 존재
-  // 전날 날짜 계산
+  if (todayData.todos !== undefined) return;
   const prev = new Date(viewDate);
   prev.setDate(prev.getDate() - 1);
   const pKey = `binder_${me.id}_${prev.getFullYear()}-${String(prev.getMonth()+1).padStart(2,'0')}-${String(prev.getDate()).padStart(2,'0')}`;
   const prevData = DB.get(pKey, {});
   const prevTodos = prevData.todos || DB.get('todos_' + me.id, []);
-  const uncompleted = prevTodos.filter(t => !t.done);
-  if (!uncompleted.length) return;
-  // 이월 복사 — 진행률/서브체크박스는 초기화
-  todayData.todos = uncompleted.map(t => ({
+  const keepDone = getTodoKeepDone();
+  const source = keepDone ? prevTodos : prevTodos.filter(t => !t.done);
+  if (!source.length) return;
+  todayData.todos = source.map(t => ({
     id: uid(), text: t.text, cat: t.cat,
     inputMode: t.inputMode || 'none',
-    done: false,
-    progress: 0,
-    subChecks: (t.subChecks || []).map(s => ({ label: s.label, done: false })),
-    at: new Date().toISOString()
+    done: keepDone ? !!t.done : false,
+    progress: keepDone && t.done ? (t.progress || 0) : 0,
+    subChecks: (t.subChecks || []).map(s => ({ label: s.label, done: keepDone ? !!s.done : false })),
+    at: new Date().toISOString(),
+    linkedChallengeUid: t.linkedChallengeUid || undefined
   }));
   DB.set(binderKey(), todayData);
-  toast(`📋 미완료 할 일 ${todayData.todos.length}개를 오늘로 이월했어요`);
+  toast(`📋 할 일 ${todayData.todos.length}개를 오늘로 이월했어요`);
 }
 
 // 드로잉 Todo 카드 이월 — 체크 안 된 카드 + 칸 높이 그대로
@@ -4633,24 +4681,27 @@ function carryOverDrawTodosIfNeeded() {
   const prevCards = (DB.get(pKey, {})).drawTodoCards;
   if (!prevCards || !prevCards.length) return;
 
-  // 체크(반전)되지 않은 카드만 이월
   const invStates = DB.get('drawInv_' + me.id, {});
   const heights   = DB.get('drawCatH_' + me.id, {});
-  const unchecked = prevCards.filter(c => !invStates[c.id]);
-  if (!unchecked.length) return;
+  const keepDone  = getTodoKeepDone();
+  const source    = keepDone ? prevCards : prevCards.filter(c => !invStates[c.id]);
+  if (!source.length) return;
 
   // 새 ID로 카드 생성 + 칸 높이도 이전
-  const carried = unchecked.map(c => {
+  const newInv = DB.get('drawInv_' + me.id, {});
+  const carried = source.map(c => {
     const newId = uid();
     const oldH  = heights[c.id];
-    if (oldH) heights[newId] = oldH; // 이전 날 높이를 새 ID에 연결
+    if (oldH) heights[newId] = oldH;
+    if (keepDone && invStates[c.id]) newInv[newId] = true;
     return { id: newId, cat: c.cat, createdAt: new Date().toISOString() };
   });
 
-  DB.set('drawCatH_' + me.id, heights); // 높이 맵 업데이트
+  DB.set('drawCatH_' + me.id, heights);
+  if (keepDone) DB.set('drawInv_' + me.id, newInv);
   todayData.drawTodoCards = carried;
   DB.set(binderKey(), todayData);
-  toast(`✏ 미체크 드로잉 할 일 ${carried.length}칸을 오늘로 이월했어요`);
+  toast(`✏ 드로잉 할 일 ${carried.length}칸을 오늘로 이월했어요`);
 }
 
 // ── 선택 도구 ──
@@ -5011,6 +5062,23 @@ function calPickYear(y) {
 //  TODO
 // ================================================
 
+// ── TODO 설정 ──
+function getTodoKeepDone()  { return DB.get('todoKeepDone_' + me.id, false); }
+function setTodoKeepDone(v) {
+  DB.set('todoKeepDone_' + me.id, v);
+  if (window._fbReady && window._fb)
+    window._fb.updateUser(me.id, { todoKeepDone: v }).catch(() => {});
+}
+function getTodoCatAlign()  { return DB.get('todoCatAlign_' + me.id, 'right'); }
+function setTodoCatAlign(v) {
+  DB.set('todoCatAlign_' + me.id, v);
+  if (window._fbReady && window._fb)
+    window._fb.updateUser(me.id, { todoCatAlign: v }).catch(() => {});
+  renderTodos();
+  renderDrawTodoSection();
+  refreshTodoSettingsUI();
+}
+
 // ── 카테고리 ──
 function getCategories() { return DB.get('todoCats_' + me.id, ['신앙/말씀&기도','전도','생활/건강','학습','직무/사무']); }
 function saveCategories(c) { DB.set('todoCats_' + me.id, c); }
@@ -5150,6 +5218,7 @@ function renderTodos() {
   const container = document.getElementById('todo-list');
   if (!container) return;
   const cats = getCategories();
+  const align = getTodoCatAlign();
 
   if (!todos.length) {
     container.innerHTML = '<div class="todo-empty">아직 할 일이 없어요. 추가해볼까요? 🌱</div>';
@@ -5161,7 +5230,7 @@ function renderTodos() {
   cats.forEach(cat => {
     const items = todos.filter(t => t.cat === cat);
     if (!items.length) return;
-    html += `<div class="todo-category-title">${escHtml(cat)}</div>`;
+    html += `<div class="todo-category-title" style="text-align:${align}">${escHtml(cat)}</div>`;
     items.forEach(t => {
       const done = !!t.done;
       const mode = t.inputMode || 'none';
@@ -5472,7 +5541,18 @@ function applySchSettings() {
 }
 
 // ── 설정 모달 — 카테고리 관리 ──
+function refreshTodoSettingsUI() {
+  const cb = document.getElementById('ts-keep-done');
+  if (cb) cb.checked = getTodoKeepDone();
+  const align = getTodoCatAlign();
+  const rBtn = document.getElementById('ts-align-right');
+  const lBtn = document.getElementById('ts-align-left');
+  if (rBtn) rBtn.classList.toggle('active', align === 'right');
+  if (lBtn) lBtn.classList.toggle('active', align === 'left');
+}
+
 function openTodoSettingsModal() {
+  refreshTodoSettingsUI();
   renderCategoryManager();
   document.getElementById('modal-todo-settings').classList.add('open');
 }
@@ -5487,14 +5567,37 @@ function closeTodoSettingsModal(e) {
 
 function renderCategoryManager() {
   const cats = getCategories();
-  const defaults = ['신앙/말씀&기도','전도','생활/건강','학습','직무/사무'];
   document.getElementById('settings-cat-list').innerHTML = cats.map((c, i) => `
     <div class="settings-cat-row">
       <span class="settings-cat-name">${escHtml(c)}</span>
+      <div class="settings-cat-move">
+        ${i > 0 ? `<button onclick="moveCategoryUp(${i})">↑</button>` : `<button disabled style="opacity:0.3">↑</button>`}
+        ${i < cats.length - 1 ? `<button onclick="moveCategoryDown(${i})">↓</button>` : `<button disabled style="opacity:0.3">↓</button>`}
+      </div>
       ${cats.length > 1
         ? `<span class="settings-cat-del" onclick="removeCategory(${i})">×</span>`
         : `<span class="settings-cat-del settings-cat-del-default">×</span>`}
     </div>`).join('');
+}
+
+function moveCategoryUp(idx) {
+  if (idx <= 0) return;
+  const cats = getCategories();
+  [cats[idx - 1], cats[idx]] = [cats[idx], cats[idx - 1]];
+  saveCategories(cats);
+  renderCategoryManager();
+  renderTodos();
+  renderDrawTodoSection();
+}
+
+function moveCategoryDown(idx) {
+  const cats = getCategories();
+  if (idx >= cats.length - 1) return;
+  [cats[idx], cats[idx + 1]] = [cats[idx + 1], cats[idx]];
+  saveCategories(cats);
+  renderCategoryManager();
+  renderTodos();
+  renderDrawTodoSection();
 }
 
 function addCategory() {

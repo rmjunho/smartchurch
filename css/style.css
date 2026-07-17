@@ -1895,6 +1895,42 @@
     .settings-cat-del:active { color: var(--danger); }
     .settings-cat-del-default { opacity: 0.3; cursor: not-allowed; }
     .settings-cat-add-row { display: flex; gap: 10px; align-items: center; margin-top: 10px; }
+    /* toggle row */
+    .ts-toggle-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 14px; background: var(--cream); border-radius: 10px;
+      border: 1px solid var(--border); cursor: pointer; position: relative;
+    }
+    .ts-toggle-cb { display: none; }
+    .ts-toggle-slider {
+      width: 44px; height: 24px; border-radius: 12px; background: #ccc;
+      position: relative; transition: background 0.2s; flex-shrink: 0;
+    }
+    .ts-toggle-slider::after {
+      content: ''; position: absolute; left: 2px; top: 2px;
+      width: 20px; height: 20px; border-radius: 50%; background: white;
+      transition: transform 0.2s;
+    }
+    .ts-toggle-cb:checked + .ts-toggle-slider { background: var(--gold); }
+    .ts-toggle-cb:checked + .ts-toggle-slider::after { transform: translateX(20px); }
+    /* align buttons */
+    .ts-align-row { display: flex; gap: 8px; }
+    .ts-align-btn {
+      flex: 1; padding: 9px 0; border-radius: 10px; border: 1.5px solid var(--border);
+      background: var(--cream); font-size: 13px; font-weight: 700; color: var(--muted);
+      cursor: pointer; transition: all 0.15s;
+    }
+    .ts-align-btn.active { border-color: var(--gold); background: var(--gold); color: white; }
+    /* category reorder buttons */
+    .settings-cat-move {
+      display: flex; flex-direction: column; gap: 2px; margin-left: auto; margin-right: 6px;
+    }
+    .settings-cat-move button {
+      width: 26px; height: 18px; border: 1px solid var(--border); border-radius: 5px;
+      background: white; font-size: 11px; line-height: 1; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; color: var(--muted);
+    }
+    .settings-cat-move button:active { background: var(--cream); }
     .todo-cb { cursor: pointer; }
     .todo-edit {
       font-size: 15px; color: inherit; opacity: 0.5;
