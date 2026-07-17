@@ -44,6 +44,9 @@ window._fb = {
       // 모든 공개 챌린지
       getPublicChallenges: () =>
         getDocs(query(collection(fbDb, 'challenges'), where('isPublic','==',true))),
+      // 개인 챌린지
+      getPersonalChallenges: (uid) =>
+        getDocs(query(collection(fbDb, 'challenges'), where('scope','==','personal'), where('createdByUid','==',uid))),
       // 바인더 공유 (리더 열람용)
       setBinderEntry:  (key, data) => setDoc(doc(fbDb, 'binderEntries', key), data, { merge: true }),
       getBinderEntry:  (key)       => getDoc(doc(fbDb, 'binderEntries', key)),

@@ -271,53 +271,51 @@ async function syncChallengesFromFirestore() {
   if (!window._fbReady || !window._fb) return;
   try {
     const fetched = [];
+    const seen = new Set();
+    const add = (d) => { if (!seen.has(d.id)) { seen.add(d.id); fetched.push({ id: d.id, ...d.data() }); } };
 
-    // 내 교회 챌린지 (공개+비공개)
-    // ⚠️ 챌린지는 createdByChurch 에 '교회 이름'을 저장하므로, 조회도 churchCode 가 아닌
-    //    me.church(이름)로 해야 매칭된다. (이전엔 churchCode 로 조회해 항상 0건이었음)
+    // 내 교회 챌린지
     if (me.church) {
       const snap = await window._fb.getChallengesByChurch(me.church);
-      snap.forEach(d => fetched.push({ id: d.id, ...d.data() }));
+      snap.forEach(add);
     }
 
-    // 다른 교회 공개 챌린지
+    // 공개 챌린지
     const pubSnap = await window._fb.getPublicChallenges();
-    pubSnap.forEach(d => {
-      const data = d.data();
-      // 내 교회 챌린지가 아닌 것만 추가 (중복 방지)
-      if (data.createdByChurch !== (me.church || '')) {
-        fetched.push({ id: d.id, ...data });
-      }
-    });
+    pubSnap.forEach(add);
+
+    // 개인 챌린지
+    const perSnap = await window._fb.getPersonalChallenges(me.id);
+    perSnap.forEach(add);
 
     if (!fetched.length) return;
 
-    // localStorage와 머지 (Firestore 우선, 없는 것은 유지)
     const local = DB.get('allCustomChallenges', []);
-    const localIds = local.map(c => c.id);
-    const fetchedIds = fetched.map(c => c.id);
-
-    // 로컬에만 있는 것 + Firestore 최신 데이터 합치기
-    const localOnly = local.filter(c => !fetchedIds.includes(c.id));
-    const merged = [...fetched, ...localOnly];
-
-    saveAllCustomChallenges(merged);
-    renderChallenge(); // 화면 갱신
+    const fetchedIds = new Set(fetched.map(c => c.id));
+    const localOnly = local.filter(c => !fetchedIds.has(c.id));
+    saveAllCustomChallenges([...fetched, ...localOnly]);
+    renderChallenge();
   } catch(e) {
     console.warn('Firestore 챌린지 동기화 실패:', e);
   }
 }
 
+function personalChallenges() {
+  return allCustomChallenges().filter(c => c.scope === 'personal' && c.createdByUid === me.id);
+}
+
 function customChallenges() {
-  return allCustomChallenges().filter(c => c.createdByChurch === (me.church || ''));
+  return allCustomChallenges().filter(c =>
+    c.scope !== 'personal' && c.createdByChurch === (me.church || ''));
 }
 
 function publicChallenges() {
-  return allCustomChallenges().filter(c => c.isPublic && c.createdByChurch !== (me.church || ''));
+  return allCustomChallenges().filter(c =>
+    c.scope !== 'personal' && c.isPublic && c.createdByChurch !== (me.church || ''));
 }
 
 function fullCatalog() {
-  return [...CHALLENGE_CATALOG, ...customChallenges(), ...publicChallenges()];
+  return [...CHALLENGE_CATALOG, ...personalChallenges(), ...customChallenges(), ...publicChallenges()];
 }
 
 function myChallenges() { return DB.get('myChallenges_' + me.id, []); }
@@ -329,8 +327,9 @@ function deleteChallenge(e, id) {
   const list = allCustomChallenges();
   const ch   = list.find(c => c.id === id);
   if (!ch) return;
-  const isOwner = ch.createdByChurch === (me.church || '');
-  if (!me.isAppAdmin && !(isOwner && (isLeader() || hasLeaderPerm('challenge')))) {
+  const isMine = ch.createdByUid === me.id;
+  const isChurchOwner = ch.createdByChurch === (me.church || '') && (isLeader() || hasLeaderPerm('challenge'));
+  if (!me.isAppAdmin && !isMine && !isChurchOwner) {
     toast('삭제 권한이 없어요'); return;
   }
   saveAllCustomChallenges(list.filter(c => c.id !== id));
@@ -347,6 +346,7 @@ function toggleChallengePublic(id) {
   const ch   = list.find(c => c.id === id);
   if (!ch) return;
   ch.isPublic = !ch.isPublic;
+  ch.scope = ch.isPublic ? 'public' : 'church';
   ch.updatedAt = new Date().toISOString();
   saveAllCustomChallenges(list);
   if (window._fbReady && window._fb)
@@ -359,9 +359,9 @@ function openEditChallengeModal(id) {
   const ch = allCustomChallenges().find(c => c.id === id);
   if (!ch) return;
 
-  // 권한 체크: 앱 관리자 OR 해당 교회 리더
-  const isOwner = ch.createdByChurch === (me.church || '');
-  if (!me.isAppAdmin && !(isOwner && (isLeader() || hasLeaderPerm('challenge')))) {
+  const isMine = ch.createdByUid === me.id;
+  const isChurchOwner = ch.createdByChurch === (me.church || '') && (isLeader() || hasLeaderPerm('challenge'));
+  if (!me.isAppAdmin && !isMine && !isChurchOwner) {
     toast('수정 권한이 없어요 🔒'); return;
   }
 
@@ -376,11 +376,9 @@ function openEditChallengeModal(id) {
   document.getElementById('cc-start-date').value = ch.startDate || '';
   document.getElementById('cc-end-date').value   = ch.endDate   || '';
   ccSetType(ch.freqType || 'daily');
-  _ccIsPublic = ch.isPublic || false;
-  document.getElementById('cc-btn-public')?.classList.toggle('on', _ccIsPublic);
-  document.getElementById('cc-btn-private')?.classList.toggle('on', !_ccIsPublic);
+  const scope = ch.scope || (ch.isPublic ? 'public' : 'church');
+  ccSetScope(scope);
 
-  // 모달 타이틀 변경
   const titleEl = document.querySelector('#modal-create-challenge .modal-title');
   if (titleEl) titleEl.textContent = '챌린지 수정 ✏️';
   const submitBtn = document.getElementById('cc-submit-btn');
@@ -395,15 +393,19 @@ function submitEditChallenge() {
   const idx  = list.findIndex(c => c.id === id);
   if (idx < 0) return;
 
-  // 권한 재확인
   const ch = list[idx];
-  const isOwner = ch.createdByChurch === (me.church || '');
-  if (!me.isAppAdmin && !(isOwner && (isLeader() || hasLeaderPerm('challenge')))) {
+  const isMine = ch.createdByUid === me.id;
+  const isChurchOwner = ch.createdByChurch === (me.church || '') && (isLeader() || hasLeaderPerm('challenge'));
+  if (!me.isAppAdmin && !isMine && !isChurchOwner) {
     toast('수정 권한이 없어요 🔒'); return;
   }
 
   const label = document.getElementById('cc-label').value.trim();
   if (!label) { toast('챌린지 이름을 입력해 주세요'); return; }
+
+  if (_ccScope === 'church' && !me.church) {
+    toast('교회에 소속되어 있어야 교회 챌린지를 만들 수 있어요'); return;
+  }
 
   const updated = {
     ...list[idx],
@@ -414,7 +416,8 @@ function submitEditChallenge() {
     freqTarget:  _ccFreqType !== 'daily' ? (parseInt(document.getElementById('cc-target').value)||1) : null,
     startDate:   document.getElementById('cc-start-date').value || null,
     endDate:     document.getElementById('cc-end-date').value   || null,
-    isPublic:    _ccIsPublic,
+    scope:       _ccScope,
+    isPublic:    _ccScope === 'public',
     updatedAt:   new Date().toISOString(),
     type:        _ccFreqType === 'daily' ? 'streak' : 'weekly',
   };
@@ -426,124 +429,98 @@ function submitEditChallenge() {
   closeCreateChallengeModal();
   renderChallenge();
   toast(`✅ "${label}" 챌린지가 수정됐어요!`);
-  setTimeout(() => openSubscreen('challenge-manage'), 200);
+}
+
+function _cmChCard(ch, showActions) {
+  const freqLabel = ch.freqType === 'daily' ? '매일' :
+    ch.freqType === 'weekly' ? `주 ${ch.freqTarget}회` :
+    ch.freqType === 'monthly' ? `월 ${ch.freqTarget}회` : '';
+  const scopeLabel = ch.scope === 'personal' ? '🔐 개인'
+    : ch.isPublic ? '🌐 전체 공개' : '🔒 교회';
+  const scopeColor = ch.scope === 'personal' ? 'rgba(142,68,173,0.12)'
+    : ch.isPublic ? 'rgba(41,128,185,0.12)' : 'rgba(0,0,0,0.06)';
+  const scopeText = ch.scope === 'personal' ? '#8E44AD'
+    : ch.isPublic ? '#2980B9' : 'var(--muted)';
+
+  let html = `
+    <div style="background:white;border-radius:14px;border:1.5px solid var(--border);padding:14px;margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:14.5px;font-weight:800;margin-bottom:3px">${escHtml(ch.label)}</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+            <span style="font-size:11.5px;background:var(--cream2);border-radius:6px;padding:2px 8px;font-weight:600">${escHtml(ch.tag||'기타')}</span>
+            ${freqLabel ? `<span style="font-size:11.5px;background:var(--cream2);border-radius:6px;padding:2px 8px;font-weight:600">${freqLabel}</span>` : ''}
+            <span style="font-size:11.5px;background:${scopeColor};color:${scopeText};border-radius:6px;padding:2px 8px;font-weight:700">${scopeLabel}</span>
+          </div>
+        </div>
+      </div>
+      ${ch.desc ? `<div style="font-size:12.5px;color:var(--muted);line-height:1.6;margin-bottom:10px">${escHtml(ch.desc.slice(0,60)+(ch.desc.length>60?'…':''))}</div>` : ''}`;
+  if (showActions) {
+    html += `<div style="display:flex;gap:7px">
+      <button onclick="openEditChallengeModal('${ch.id}')"
+        style="flex:1;height:34px;border-radius:9px;border:1.5px solid var(--border);background:white;
+               color:var(--dark);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">✏️ 수정</button>
+      <button onclick="deleteChallenge(null,'${ch.id}')"
+        style="height:34px;padding:0 12px;border-radius:9px;border:1.5px solid rgba(192,57,43,0.25);
+               background:#FBE5E5;color:#C0392B;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">🗑</button>
+    </div>`;
+  }
+  return html + '</div>';
 }
 
 function renderChallengeManage() {
-  if (!isLeader() && !hasLeaderPerm('challenge')) {
-    return `<div class="ss-empty"><div class="ss-empty-icon">🔒</div>
-      <div class="ss-empty-title">챌린지 관리 권한이 없어요</div></div>`;
-  }
+  const perList  = personalChallenges();
+  const chList   = customChallenges();
+  const pubAll   = allCustomChallenges().filter(c => c.isPublic);
 
-  const mine   = customChallenges(); // 우리 교회 챌린지
-  const pubAll = allCustomChallenges().filter(c => c.isPublic); // 전체 공개
-  const allUsers = DB.get('users', []);
+  const tabBtn = (key, label, count) => `
+    <button onclick="_cmSetTab('${key}')"
+      style="height:32px;padding:0 14px;border-radius:20px;border:none;
+             background:${_cmTab===key?'var(--black)':'var(--cream2)'};
+             color:${_cmTab===key?'white':'var(--muted)'};
+             font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit">
+      ${label} (${count})
+    </button>`;
 
-  // 탭 헤더
   let html = `
     <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
-      <div style="display:flex;gap:6px">
-        <button onclick="_cmSetTab('mine')" id="cm-tab-mine"
-          style="height:32px;padding:0 14px;border-radius:20px;border:none;
-                 background:${_cmTab==='mine'?'var(--black)':'var(--cream2)'};
-                 color:${_cmTab==='mine'?'white':'var(--muted)'};
-                 font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit">
-          우리 교회 (${mine.length})
-        </button>
-        <button onclick="_cmSetTab('public')" id="cm-tab-public"
-          style="height:32px;padding:0 14px;border-radius:20px;border:none;
-                 background:${_cmTab==='public'?'var(--black)':'var(--cream2)'};
-                 color:${_cmTab==='public'?'white':'var(--muted)'};
-                 font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit">
-          전체 공개 (${pubAll.length})
-        </button>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        ${tabBtn('personal','개인',perList.length)}
+        ${tabBtn('mine','교회',chList.length)}
+        ${tabBtn('public','공개',pubAll.length)}
       </div>
       <button onclick="openCreateChallengeModal()"
         style="height:32px;padding:0 14px;border-radius:20px;border:none;background:var(--gold);
-               color:var(--dark);font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit">
+               color:var(--dark);font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit;flex-shrink:0">
         + 만들기
       </button>
     </div>
     <div style="padding:14px 16px 32px">`;
 
-  if (_cmTab === 'mine') {
-    // ── 우리 교회 챌린지 ──
-    if (!mine.length) {
+  if (_cmTab === 'personal') {
+    if (!perList.length) {
+      html += `<div class="ss-empty"><div class="ss-empty-icon">🔐</div>
+        <div class="ss-empty-title">아직 개인 챌린지가 없어요</div>
+        <div class="ss-empty-sub">나만의 챌린지를 만들어보세요!</div></div>`;
+    } else {
+      perList.forEach(ch => { html += _cmChCard(ch, true); });
+    }
+  } else if (_cmTab === 'mine') {
+    if (!chList.length) {
       html += `<div class="ss-empty"><div class="ss-empty-icon">📣</div>
         <div class="ss-empty-title">아직 만든 챌린지가 없어요</div>
         <div class="ss-empty-sub">+ 만들기 버튼으로 첫 챌린지를 시작해보세요!</div></div>`;
     } else {
-      mine.forEach(ch => {
-        const participants = allUsers.filter(u => {
-          const mc = DB.get('myChallenges_' + u.id, []);
-          return mc.some(m => m.id === ch.id);
-        }).length;
-        const freqLabel = ch.freqType === 'daily' ? '매일' :
-          ch.freqType === 'weekly' ? `주 ${ch.freqTarget}회` :
-          ch.freqType === 'monthly' ? `월 ${ch.freqTarget}회` : '';
-
-        html += `
-          <div style="background:white;border-radius:14px;border:1.5px solid var(--border);padding:14px;margin-bottom:12px">
-            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
-              <div style="flex:1;min-width:0">
-                <div style="font-size:14.5px;font-weight:800;margin-bottom:3px">${escHtml(ch.label)}</div>
-                <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
-                  <span style="font-size:11.5px;background:var(--cream2);border-radius:6px;padding:2px 8px;font-weight:600">${escHtml(ch.tag||'기타')}</span>
-                  <span style="font-size:11.5px;background:var(--cream2);border-radius:6px;padding:2px 8px;font-weight:600">${freqLabel}</span>
-                  <span style="font-size:11.5px;background:${ch.isPublic?'rgba(41,128,185,0.12)':'rgba(0,0,0,0.06)'};
-                               color:${ch.isPublic?'#2980B9':'var(--muted)'};border-radius:6px;padding:2px 8px;font-weight:700">
-                    ${ch.isPublic?'🌐 전체 공개':'🔒 교회 비공개'}
-                  </span>
-                </div>
-              </div>
-              <span style="font-size:12px;color:var(--muted);margin-left:8px;flex-shrink:0">👥 ${participants}명</span>
-            </div>
-            ${ch.desc ? `<div style="font-size:12.5px;color:var(--muted);line-height:1.6;margin-bottom:10px">${escHtml(ch.desc.slice(0,60)+(ch.desc.length>60?'…':''))}</div>` : ''}
-            <div style="display:flex;gap:7px">
-              <button onclick="toggleChallengePublic('${ch.id}')"
-                style="flex:2;height:34px;border-radius:9px;border:1.5px solid var(--border);background:white;
-                       color:var(--dark);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">
-                ${ch.isPublic ? '🔒 비공개로' : '🌐 전체 공개'}
-              </button>
-              <button onclick="openEditChallengeModal('${ch.id}')"
-                style="flex:1;height:34px;border-radius:9px;border:1.5px solid var(--border);background:white;
-                       color:var(--dark);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">✏️ 수정</button>
-              <button onclick="deleteChallenge(null,'${ch.id}')"
-                style="height:34px;padding:0 12px;border-radius:9px;border:1.5px solid rgba(192,57,43,0.25);
-                       background:#FBE5E5;color:#C0392B;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">🗑</button>
-            </div>
-          </div>`;
-      });
+      chList.forEach(ch => { html += _cmChCard(ch, ch.createdByUid === me.id || me.isAppAdmin || isLeader()); });
     }
   } else {
-    // ── 전체 공개 챌린지 모니터링 ──
     if (!pubAll.length) {
       html += `<div class="ss-empty"><div class="ss-empty-icon">🌐</div>
-        <div class="ss-empty-title">공개된 챌린지가 없어요</div>
-        <div class="ss-empty-sub">우리 교회 챌린지를 전체 공개로 설정해보세요</div></div>`;
+        <div class="ss-empty-title">공개된 챌린지가 없어요</div></div>`;
     } else {
       pubAll.forEach(ch => {
-        const isOwn = ch.createdByChurch === (me.church || '');
-        html += `
-          <div style="background:white;border-radius:14px;border:1.5px solid var(--border);padding:14px;margin-bottom:12px">
-            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
-              <div>
-                <div style="font-size:14px;font-weight:800;margin-bottom:3px">${escHtml(ch.label)}</div>
-                <div style="font-size:12px;color:var(--muted)">${escHtml(ch.createdByChurch||'알 수 없음')} · ${escHtml(ch.createdBy||'')}</div>
-              </div>
-              ${isOwn ? `<span style="font-size:11px;background:rgba(201,169,110,0.15);color:var(--gold);border-radius:6px;padding:2px 8px;font-weight:700;flex-shrink:0">우리 교회</span>` : ''}
-            </div>
-            ${ch.desc ? `<div style="font-size:12.5px;color:var(--muted);line-height:1.6;margin-bottom:${isOwn?'10px':'0'}">${escHtml(ch.desc.slice(0,60)+(ch.desc.length>60?'…':''))}</div>` : ''}
-            ${isOwn ? `
-              <div style="display:flex;gap:7px;margin-top:8px">
-                <button onclick="toggleChallengePublic('${ch.id}')"
-                  style="flex:2;height:32px;border-radius:9px;border:1.5px solid var(--border);background:white;
-                         color:var(--dark);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">🔒 비공개로</button>
-                <button onclick="deleteChallenge(null,'${ch.id}')"
-                  style="height:32px;padding:0 12px;border-radius:9px;border:1.5px solid rgba(192,57,43,0.25);
-                         background:#FBE5E5;color:#C0392B;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">🗑</button>
-              </div>` : ''}
-          </div>`;
+        const canEdit = ch.createdByUid === me.id || me.isAppAdmin;
+        html += _cmChCard(ch, canEdit);
       });
     }
   }
@@ -626,11 +603,14 @@ function renderChallenge() {
         else if (checkedToday){ btnLabel='✅ 오늘 완료!'; btnClass='done'; disabled=true; }
         else                 { btnLabel='오늘 체크하기';  btnClass='';     disabled=false; }
 
+        const tpl = catalog.find(t => t.id === c.templateId);
+        const canEdit = tpl && tpl.createdByUid === me.id;
         return `
         <div class="challenge-card" style="flex-direction:column;align-items:stretch">
           <div style="display:flex;align-items:center;gap:8px">
             <span class="c-tag">${escHtml(c.tag)}</span>
             <span class="c-label" style="flex:1">${escHtml(c.label)}</span>
+            ${canEdit ? `<button class="c-delete-btn" onclick="openEditChallengeModal('${c.templateId}')" title="수정" style="font-size:13px">✏️</button>` : ''}
             <span class="c-streak">${rightLbl}</span>
           </div>
           ${periodTag ? `<div style="margin-top:4px;display:flex;align-items:center;gap:4px">${periodTag}</div>` : ''}
@@ -646,14 +626,19 @@ function renderChallenge() {
     ? filtered.map(c => {
         const started    = startedIds.includes(c.id);
         const isCustom   = c.id && c.id.startsWith('custom_');
-        const myChurch   = isCustom && c.createdByChurch === (me.church || '');
-        const otherChurch= isCustom && !myChurch;
+        const isMine     = isCustom && c.createdByUid === me.id;
+        const isPersonal = c.scope === 'personal';
+        const scopeIcon  = isPersonal ? '🔐' : c.isPublic ? '🌐' : '🔒';
+        const scopeText  = isPersonal ? '개인' : (c.createdByChurch || '교회');
         const churchBadge = isCustom
-          ? `<span class="c-church-badge${c.isPublic && otherChurch ? ' public' : ''}">
-               ${c.isPublic ? '🌐' : '🔒'} ${escHtml(c.createdByChurch || '교회')}
+          ? `<span class="c-church-badge${c.isPublic && !isMine ? ' public' : ''}">
+               ${scopeIcon} ${escHtml(scopeText)}
              </span>`
           : '';
-        const deleteBtn = me.isAppAdmin && isCustom
+        const editBtn = isMine
+          ? `<button class="c-delete-btn" onclick="openEditChallengeModal('${c.id}');event.stopPropagation()" title="수정" style="font-size:13px">✏️</button>`
+          : '';
+        const deleteBtn = (isMine || me.isAppAdmin) && isCustom
           ? `<button class="c-delete-btn" onclick="deleteChallenge(event,'${c.id}')" title="삭제">🗑</button>`
           : '';
         return `
@@ -663,7 +648,7 @@ function renderChallenge() {
           <span class="c-tag">${escHtml(c.tag)}</span>
           <span class="c-label">${escHtml(c.label)}</span>
           <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
-            ${deleteBtn}
+            ${editBtn}${deleteBtn}
             <span class="c-action${started ? ' started' : ''}">${started ? '진행중' : '+ 시작'}</span>
           </div>
           ${churchBadge ? `<div style="flex-basis:100%;padding-top:4px">${churchBadge}</div>` : ''}
@@ -788,10 +773,7 @@ function confirmStartChallenge() {
 }
 
 function openCreateChallengeModal() {
-  if (!isLeader() && !hasLeaderPerm('challenge')) {
-    toast('챌린지 만들기 권한이 없어요'); return;
-  }
-  _editChallengeId = null; // 수정 모드 초기화
+  _editChallengeId = null;
   const titleEl = document.querySelector('#modal-create-challenge .modal-title');
   if (titleEl) titleEl.textContent = '새 챌린지 만들기 ✨';
   const submitBtn = document.getElementById('cc-submit-btn');
@@ -804,9 +786,7 @@ function openCreateChallengeModal() {
   document.getElementById('cc-start-date').value = '';
   document.getElementById('cc-end-date').value   = '';
   ccSetType('daily');
-  _ccIsPublic = false;
-  document.getElementById('cc-btn-private')?.classList.add('on');
-  document.getElementById('cc-btn-public')?.classList.remove('on');
+  ccSetScope('personal');
   document.getElementById('modal-create-challenge').classList.add('open');
 }
 
@@ -817,14 +797,15 @@ function closeCreateChallengeModal(e) {
 }
 
 function submitCreateChallenge() {
-  // 수정 모드
   if (_editChallengeId) { submitEditChallenge(); return; }
 
-  if (!isLeader() && !hasLeaderPerm('challenge')) {
-    toast('챌린지 만들기 권한이 없어요'); return;
-  }
   const label = document.getElementById('cc-label').value.trim();
   if (!label) { toast('챌린지 이름을 입력해 주세요'); return; }
+
+  if (_ccScope === 'church' && !me.church) {
+    toast('교회에 소속되어 있어야 교회 챌린지를 만들 수 있어요'); return;
+  }
+
   const tag       = document.getElementById('cc-tag').value;
   const desc      = document.getElementById('cc-desc').value.trim();
   const startDate = document.getElementById('cc-start-date').value || null;
@@ -836,28 +817,30 @@ function submitCreateChallenge() {
     toast('종료일이 시작일보다 빠를 수 없어요'); return;
   }
 
+  const scopeDesc = _ccScope === 'personal' ? '나만의' : _ccScope === 'public' ? '공개' : (me.church || '우리 교회');
+
   const newChallenge = {
-    id:             'custom_' + uid(),
+    id:              'custom_' + uid(),
     tag, label,
-    freqType:       _ccFreqType,
+    freqType:        _ccFreqType,
     freqTarget,
     startDate,
     endDate,
-    desc:           desc || `${me.church || '우리 교회'}에서 만든 챌린지예요.`,
-    createdBy:      me.name,
-    createdByChurch: me.church || '',
-    isPublic:       _ccIsPublic,
-    createdAt:      new Date().toISOString(),
-    // 구 호환
-    type:           _ccFreqType === 'daily' ? 'streak' : 'weekly',
-    target:         freqTarget
+    desc:            desc || `${scopeDesc} 챌린지예요.`,
+    createdBy:       me.name,
+    createdByUid:    me.id,
+    createdByChurch: _ccScope !== 'personal' ? (me.church || '') : '',
+    scope:           _ccScope,
+    isPublic:        _ccScope === 'public',
+    createdAt:       new Date().toISOString(),
+    type:            _ccFreqType === 'daily' ? 'streak' : 'weekly',
+    target:          freqTarget
   };
 
   const list = allCustomChallenges();
   list.push(newChallenge);
   saveAllCustomChallenges(list);
 
-  // Firestore에도 저장 (비동기, 실패해도 앱 동작에 영향 없음)
   if (window._fbReady && window._fb) {
     window._fb.setChallenge(newChallenge.id, newChallenge)
       .catch(e => console.warn('Firestore 챌린지 저장 실패:', e));
@@ -865,8 +848,8 @@ function submitCreateChallenge() {
 
   closeCreateChallengeModal();
   renderChallenge();
-  const scope = _ccIsPublic ? '🌐 모든 교회 공개' : '🔒 우리 교회 비공개';
-  toast(`✨ "${label}" 챌린지를 만들었어요! (${scope})`);
+  const scopeMsg = { personal:'🔐 개인', church:'🔒 교회', public:'🌐 전체 공개' }[_ccScope];
+  toast(`✨ "${label}" 챌린지를 만들었어요! (${scopeMsg})`);
 }
 
 function checkChallengeToday(instanceUid) {

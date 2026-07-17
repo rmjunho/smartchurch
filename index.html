@@ -1626,12 +1626,13 @@
       <!-- 공개 범위 -->
       <div class="form-group">
         <label class="form-label">공개 범위</label>
-        <div class="cc-type-row">
-          <button class="cc-type-btn on" id="cc-btn-private" onclick="ccSetPublic(false)">🔒 우리 교회만</button>
-          <button class="cc-type-btn"    id="cc-btn-public"  onclick="ccSetPublic(true)">🌐 모든 교회 공개</button>
+        <div class="cc-type-row" style="flex-wrap:wrap;gap:6px">
+          <button class="cc-type-btn on" id="cc-scope-personal" onclick="ccSetScope('personal')">🔐 개인</button>
+          <button class="cc-type-btn"    id="cc-scope-church"   onclick="ccSetScope('church')">🔒 우리 교회</button>
+          <button class="cc-type-btn"    id="cc-scope-public"   onclick="ccSetScope('public')">🌐 전체 공개</button>
         </div>
         <div style="font-size:11.5px;color:var(--muted);margin-top:6px;line-height:1.5">
-          🔒 비공개: 우리 교회 교인만 사용 · 🌐 공개: 앱을 사용하는 모든 교회와 공유
+          🔐 개인: 나만 보기 · 🔒 교회: 우리 교회 교인만 · 🌐 공개: 모든 교회와 공유
         </div>
       </div>
       <div class="modal-actions">
@@ -6538,7 +6539,7 @@ var _editChallengeId = null;
 
 
 // ── 챌린지 관리 서브스크린 ──
-var _cmTab = 'mine'; // 'mine' | 'public'
+var _cmTab = 'personal'; // 'personal' | 'mine' | 'public'
 
 
 function _cmSetTab(tab) {
@@ -6546,27 +6547,24 @@ function _cmSetTab(tab) {
   openSubscreen('challenge-manage');
 }
 
-// ── 공개/비공개 토글 상태 ──
-var _ccIsPublic = false;
-function ccSetPublic(v) {
-  _ccIsPublic = v;
-  document.getElementById('cc-btn-private').classList.toggle('on',  !v);
-  document.getElementById('cc-btn-public').classList.toggle('on',    v);
+// ── 공개 범위 상태 ──
+var _ccScope = 'personal'; // 'personal' | 'church' | 'public'
+function ccSetScope(s) {
+  _ccScope = s;
+  ['personal','church','public'].forEach(v =>
+    document.getElementById('cc-scope-' + v)?.classList.toggle('on', v === s));
 }
 
 var chFilter = '전체';
 
 function renderLeaderBar() {
   const bar = document.getElementById('ch-leader-bar');
-  if (isLeader() || hasLeaderPerm('challenge')) {
-    bar.innerHTML = `
-      <div class="ch-leader-bar">
-        <div class="ch-leader-bar-text"><b>${me.role}</b>님은 교회 챌린지를<br>새로 만들 수 있어요</div>
-        <button class="btn-create-challenge" onclick="openCreateChallengeModal()">+ 챌린지 만들기</button>
-      </div>`;
-  } else {
-    bar.innerHTML = '';
-  }
+  if (!bar || !me) return;
+  bar.innerHTML = `
+    <div class="ch-leader-bar">
+      <div class="ch-leader-bar-text">나만의 챌린지를 만들어보세요!</div>
+      <button class="btn-create-challenge" onclick="openCreateChallengeModal()">+ 챌린지 만들기</button>
+    </div>`;
 }
 
 
