@@ -967,10 +967,9 @@
         <div class="openchat-input-bar">
           <textarea class="openchat-input" id="room-panel-input"
             placeholder="메시지를 입력해 주세요..."
-            rows="1"
+            rows="1" autocomplete="off" autocorrect="off" autocapitalize="off"
             oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,100)+'px'"
-            onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendRoomMsg();}">
-          </textarea>
+            onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendRoomMsg();}"></textarea>
           <button class="openchat-send-btn" id="room-panel-send-btn" onclick="sendRoomMsg()">➤</button>
         </div>
       </div>
@@ -1008,10 +1007,9 @@
           <div class="openchat-input-bar">
             <textarea class="openchat-input" id="openchat-input"
               placeholder="메시지를 입력해 주세요..."
-              rows="1"
+              rows="1" autocomplete="off" autocorrect="off" autocapitalize="off"
               oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,100)+'px'"
-              onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendOpenChatMsg();}">
-            </textarea>
+              onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendOpenChatMsg();}"></textarea>
             <button class="openchat-send-btn" id="openchat-send-btn" onclick="sendOpenChatMsg()">➤</button>
           </div>
         </div>
@@ -7093,12 +7091,20 @@ function startDmWith(userId, name) {
     return;
   }
   // 새 DM 방 생성
-  rooms.push({
-    id: 'room_' + uid(), type: 'dm', name, emoji: '👤',
+  const roomId = 'room_' + uid();
+  const newRoom = {
+    id: roomId, type: 'dm', name, emoji: '👤',
     members: [me.id, userId], memberNames: [name],
-    createdAt: new Date().toISOString()
-  });
+    createdBy: me.id,
+    createdAt: new Date().toISOString(),
+    lastMessage: '',
+    lastMessageAt: new Date().toISOString()
+  };
+  rooms.push(newRoom);
   saveChatRooms(rooms);
+  if (window._fbReady && window._fb) {
+    window._fb.ensureChatRoom(roomId, newRoom).catch(e => console.warn('DM Firestore 저장 실패:', e));
+  }
   setChatInnerTab('rooms');
   toast(`💬 ${name}님과의 채팅방이 생겼어요`);
 }
@@ -7556,6 +7562,7 @@ async function sendOpenChatMsg() {
   const text  = input?.value.trim();
   if (!text) return;
   if (!me.church || !me.churchCode) { toast('교회에 가입해야 채팅할 수 있어요'); return; }
+  if (me.churchStatus === 'pending') { toast('교회 가입 승인 후 메시지를 보낼 수 있어요'); return; }
   if (!window._fbReady || !window._fb) { toast('연결 중입니다. 잠시 후 시도해 주세요'); return; }
 
   const btn = document.getElementById('openchat-send-btn');

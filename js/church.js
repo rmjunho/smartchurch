@@ -222,14 +222,26 @@ function approveMinor(userId) {
   u.status     = 'active';
   u.approvedBy = me.id;
   u.approvedAt = new Date().toISOString();
+  // 승인자의 교회에 자동 배정
+  if (me.churchCode && (!u.churchCode || !u.church)) {
+    u.church        = me.church;
+    u.churchCode    = me.churchCode;
+    u.churchStatus  = 'active';
+    u.orgType       = me.orgType || 'church';
+  }
   DB.set('users', users);
   const cached = _membersCache.find(x => x.id === userId);
-  if (cached) cached.status = 'active';
+  if (cached) { cached.status = 'active'; if (me.churchCode) cached.churchStatus = 'active'; }
   // Firestore 동기화
   if (window._fbReady && window._fb) {
-    window._fb.updateUser(userId, {
-      status: 'active', approvedBy: me.id, approvedAt: u.approvedAt
-    }).catch(() => {});
+    const update = { status: 'active', approvedBy: me.id, approvedAt: u.approvedAt };
+    if (me.churchCode && u.churchCode === me.churchCode) {
+      update.church       = u.church;
+      update.churchCode   = u.churchCode;
+      update.churchStatus = 'active';
+      update.orgType      = u.orgType;
+    }
+    window._fb.updateUser(userId, update).catch(() => {});
   }
   toast(`✅ ${u.name || '회원'}님의 계정을 승인했어요`);
   const cur = document.getElementById('subscreen')?.dataset?.current;
