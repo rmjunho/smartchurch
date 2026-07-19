@@ -5,6 +5,8 @@ import { getFirestore, doc, setDoc, getDoc,
          updateDoc, deleteDoc, collection, collectionGroup, getDocs,
          addDoc, query, where, orderBy, limit,
          arrayUnion, onSnapshot, serverTimestamp }              from "https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js";
+import { getStorage, ref as storageRef, uploadString,
+         getDownloadURL }                                       from "https://www.gstatic.com/firebasejs/12.15.0/firebase-storage.js";
 
 const firebaseConfig = {
   apiKey:            "AIzaSyBSjbD1j0mQBw6KFFgetTwk-iDHXkkBX0A",
@@ -15,13 +17,15 @@ const firebaseConfig = {
   appId:             "1:826976279573:web:49c222868c44f82071821c"
 };
 
-const fbApp  = initializeApp(firebaseConfig);
-const fbDb   = getFirestore(fbApp);
+const fbApp    = initializeApp(firebaseConfig);
+const fbDb     = getFirestore(fbApp);
+const fbStore  = getStorage(fbApp);
 
 // 전역 노출
-window.fbApp = fbApp;   // auth.js 에서 getAuth 에 사용
-window._fbDb = fbDb;
-window.db    = fbDb;    // 요청된 별칭
+window.fbApp   = fbApp;   // auth.js 에서 getAuth 에 사용
+window._fbDb   = fbDb;
+window._fbStore = fbStore;
+window.db      = fbDb;    // 요청된 별칭
 window._fb = {
       setUser:    (uid, data) => setDoc(doc(fbDb, 'users', uid), data, { merge: true }),
       getUser:    (uid)       => getDoc(doc(fbDb, 'users', uid)),
@@ -62,6 +66,12 @@ window._fb = {
       getChurchInfo:   (code)       => getDoc(doc(fbDb, 'churchInfo', code)),
       getAllChurchInfo: ()          => getDocs(collection(fbDb, 'churchInfo')),   // 관리자: 전체 교회 목록
       deleteChurchInfo: (code)      => deleteDoc(doc(fbDb, 'churchInfo', code)),
+      // 채팅 이미지 업로드 (Storage) → 다운로드 URL 반환 (메시지엔 URL만 저장)
+      uploadChatImage: async (path, dataUrl) => {
+        const r = storageRef(fbStore, path);
+        await uploadString(r, dataUrl, 'data_url');
+        return await getDownloadURL(r);
+      },
       // 오픈채팅 실시간 메시지
       sendChatMsg: (roomId, msg) =>
         addDoc(collection(fbDb, 'chatRooms', roomId, 'messages'),

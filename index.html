@@ -7003,7 +7003,7 @@ function _renderRoomMsgs(msgs) {
       : '👤';
     const isImg = msg.type === 'image' && msg.imageUrl;
     const bubbleInner = isImg
-      ? `<img class="chat-img" src="${msg.imageUrl}" alt="사진" onclick="openImageLightbox(this.src)">`
+      ? `<img class="chat-img" src="${msg.imageUrl}" alt="사진" loading="lazy" onclick="openImageLightbox(this.src)">`
       : escHtml(msg.text);
     html += `<div class="chat-bubble-wrap ${isMine ? 'mine' : ''}">
       ${!isMine ? `<div class="chat-avatar">${avatarHtml}</div>` : ''}
@@ -7088,11 +7088,15 @@ async function sendChatImage(kind, event) {
   }
 
   try {
+    // Storage 업로드 → 메시지엔 다운로드 URL(짧은 문자열)만 저장 (문서 경량화 + 브라우저 캐싱)
     const raw      = await _readFileAsDataUrl(file);
-    const imageUrl = await _fitImageForFirestore(raw);
+    const compact  = await _compressImageDataUrl(raw, 1600, 0.82);   // Storage 는 1MB 제한 없음 → 고화질
+    const path     = `chatImages/${roomId}/${Date.now()}.jpg`;
+    const imageUrl = await window._fb.uploadChatImage(path, compact);
     await window._fb.sendChatMsg(roomId, {
       type:        'image',
       imageUrl,
+      imagePath:   path,
       text:        '',
       senderId:    me.id,
       senderName:  me.name,
@@ -7104,7 +7108,10 @@ async function sendChatImage(kind, event) {
     else                 window._fb.updateChatRoom(roomId, meta).catch(() => {});
   } catch(e) {
     console.error('이미지 전송 실패:', e);
-    toast('사진 전송 실패. 다시 시도해 주세요');
+    const hint = (e && String(e.code||e.message||'').indexOf('storage/') >= 0)
+      ? '사진 전송 실패 — Storage 설정을 확인해 주세요'
+      : '사진 전송 실패. 다시 시도해 주세요';
+    toast(hint);
     if (spin && spin.parentNode) spin.parentNode.removeChild(spin);
   } finally {
     if (attachBtn) attachBtn.disabled = false;
@@ -7633,7 +7640,7 @@ function _renderOpenChatMsgs(msgs) {
       : '👤';
     const isImg = msg.type === 'image' && msg.imageUrl;
     const bubbleInner = isImg
-      ? `<img class="chat-img" src="${msg.imageUrl}" alt="사진" onclick="openImageLightbox(this.src)">`
+      ? `<img class="chat-img" src="${msg.imageUrl}" alt="사진" loading="lazy" onclick="openImageLightbox(this.src)">`
       : escHtml(msg.text);
 
     html += `<div class="chat-bubble-wrap ${isMine ? 'mine' : ''}">
