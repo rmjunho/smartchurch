@@ -2404,7 +2404,13 @@ function changeChurchCode() {
     const update = { church: me.church, churchCode: me.churchCode, churchStatus: me.churchStatus, registrationType: me.registrationType };
     if (wasPersonal) { update.orgType = newOrgType; update.role = newDefRole; }
     window._fb.updateUser(me.id, update).catch(() => {});
+    // 사진 문서의 churchCode 도 갱신 → 새 교회 교인 목록에 사진 노출
+    if (typeof getMyPhoto === 'function' && getMyPhoto()) {
+      window._fb.setUserPhoto(me.id, { churchCode: me.churchCode }).catch(() => {});
+    }
   }
+  // 새 교회 사진 캐시를 다시 로드하도록 예열 가드 해제
+  if (typeof _photoCacheWarmed !== 'undefined') _photoCacheWarmed = false;
 
   updateProfileDisplay();
   initSideMenu();
