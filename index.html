@@ -3344,6 +3344,9 @@ function bootApp() {
   // 교회 가입 상태 Firestore에서 재확인 (승인/거부 반영)
   _syncChurchStatus();
 
+  // 프로필 사진 캐시 예열 (userPhotos 컬렉션 → 교회 단위 1회 벌크 로드)
+  warmPhotoCache();
+
   // Date
   updateDateSegments();
 
@@ -7359,6 +7362,7 @@ async function searchByFriendCode() {
     }
     const alreadyFriend = getFriends().find(f => f.userId === found.id);
     _cacheUserPhotos([found]);
+    await ensurePhotoCached(found.id);   // userPhotos 에서 사진 확보 (다른 교회 사용자 대비)
     const photo  = getUserPhoto(found);
     el.innerHTML = `<div class="friend-item">
       <div class="friend-avatar">${photo ? `<img src="${photo}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">` : '👤'}</div>
@@ -7709,8 +7713,33 @@ function getUserPhoto(userOrId) {
 }
 function getMyPhoto() { return getUserPhoto(me.id); }
 // Firestore 사용자 배열에서 photoURL 을 캐시에 심음 → id만 있는 렌더에서도 사진 표시
+// (레거시 호환: 예전엔 users 문서에 photoURL 이 들어있었음)
 function _cacheUserPhotos(arr) {
   (arr || []).forEach(u => { if (u && u.id && u.photoURL) _photoCache[u.id] = u.photoURL; });
+}
+// 교회 단위로 사진을 한 번에 로드해 캐시 채움 (users 조회에서 base64 를 분리한 대가로 1회 벌크 조회)
+var _photoCacheWarmed = false;
+async function warmPhotoCache(force) {
+  if (_photoCacheWarmed && !force) return;
+  if (!window._fbReady || !window._fb || !me) return;
+  try {
+    if (me.churchCode) {
+      const snap = await window._fb.getUserPhotosByChurch(me.churchCode);
+      snap.forEach(d => { const p = d.data(); if (p && p.photoURL) _photoCache[d.id] = p.photoURL; });
+    }
+    if (!_photoCache[me.id]) await ensurePhotoCached(me.id);   // 교회 없어도 내 사진은 확보
+    _photoCacheWarmed = true;
+    // 다른 기기 첫 로그인 시 내 아바타가 뒤늦게 채워지도록 1회 새로고침
+    if (typeof updateProfileAvatarDisplay === 'function') updateProfileAvatarDisplay();
+  } catch(e) { console.warn('사진 캐시 로드 실패:', e); }
+}
+// 단일 사용자 사진을 캐시에 확보 (없을 때만 1회 조회)
+async function ensurePhotoCached(uid) {
+  if (!uid || _photoCache[uid] || !window._fbReady || !window._fb) return;
+  try {
+    const d = await window._fb.getUserPhotoDoc(uid);
+    if (d.exists() && d.data().photoURL) _photoCache[uid] = d.data().photoURL;
+  } catch(e) {}
 }
 
 // ── 이미지 base64 유틸 (Firebase Storage 미사용 → Firestore 문서에 압축본 저장) ──
@@ -7912,7 +7941,10 @@ function saveProfileEdit() {
     const rawPhoto = _editPhotoBase64;
     _fitImageForFirestore(rawPhoto).then(small => {
       _photoCache[me.id] = small;
-      if (window._fbReady && window._fb) window._fb.updateUser(me.id, { photoURL: small }).catch(() => {});
+      // users 문서가 아닌 별도 컬렉션에 저장 → 교인목록/검색/로그인 조회가 사진을 안 끌고 옴
+      if (window._fbReady && window._fb) {
+        window._fb.setUserPhoto(me.id, { photoURL: small, churchCode: me.churchCode || '' }).catch(() => {});
+      }
     }).catch(() => {});
   }
 

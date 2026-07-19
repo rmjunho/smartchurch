@@ -47,6 +47,11 @@ window._fb = {
       // 개인 챌린지
       getPersonalChallenges: (uid) =>
         getDocs(query(collection(fbDb, 'challenges'), where('scope','==','personal'), where('createdByUid','==',uid))),
+      // 프로필 사진 (users 문서에서 분리 저장 → 목록 조회 시 base64 미포함)
+      setUserPhoto:    (uid, data) => setDoc(doc(fbDb, 'userPhotos', uid), data, { merge: true }),
+      getUserPhotoDoc: (uid)       => getDoc(doc(fbDb, 'userPhotos', uid)),
+      getUserPhotosByChurch: (churchCode) =>
+        getDocs(query(collection(fbDb, 'userPhotos'), where('churchCode', '==', churchCode))),
       // 바인더 공유 (리더 열람용)
       setBinderEntry:  (key, data) => setDoc(doc(fbDb, 'binderEntries', key), data, { merge: true }),
       getBinderEntry:  (key)       => getDoc(doc(fbDb, 'binderEntries', key)),

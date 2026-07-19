@@ -1635,7 +1635,8 @@ async function _loadChurchMembers() {
       u.churchStatus !== 'pending'
     );
   }
-  if (typeof _cacheUserPhotos === 'function') _cacheUserPhotos(members);
+  if (typeof _cacheUserPhotos === 'function') _cacheUserPhotos(members);   // 레거시 photoURL 호환
+  if (typeof warmPhotoCache === 'function') await warmPhotoCache();         // userPhotos 벌크 로드 (최초 1회)
   return members;
 }
 
