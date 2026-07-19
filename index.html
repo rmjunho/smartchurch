@@ -6895,7 +6895,7 @@ function renderChatRooms() {
   el.innerHTML = rooms.map(r => {
     const isGroup  = r.type === 'group';
     const subText  = isGroup
-      ? `그룹 · ${(r.memberNames||[]).length + 1}명`
+      ? `그룹 · ${(r.members||[]).length || (r.memberNames||[]).length + 1}명`
       : '1:1 채팅';
     const lastMsg  = r.lastMessage
       ? escHtml(r.lastMessage.length > 22 ? r.lastMessage.slice(0,22)+'…' : r.lastMessage)
@@ -6951,7 +6951,7 @@ function openChatRoom(roomId) {
   document.getElementById('room-panel-name').textContent =
     isDm ? room.name : (room.name || '그룹 채팅');
   document.getElementById('room-panel-sub').textContent  =
-    isDm ? '1:1 채팅' : `그룹 채팅 · ${(room.memberNames||[]).length + 1}명`;
+    isDm ? '1:1 채팅' : `그룹 채팅 · ${(room.members||[]).length || (room.memberNames||[]).length + 1}명`;
 
   // 기존 리스너 해제
   if (_roomUnsubscribe) { _roomUnsubscribe(); _roomUnsubscribe = null; }
@@ -7144,7 +7144,7 @@ function renderFriendsList() {
     return;
   }
   el.innerHTML = friends.map(f => {
-    const photo = getUserPhoto(f.userId);
+    const photo = f.photoURL || getUserPhoto(f.userId);
     const avatarHtml = photo
       ? `<img src="${photo}" alt="${escHtml(f.name)}">`
       : '👤';
@@ -7414,6 +7414,7 @@ function renderFriendSearch() {
       return;
     }
 
+    _cacheUserPhotos(combined);   // addFriend 가 사진을 저장할 수 있도록 캐시 시딩
     el.innerHTML = combined.map(u => {
       const photo = getUserPhoto(u);
       const isPublicBadge = u.profilePublic && u.church !== me.church
@@ -7437,7 +7438,8 @@ function renderFriendSearch() {
 function addFriend(userId, name, role, church, btn) {
   const friends = getFriends();
   if (friends.find(f => f.userId === userId)) { toast('이미 친구예요'); return; }
-  friends.push({ userId, name, role, church, addedAt: new Date().toISOString() });
+  // 추가 시점의 사진을 저장 → 다른 교회 친구도 사진 표시 (검색 시 _photoCache 에 심어둠)
+  friends.push({ userId, name, role, church, photoURL: getUserPhoto(userId) || null, addedAt: new Date().toISOString() });
   saveFriends(friends);
   if (btn) { btn.textContent = '✅ 추가됨'; btn.disabled = true; btn.style.opacity = '0.5'; }
   toast(`${name}님을 친구로 추가했어요!`);
