@@ -1176,7 +1176,7 @@
       </div>
       <span class="nav-lbl">채팅</span>
     </div>
-    <div class="nav-btn" id="nav-church" onclick="switchTab('church','교회',this)">
+    <div class="nav-btn" id="nav-church" onclick="switchTab('church',communityTabLabel(),this)">
       <div class="nav-icon-ring">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
           <rect x="11" y="1" width="2" height="6" rx="1" fill="#C9A96E"/>
@@ -1188,7 +1188,7 @@
           <rect x="10.5" y="18" width="3" height="5" rx="0.5" fill="#0D0D0D" opacity="0.5"/>
         </svg>
       </div>
-      <span class="nav-lbl">교회</span>
+      <span class="nav-lbl" id="nav-church-lbl">교회</span>
     </div>
     <div class="nav-btn" id="nav-mypage" onclick="switchTab('mypage','마이 페이지',this)">
       <div class="nav-icon-ring">
@@ -3210,6 +3210,24 @@ function hideLoadingOverlay() {
 // ================================================
 //  TAB SWITCHING
 // ================================================
+// 4번째 탭 라벨 — 공동체 유형에 따라 교회 / 기관·단체 / 개인
+function communityTabLabel() {
+  const t = me && me.orgType;
+  if (t === 'personal') return '개인';
+  if (!t || t === 'church') return '교회';
+  return '기관/단체';   // org, camp, cell 등
+}
+function updateCommunityTabLabel() {
+  const lbl = document.getElementById('nav-church-lbl');
+  if (lbl) lbl.textContent = communityTabLabel();
+  // 교회 탭이 열려 있으면 상단 제목도 갱신
+  const nav = document.getElementById('nav-church');
+  if (nav && nav.classList.contains('active')) {
+    const tb = document.getElementById('topbar-lbl');
+    if (tb) tb.textContent = communityTabLabel();
+  }
+}
+
 function switchTab(tab, label, el) {
   closeSubscreen();
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
@@ -8588,6 +8606,8 @@ function updateProfileDisplay() {
   updateProfileAvatarDisplay();
   // 친구 코드 카드 업데이트
   updateFriendCodeDisplay();
+  // 4번째 탭 라벨(교회/기관·단체/개인) 갱신
+  updateCommunityTabLabel();
 }
 
 // ── 나의 교회 서브스크린 ──
