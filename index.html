@@ -7099,6 +7099,7 @@ async function sendRoomMsg() {
   const text  = input?.value.trim();
   if (!text || !_currentRoomId) return;
   if (!window._fbReady || !window._fb) { toast('연결 중입니다'); return; }
+  if (!_requireFbAuth()) return;
 
   const btn = document.getElementById('room-panel-send-btn');
   if (btn) btn.disabled = true;
@@ -7121,7 +7122,9 @@ async function sendRoomMsg() {
     }).catch(() => {});
   } catch(e) {
     console.error(e);
-    toast('전송 실패. 다시 시도해 주세요');
+    toast((e && (e.code === 'permission-denied' || e.code === 'unauthenticated'))
+      ? '로그인이 만료됐어요. 로그아웃 후 다시 로그인해 주세요 🔑'
+      : '전송 실패. 다시 시도해 주세요');
     input.value = text;
   } finally {
     if (btn) btn.disabled = false;
@@ -7138,6 +7141,7 @@ async function sendChatImage(kind, event) {
   if (!file.type.startsWith('image/')) { toast('이미지 파일만 보낼 수 있어요'); return; }
   if (file.size > 5 * 1024 * 1024) { toast('이미지 크기는 5MB 이하여야 합니다.'); return; }
   if (!window._fbReady || !window._fb) { toast('연결 중입니다. 잠시 후 시도해 주세요'); return; }
+  if (!_requireFbAuth()) return;
 
   // 대상 방 결정
   let roomId;
@@ -7843,6 +7847,15 @@ function _canApproveChannel() {
   return (typeof isLeader === 'function' && isLeader()) || me.isAppAdmin;
 }
 
+// Firebase 인증 세션 확인 — 로컬 fallback 로그인(인증 없음)이면 서버 쓰기가 규칙에서 거부됨
+function _requireFbAuth() {
+  if (window._fbReady && window._fbAuth && !window._fbAuth.currentUser) {
+    toast('로그인이 만료됐어요. 로그아웃 후 다시 로그인해 주세요 🔑');
+    return false;
+  }
+  return true;
+}
+
 function initOpenChat() {
   const noChurch = document.getElementById('openchat-no-church');
   const list     = document.getElementById('openchat-list');
@@ -8053,6 +8066,7 @@ async function sendOpenChatMsg() {
   if (!me.church || !me.churchCode) { toast('교회에 가입해야 채팅할 수 있어요'); return; }
   if (me.churchStatus === 'pending') { toast('교회 가입 승인 후 메시지를 보낼 수 있어요'); return; }
   if (!window._fbReady || !window._fb) { toast('연결 중입니다. 잠시 후 시도해 주세요'); return; }
+  if (!_requireFbAuth()) return;
 
   const roomId = _currentOpenChannelId || `${me.churchCode}_open`;
   const btn = document.getElementById('openchat-send-btn');
@@ -8076,7 +8090,9 @@ async function sendOpenChatMsg() {
     }).catch(() => {});
   } catch(e) {
     console.error('메시지 전송 실패:', e);
-    toast('전송 실패. 다시 시도해 주세요');
+    toast((e && (e.code === 'permission-denied' || e.code === 'unauthenticated'))
+      ? '로그인이 만료됐어요. 로그아웃 후 다시 로그인해 주세요 🔑'
+      : '전송 실패. 다시 시도해 주세요');
     input.value = text; // 실패 시 복원
   } finally {
     if (btn) btn.disabled = false;
