@@ -6941,11 +6941,12 @@ function renderChatRooms() {
       ? escHtml(r.lastMessage.length > 22 ? r.lastMessage.slice(0,22)+'…' : r.lastMessage)
       : '채팅을 시작해보세요';
     const unread  = _isRoomUnread(r);
+    const roomTitle = isGroup ? (r.name || subText) : dmDisplayName(r);
     return `<div class="chat-room-item" onclick="openChatRoom('${r.id}')">
       <div class="chat-room-emoji">${r.emoji || (isGroup ? '👥' : '👤')}</div>
       <div style="flex:1;min-width:0">
         <div style="display:flex;justify-content:space-between;align-items:center">
-          <span style="font-size:14px;font-weight:${unread?'800':'700'};color:var(--black)">${escHtml(r.name||subText)}</span>
+          <span style="font-size:14px;font-weight:${unread?'800':'700'};color:var(--black)">${escHtml(roomTitle)}</span>
           <span style="font-size:11px;color:var(--muted)">${r.lastMessageAt ? _fmtRoomTime(r.lastMessageAt) : ''}</span>
         </div>
         <div style="display:flex;align-items:center;justify-content:space-between;margin-top:2px">
@@ -6971,6 +6972,16 @@ function _fmtRoomTime(iso) {
 var _roomUnsubscribe = null;
 var _currentRoomId  = null;
 
+// 두 사람 공통 결정적 DM 방 ID → 양쪽이 같은 방을 씀 (중복 방지)
+function dmRoomId(a, b) { return 'dm_' + [a, b].sort().join('_'); }
+// DM 표시 이름 = 내가 아닌 상대 멤버의 이름 (memberNames 는 members 와 인덱스 정렬)
+function dmDisplayName(room) {
+  if (!room || room.type !== 'dm') return (room && room.name) || '채팅';
+  const idx = (room.members || []).findIndex(id => id !== me.id);
+  if (idx >= 0 && room.memberNames && room.memberNames[idx]) return room.memberNames[idx];
+  return room.name || '1:1 채팅';   // 구버전 방 호환
+}
+
 function openChatRoom(roomId) {
   const room = _allRooms.find(r => r.id === roomId) || getChatRooms().find(r => r.id === roomId);
   if (!room) return;
@@ -6990,7 +7001,7 @@ function openChatRoom(roomId) {
   // 이름/서브타이틀 설정
   const isDm   = room.type === 'dm';
   document.getElementById('room-panel-name').textContent =
-    isDm ? room.name : (room.name || '그룹 채팅');
+    isDm ? dmDisplayName(room) : (room.name || '그룹 채팅');
   document.getElementById('room-panel-sub').textContent  =
     isDm ? '1:1 채팅' : `그룹 채팅 · ${(room.members||[]).length || (room.memberNames||[]).length + 1}명`;
 
@@ -7221,11 +7232,11 @@ function startDmWith(userId, name) {
     openChatRoom(existing.id);
     return;
   }
-  // 새 DM 방 생성
-  const roomId = 'room_' + uid();
+  // 새 DM 방 생성 — 결정적 ID + memberNames 를 members 와 정렬
+  const roomId = dmRoomId(me.id, userId);
   const newRoom = {
     id: roomId, type: 'dm', name, emoji: '👤',
-    members: [me.id, userId], memberNames: [name],
+    members: [me.id, userId], memberNames: [me.name, name],
     createdBy: me.id,
     createdAt: new Date().toISOString(),
     lastMessage: '',
@@ -7298,14 +7309,15 @@ function createChatRoom() {
     const dup = rooms.find(r => r.type === 'dm' && r.members?.includes(targetId));
     if (dup) { closeCreateChatRoomModal(); openChatRoom(dup.id); return; }
   }
-  const roomId = 'room_' + uid();
+  const isDmRoom = _crType === 'dm';
+  const roomId   = isDmRoom ? dmRoomId(me.id, [..._crSelected][0]) : ('room_' + uid());
   const newRoom = {
     id:          roomId,
     type:        _crType,
     name:        roomName,
-    emoji:       _crType === 'dm' ? '👤' : '👥',
+    emoji:       isDmRoom ? '👤' : '👥',
     members:     [me.id, ...[..._crSelected]],
-    memberNames,
+    memberNames: isDmRoom ? [me.name, memberNames[0]] : memberNames,   // DM 은 members 와 정렬
     createdBy:   me.id,
     createdAt:   new Date().toISOString(),
     lastMessage: '',

@@ -168,10 +168,10 @@ function createMatchDMRoom(req) {
     room = {
       id:            'dm_' + [me.id, partnerId].sort().join('_'), // 두 사람 공통 결정적 ID
       type:          'dm',
-      name:          partnerName,       // 생성자(수락자) 관점 표시명 — 기존 DM 규칙과 동일
+      name:          partnerName,
       emoji:         '💛',
       members:       [me.id, partnerId],
-      memberNames:   [partnerName],
+      memberNames:   [me.name, partnerName],   // members 와 인덱스 정렬 (양쪽 표시명 올바르게)
       createdBy:     me.id,
       createdAt:     new Date().toISOString(),
       lastMessage:   `🤝 ${matchTypeLabel(req.type)}(으)로 연결되었어요`,
