@@ -3382,12 +3382,28 @@ function bootApp() {
     if (_selfDocUnsub) { _selfDocUnsub(); _selfDocUnsub = null; }
     let _selfSeen = false;
     _selfDocUnsub = window._fb.listenUser(me.id, snap => {
-      if (snap.exists()) { _selfSeen = true; return; }
-      if (!_selfSeen || !me) return;              // 최초 스냅샷이 '없음'이면 동기화 지연으로 보고 무시
-      if (_selfDocUnsub) { _selfDocUnsub(); _selfDocUnsub = null; }
-      _clearAllLocalData();
-      toast('계정이 삭제되었습니다.');
-      setTimeout(() => { doLogout(); location.reload(); }, 900);
+      // 삭제 감지 → 자동 로그아웃
+      if (!snap.exists()) {
+        if (!_selfSeen || !me) return;            // 최초 스냅샷이 '없음'이면 동기화 지연으로 보고 무시
+        if (_selfDocUnsub) { _selfDocUnsub(); _selfDocUnsub = null; }
+        _clearAllLocalData();
+        toast('계정이 삭제되었습니다.');
+        setTimeout(() => { doLogout(); location.reload(); }, 900);
+        return;
+      }
+      _selfSeen = true;
+      // 승인(status/churchStatus) 변경을 로컬 me 에 실시간 반영 → 리더 승인이 재로그인 없이 적용됨
+      const data = snap.data();
+      const wasActive = me.churchStatus === 'active';
+      let changed = false;
+      ['status', 'churchStatus'].forEach(f => {
+        if (data[f] !== undefined && me[f] !== data[f]) { me[f] = data[f]; changed = true; }
+      });
+      if (changed) {
+        DB.saveUser(me);
+        if (!wasActive && me.churchStatus === 'active') toast('✅ 교회 가입이 승인됐어요!');
+        if (typeof updateProfileDisplay === 'function') updateProfileDisplay();
+      }
     });
   }
 
