@@ -854,7 +854,8 @@ function assignRole(userId, role) {
   const cached = _membersCache.find(x => x.id === userId);
   if (cached) { cached.role = role; delete cached.requestedRole; }
   if (window._fbReady && window._fb) {
-    window._fb.updateUser(userId, { role, requestedRole: '' }).catch(() => toast('동기화 실패 — 다시 시도해 주세요'));
+    window._fb.updateUser(userId, { role, requestedRole: '' })
+      .catch(e => { if (window._fbErr) window._fbErr('직분 변경 저장', e); toast('동기화 실패 — 다시 시도해 주세요'); });
   }
   toast(`${u.name || '교인'}님을 "${role}"(으)로 지정했어요`);
   const cur = document.getElementById('subscreen')?.dataset?.current;
@@ -899,7 +900,7 @@ async function loadMembersScreenData() {
       snap.forEach(d => allUsers.push({ id: d.id, ...d.data() }));
     }
   } catch(e) {
-    console.warn('Firestore 교인 로드 실패:', e);
+    if (window._fbErr) window._fbErr('교인 관리 조회', e);
   }
 
   // fallback — 현재 교회로 제한
@@ -918,6 +919,8 @@ async function loadMembersScreenData() {
 
   _membersCache = allUsers;   // 승인/거절 핸들러가 대상 사용자를 찾을 수 있도록 캐시
   if (typeof _cacheUserPhotos === 'function') _cacheUserPhotos(allUsers);
+  if (typeof warmPhotoCache === 'function')   await warmPhotoCache();
+  if (typeof ensurePhotosFor === 'function')  await ensurePhotosFor(allUsers);
   body.outerHTML = renderMembersScreenHtml(allUsers);
 }
 
@@ -965,7 +968,7 @@ function renderMembersScreenHtml(allUsers) {
         return `
         <div class="member-row" style="flex-wrap:wrap;gap:0">
           <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0;padding:2px 0">
-            <div class="member-avatar">🙏</div>
+            ${memberAvatarHtml(u, '🙏')}
             <div class="member-info">
               <div class="member-name">
                 ${escHtml(u.name)}
@@ -1030,7 +1033,7 @@ function renderMembersScreenHtml(allUsers) {
         html += `
           <div style="padding:14px 16px;border-bottom:1px solid var(--border)">
             <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
-              <div class="member-avatar">🙏</div>
+              ${memberAvatarHtml(u, '🙏')}
               <div>
                 <div class="member-name">${escHtml(u.name)} ${typeBadge}</div>
                 <div class="member-role">${escHtml(u.role||'성도')} · 신청일 ${(u.createdAt||'').split('T')[0]}</div>
@@ -1651,7 +1654,7 @@ async function _loadChurchMembers() {
       });
     }
   } catch(e) {
-    console.warn('Firestore 교인 로드 실패:', e);
+    if (window._fbErr) window._fbErr('교인 목록 조회', e);
   }
   // Firestore 데이터 없으면 localStorage fallback
   if (!members.length) {
@@ -1663,6 +1666,7 @@ async function _loadChurchMembers() {
   }
   if (typeof _cacheUserPhotos === 'function') _cacheUserPhotos(members);   // 레거시 photoURL 호환
   if (typeof warmPhotoCache === 'function') await warmPhotoCache();         // userPhotos 벌크 로드 (최초 1회)
+  if (typeof ensurePhotosFor === 'function') await ensurePhotosFor(members); // 벌크에서 누락된 사람 개별 보충
   return members;
 }
 

@@ -3412,11 +3412,20 @@ function bootApp() {
   // 차단 목록 기기 간 동기화 (Firestore me.blocked → 로컬)
   syncBlockedFromMe();
 
-  // 계정 삭제 감지 — 서버(Firebase)에서 내 사용자 문서가 삭제되면 자동 로그아웃
-  if (window._fbReady && window._fb && me) {
-    if (_selfDocUnsub) { _selfDocUnsub(); _selfDocUnsub = null; }
-    let _selfSeen = false;
-    _selfDocUnsub = window._fb.listenUser(me.id, snap => {
+  // 계정 삭제 감지 + 내 직분·권한 실시간 반영
+  startSelfDocWatch();
+
+  // Date
+  updateDateSegments();
+  _bootAppTail();
+}
+
+// 내 사용자 문서 실시간 감시 — 계정 삭제 감지 + 직분·리더 권한 변경 즉시 반영
+function startSelfDocWatch() {
+  if (!window._fbReady || !window._fb || !me) return;
+  if (_selfDocUnsub) { _selfDocUnsub(); _selfDocUnsub = null; }
+  let _selfSeen = false;
+  _selfDocUnsub = window._fb.listenUser(me.id, snap => {
       // 삭제 감지 → 자동 로그아웃
       if (!snap.exists()) {
         if (!_selfSeen || !me) return;            // 최초 스냅샷이 '없음'이면 동기화 지연으로 보고 무시
@@ -3454,11 +3463,10 @@ function bootApp() {
         }
       }
     });
-  }
+}
 
-  // Date
-  updateDateSegments();
-
+// bootApp 나머지 초기화 (화면 렌더 계열)
+function _bootAppTail() {
   // My page verse — 연중 일자 기준으로 60개 구절을 매일 순환
   const _now = new Date();
   const _doy = Math.floor((_now - new Date(_now.getFullYear(), 0, 0)) / 86400000);
@@ -8319,6 +8327,13 @@ function getUserPhoto(userOrId) {
   return _photoCache[userOrId] || DB.get('profilePhoto_' + userOrId, null) || null;
 }
 function getMyPhoto() { return getUserPhoto(me.id); }
+// 교인 목록 아바타 HTML — 사진이 있으면 사진, 없으면 이모지
+function memberAvatarHtml(u, fallback) {
+  const p = getUserPhoto(u);
+  return `<div class="member-avatar" style="overflow:hidden">${p
+    ? `<img src="${p}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`
+    : (fallback || '👤')}</div>`;
+}
 // Firestore 사용자 배열에서 photoURL 을 캐시에 심음 → id만 있는 렌더에서도 사진 표시
 // (레거시 호환: 예전엔 users 문서에 photoURL 이 들어있었음)
 function _cacheUserPhotos(arr) {
@@ -8348,6 +8363,13 @@ async function ensurePhotoCached(uid, force) {
     if (d.exists() && d.data().photoURL) _photoCache[uid] = d.data().photoURL;
   } catch(e) {}
 }
+// 교인 목록용 — 벌크 조회(getUserPhotosByChurch)는 userPhotos 문서의 churchCode 로 거르기 때문에
+// 교회 가입 전에 사진을 올렸거나 교회를 옮긴 사람은 누락된다. 빠진 사람만 개별 조회로 채운다.
+async function ensurePhotosFor(members) {
+  const miss = (members || []).filter(u => u && u.id && !_photoCache[u.id]).map(u => u.id);
+  if (!miss.length) return;
+  await Promise.all(miss.map(id => ensurePhotoCached(id)));
+}
 // 채팅 뷰를 열 때마다 발신자 사진을 1회 강제 갱신 → 상대가 프로필을 바꾸면 옛 메시지에도 반영
 var _photoRefreshedThisView = new Set();
 async function _ensureSenderPhotos(msgs) {
@@ -8373,6 +8395,16 @@ async function warmUserInfoCache(force) {
 function getUserName(uid, fb) { return (_userInfoCache[uid] && _userInfoCache[uid].name) || fb || ''; }
 function getUserRole(uid, fb) { return (_userInfoCache[uid] && _userInfoCache[uid].role) || fb || ''; }
 
+// ── Firestore 실패를 조용히 삼키지 않고 화면에 알림 (권한 거부 진단용) ──
+var _fbErrShown = {};
+window._fbErr = function (where, e) {
+  console.error('[Firestore] ' + where + ' 실패:', e && (e.code || e.message), e);
+  if (_fbErrShown[where]) return;                    // 같은 지점은 1회만 토스트
+  _fbErrShown[where] = true;
+  if (e && e.code === 'permission-denied')
+    toast(where + ': 서버 권한 거부 — 보안 규칙 확인 필요');
+};
+
 // ── 교회 교인 실시간 감시 → 이름·직분 변경을 모든 화면에 실시간 반영 ──
 var _membersUnsub = null;
 var _membersSig   = '';
@@ -8397,6 +8429,17 @@ function stopChurchMembersWatch() {
   if (_membersUnsub) { _membersUnsub(); _membersUnsub = null; }
   _membersSig = '';
 }
+// Firebase 모듈이 부팅(1.8초)보다 늦게 준비되는 느린 회선에서는 위 실시간 감시들이
+// 조용히 건너뛰어진다 → 준비 완료 신호를 받으면 다시 건다.
+window.addEventListener('fb-ready', () => {
+  if (!me) return;
+  startSelfDocWatch();
+  startChurchMembersWatch();
+  warmUserInfoCache(true);
+  warmPhotoCache(true);
+  if (typeof _syncChurchStatus === 'function') _syncChurchStatus();
+});
+
 function _refreshVisibleMemberViews() {
   const cur = document.getElementById('subscreen')?.dataset?.current;
   if ((cur === 'members' || cur === 'my-church') && typeof openSubscreen === 'function') { openSubscreen(cur); return; }

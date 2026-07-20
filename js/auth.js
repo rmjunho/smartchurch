@@ -18,4 +18,6 @@ Object.assign(window._fb, {
 onAuthStateChanged(fbAuth, (user) => { window.currentUser = user; });
 
 window._fbReady = true;
+// 부팅보다 늦게 준비됐을 때(느린 회선) 앱이 건너뛴 실시간 초기화를 다시 걸도록 알림
+window.dispatchEvent(new Event('fb-ready'));
 console.log('Firebase 초기화 완료');

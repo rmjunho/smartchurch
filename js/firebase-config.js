@@ -33,7 +33,8 @@ window._fb = {
       deleteUserDoc: (uid)    => deleteDoc(doc(fbDb, 'users', uid)),   // 관리자: 계정 실제 삭제
       // 교회 교인 목록 실시간
       watchChurch: (churchCode, cb) =>
-        onSnapshot(query(collection(fbDb, 'users'), where('churchCode','==',churchCode)), cb),
+        onSnapshot(query(collection(fbDb, 'users'), where('churchCode','==',churchCode)), cb,
+          e => window._fbErr && window._fbErr('교인 실시간 동기화', e)),
       // 전체 사용자 (관리자용)
       getAllUsers: () => getDocs(collection(fbDb, 'users')),
       // 교회별 사용자
