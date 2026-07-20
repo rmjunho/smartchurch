@@ -3341,6 +3341,8 @@ function bootApp() {
 
   // 시간표 기본값 1회 정리
   migrateClearSchDefaults();
+  // 빈 손글씨(그렸다 지운 것) 1회 정리 → 달력 점 오탐 제거
+  migrateCleanBlankDrawings();
 
   // 사이드 메뉴 초기화
   initSideMenu();
@@ -3457,6 +3459,8 @@ function updateDateSegments() {
   document.getElementById('dseg-year').textContent  = viewDate.getFullYear();
   document.getElementById('dseg-month').textContent = viewDate.getMonth() + 1;
   document.getElementById('dseg-day').textContent   = viewDate.getDate();
+  // 날짜가 바뀌면 주간 스트립도 선택 날짜가 있는 주로 이동 (팝업 달력 선택과 연동)
+  _calStripBase = null;
   renderCalStrip(dateKey(), 'cal-strip-days');
   const mEl = document.getElementById('cal-strip-month');
   if (mEl) mEl.textContent = `${viewDate.getFullYear()}년 ${viewDate.getMonth()+1}월`;
@@ -3712,6 +3716,44 @@ function migrateClearSchDefaults() {
     }
   } catch (e) {}
   DB.set('schDefaultsCleared_v1', true);
+}
+
+// 수정 전 저장된 '빈 손글씨'(그렸다 지운 투명 캔버스) 1회 정리 — 달력 점 오탐 제거
+async function migrateCleanBlankDrawings() {
+  if (DB.get('blankDrawCleaned_v1', false)) return;
+  const isBlankSrc = (src) => new Promise(res => {
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const c = document.createElement('canvas');
+        c.width = img.width || 1; c.height = img.height || 1;
+        c.getContext('2d').drawImage(img, 0, 0);
+        res(isCanvasBlank(c));
+      } catch (e) { res(false); }
+    };
+    img.onerror = () => res(false);
+    img.src = src;
+  });
+  try {
+    const keys = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.indexOf('sc2_binder_') === 0) keys.push(k);
+    }
+    for (const fullKey of keys) {
+      let obj; try { obj = JSON.parse(localStorage.getItem(fullKey)); } catch (e) { continue; }
+      if (!obj || !obj.drawings || typeof obj.drawings !== 'object') continue;
+      let changed = false;
+      for (const dk of Object.keys(obj.drawings)) {
+        const v   = obj.drawings[dk];
+        const src = typeof v === 'string' ? v : (v && v.dataUrl);
+        if (!src) { delete obj.drawings[dk]; changed = true; continue; }
+        if (await isBlankSrc(src)) { delete obj.drawings[dk]; changed = true; }
+      }
+      if (changed) localStorage.setItem(fullKey, JSON.stringify(obj));
+    }
+  } catch (e) {}
+  DB.set('blankDrawCleaned_v1', true);
 }
 
 function buildDiaryRings() {
