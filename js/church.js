@@ -1160,7 +1160,7 @@ function openCreateMeetingModal() {
   const now = new Date();
   document.getElementById('mtg-name').value  = '';
   document.getElementById('mtg-desc').value  = '';
-  document.getElementById('mtg-date').value  = now.toISOString().slice(0,10);
+  document.getElementById('mtg-date').value  = ymdLocal(now);
   document.getElementById('mtg-time').value  = `${String(now.getHours()).padStart(2,'0')}:00`;
   document.getElementById('mtg-duration').value = '60';
   document.getElementById('mtg-recur-type').value = 'none';
@@ -1926,7 +1926,7 @@ function renderMbCalStrip() {
   for (let i = 0; i < 7; i++) {
     const d = new Date(weekStart);
     d.setDate(weekStart.getDate() + i);
-    const dk = d.toISOString().split('T')[0];
+    const dk = ymdLocal(d);
     const isSun = d.getDay() === 0;
     let cls = 'cal-strip-day';
     if (dk === _viewingDate) cls += ' selected';
@@ -1969,7 +1969,7 @@ function navigateMemberBinder(dir) {
   goToMbDate((() => {
     const d = new Date(_viewingDate + 'T00:00:00');
     d.setDate(d.getDate() + dir);
-    return d.toISOString().split('T')[0];
+    return ymdLocal(d);
   })());
 }
 

@@ -3496,7 +3496,7 @@ function renderCalStrip(selectedDate, containerId) {
   for (let i = 0; i < 7; i++) {
     const d = new Date(weekStart);
     d.setDate(weekStart.getDate() + i);
-    const dk = d.toISOString().split('T')[0];
+    const dk = ymdLocal(d);
     const isSun = d.getDay() === 0;
     let cls = 'cal-strip-day';
     if (dk === selectedDate) cls += ' selected';
@@ -3579,7 +3579,10 @@ function dateKey() {
 }
 
 function todayDateKey() {
-  const d = new Date();
+  return ymdLocal(new Date());
+}
+// Date → 'YYYY-MM-DD' (로컬 기준). toISOString()은 UTC라 KST에서 하루 어긋나므로 금지.
+function ymdLocal(d) {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
 

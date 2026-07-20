@@ -721,7 +721,7 @@ function calculateStreak(checkedDates) {
       streak++;
       const prev = new Date(cur + 'T00:00:00');
       prev.setDate(prev.getDate() - 1);
-      cur = prev.toISOString().slice(0,10);
+      cur = ymdLocal(prev);
     } else if (d < cur) break;
   }
   return streak;
@@ -918,7 +918,7 @@ function obToggleChallenge(id) {
 }
 
 function obGetSuggestedChallenges() {
-  const today = new Date().toISOString().split('T')[0];
+  const today = todayDateKey();
   return fullCatalog()
     .filter(c => !c.endDate || c.endDate >= today)
     .sort((a, b) => (b.createdAt || '') > (a.createdAt || '') ? 1 : -1)
