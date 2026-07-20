@@ -7897,25 +7897,41 @@ async function renderOpenChannels() {
       </div>
     </div>`;
 
-  let channels = [];
+  // 우리 공동체 채널 + 다른 공동체의 전체공개 채널 로드
+  let mine = [], publicOther = [];
   if (window._fbReady && window._fb) {
-    try { const snap = await window._fb.getOpenChannels(me.churchCode); snap.forEach(d => channels.push({ id: d.id, ...d.data() })); }
-    catch(e) { console.warn('채널 로드 실패:', e); }
+    try {
+      const [snapMine, snapPub] = await Promise.all([
+        window._fb.getOpenChannels(me.churchCode),
+        window._fb.getPublicChannels().catch(() => ({ forEach: () => {} }))
+      ]);
+      snapMine.forEach(d => mine.push({ id: d.id, ...d.data() }));
+      snapPub.forEach(d => {
+        const c = { id: d.id, ...d.data() };
+        if (c.churchCode !== me.churchCode && c.status === 'active') publicOther.push(c);  // 다른 공동체 것만
+      });
+    } catch(e) { console.warn('채널 로드 실패:', e); }
   }
-  const active  = channels.filter(c => c.status === 'active');
-  const pending = channels.filter(c => c.status === 'pending');
+  const active  = mine.filter(c => c.status === 'active');
+  const pending = mine.filter(c => c.status === 'pending');
 
-  active.forEach(c => {
-    const canDel = canApprove || c.createdBy === me.id;
-    html += `<div class="friend-item" style="cursor:pointer">
-      <div class="friend-avatar" onclick="openOpenChannel('${c.id}','#️⃣ ${escHtml(c.name)}','오픈 채널')" style="background:var(--cream2)">#️⃣</div>
-      <div style="flex:1;min-width:0" onclick="openOpenChannel('${c.id}','#️⃣ ${escHtml(c.name)}','오픈 채널')">
-        <div class="friend-name">${escHtml(c.name)}</div>
-        <div class="friend-sub">${escHtml(c.createdByName||'')} 개설</div>
+  const chanRow = (c, showChurch) => {
+    const canDel = c.createdBy === me.id || (canApprove && c.churchCode === me.churchCode);
+    const badge  = c.scope === 'public' ? '🌐' : '🔒';
+    const sub    = showChurch
+      ? `🌐 ${escHtml((typeof getChurchName === 'function' && getChurchName(c.churchCode)) || c.church || '다른 공동체')}`
+      : `${badge} ${escHtml(c.createdByName || '')} 개설`;
+    return `<div class="friend-item" style="cursor:pointer">
+      <div class="friend-avatar" onclick="openOpenChannel('${c.id}','${badge} ${escHtml(c.name)}','${showChurch ? '전체 공개 채널' : '오픈 채널'}')" style="background:var(--cream2)">#️⃣</div>
+      <div style="flex:1;min-width:0" onclick="openOpenChannel('${c.id}','${badge} ${escHtml(c.name)}','${showChurch ? '전체 공개 채널' : '오픈 채널'}')">
+        <div class="friend-name">${escHtml(c.name)} <span style="font-size:11px">${badge}</span></div>
+        <div class="friend-sub">${sub}</div>
       </div>
       ${canDel ? `<button onclick="event.stopPropagation();deleteOpenChannel('${c.id}')" style="height:30px;padding:0 10px;border-radius:16px;border:1.5px solid rgba(192,57,43,0.25);background:#FBE5E5;color:#C0392B;font-size:11.5px;font-weight:700;cursor:pointer;font-family:inherit">삭제</button>` : ''}
     </div>`;
-  });
+  };
+
+  active.forEach(c => { html += chanRow(c, false); });
 
   // 승인 대기 채널 (리더에게만 승인/거절, 신청자에겐 '승인 대기' 표시)
   pending.forEach(c => {
@@ -7923,7 +7939,7 @@ async function renderOpenChannels() {
     html += `<div class="friend-item">
       <div class="friend-avatar" style="background:var(--cream2);opacity:.55">#️⃣</div>
       <div style="flex:1;min-width:0">
-        <div class="friend-name">${escHtml(c.name)} <span style="font-size:11px;color:#E67E22;font-weight:700">승인 대기</span></div>
+        <div class="friend-name">${escHtml(c.name)} ${c.scope === 'public' ? '🌐' : ''} <span style="font-size:11px;color:#E67E22;font-weight:700">승인 대기</span></div>
         <div class="friend-sub">${escHtml(c.createdByName||'')} 신청</div>
       </div>
       ${canApprove
@@ -7932,6 +7948,12 @@ async function renderOpenChannels() {
         : '<span style="font-size:11.5px;color:var(--muted)">리더 승인 대기중</span>'}
     </div>`;
   });
+
+  // 다른 공동체의 전체 공개 채널
+  if (publicOther.length) {
+    html += `<div style="padding:12px 20px 4px;font-size:12px;font-weight:800;color:var(--gold)">🌐 전체 공개 채널 (다른 공동체)</div>`;
+    publicOther.forEach(c => { html += chanRow(c, true); });
+  }
 
   el.innerHTML = html;
 }
@@ -7977,15 +7999,20 @@ function requestOpenChannel() {
   if (!window._fbReady || !window._fb) { toast('연결 중입니다. 잠시 후 시도해 주세요'); return; }
   const name = (prompt('새 오픈채팅 채널 이름을 입력하세요') || '').trim().slice(0, 20);
   if (!name) return;
+  // 공개 범위 선택 — 전체 공개면 다른 공동체 사용자도 참여 가능
+  const isPublic = confirm(`"${name}" 채널을 전체 공개로 만들까요?\n\n확인 = 🌐 전체 공개 (다른 공동체 사용자도 참여)\n취소 = 🔒 우리 ${escHtml(me.church || '공동체')}만`);
   const canApprove = _canApproveChannel();
   const id = `ch_${me.churchCode}_${Date.now()}`;
   window._fb.setOpenChannel(id, {
-    id, churchCode: me.churchCode, name,
+    id, churchCode: me.churchCode, church: me.church || '', name,
     createdBy: me.id, createdByName: me.name,
+    scope: isPublic ? 'public' : 'church',
     status: canApprove ? 'active' : 'pending',
     createdAt: new Date().toISOString()
   }).then(() => {
-    toast(canApprove ? `채널 "${name}" 이 개설됐어요` : `채널 "${name}" 신청 완료 — 리더 승인 후 열려요 🙏`);
+    toast(canApprove
+      ? `채널 "${name}" 이 개설됐어요${isPublic ? ' 🌐' : ''}`
+      : `채널 "${name}" 신청 완료 — 리더 승인 후 열려요 🙏`);
     renderOpenChannels();
   }).catch(() => toast('채널 생성 실패 — 다시 시도해 주세요'));
 }

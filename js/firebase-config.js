@@ -102,6 +102,7 @@ window._fb = {
       setOpenChannel:    (id, data) => setDoc(doc(fbDb, 'openChannels', id), data, { merge: true }),
       deleteOpenChannel: (id)       => deleteDoc(doc(fbDb, 'openChannels', id)),
       getOpenChannels:   (churchCode) => getDocs(query(collection(fbDb, 'openChannels'), where('churchCode','==',churchCode))),
+      getPublicChannels: ()           => getDocs(query(collection(fbDb, 'openChannels'), where('scope','==','public'))),
       // ── 친구 요청 (수락제) ──
       setFriendRequest:    (id, data) => setDoc(doc(fbDb, 'friendRequests', id), data, { merge: true }),
       deleteFriendRequest: (id)       => deleteDoc(doc(fbDb, 'friendRequests', id)),
