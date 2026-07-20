@@ -4199,14 +4199,27 @@ function loadDrawingForKey(key) {
   img.src = src;
 }
 
+// 캔버스가 완전히 비었는지 (모든 픽셀 투명). 지우개는 destination-out(투명)이라 다 지우면 투명해짐.
+function isCanvasBlank(canvas) {
+  try {
+    const d = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
+    for (let i = 3; i < d.length; i += 4) { if (d[i] !== 0) return false; }
+    return true;
+  } catch(e) { return false; }   // 오류 시 안전하게 '내용 있음'으로 처리
+}
+
 function saveDrawingFor(key) {
   const entry = drawCtxMap[key];
   if (!entry) return;
   const data = DB.get(binderKey(), {});
   if (!data.drawings) data.drawings = {};
-  data.drawings[key] = entry.canvas.toDataURL('image/png');
+  // 빈(그렸다 지운) 캔버스는 저장하지 않음 → 달력 점·나눔 공유 오탐 방지
+  if (isCanvasBlank(entry.canvas)) delete data.drawings[key];
+  else                            data.drawings[key] = entry.canvas.toDataURL('image/png');
   data.updatedAt = new Date().toISOString();
-  DB.set(binderKey(), data);
+  // 바인더 전체에 실제 내용이 없으면 항목을 만들지 않음(정리)
+  if (binderHasContent(data)) DB.set(binderKey(), data);
+  else if (DB.get(binderKey(), null) !== null) DB.del(binderKey());
   // 주요 4칸의 저장됨 배지
   const savedId = 'draw-' + key + '-saved';
   const el = document.getElementById(savedId);
