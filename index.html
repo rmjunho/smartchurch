@@ -3404,6 +3404,8 @@ function bootApp() {
 
   // 프로필 사진 캐시 예열 (userPhotos 컬렉션 → 교회 단위 1회 벌크 로드)
   warmPhotoCache();
+  // 발신자 이름/직분 캐시 예열 (채팅에 현재 값 표시)
+  warmUserInfoCache();
 
   // 차단 목록 기기 간 동기화 (Firestore me.blocked → 로컬)
   syncBlockedFromMe();
@@ -3438,6 +3440,7 @@ function bootApp() {
       }
       if (changed) {
         DB.saveUser(me);
+        _userInfoCache[me.id] = { name: me.name || '', role: me.role || '' };   // 내 이름/직분 캐시 갱신
         if (!wasActive && me.churchStatus === 'active') toast('교회 가입이 승인됐어요!');
         const nowLeader = (typeof isLeader === 'function') ? isLeader() : false;
         if (!wasLeader && nowLeader) toast('리더 권한이 부여됐어요');
@@ -7170,6 +7173,7 @@ function openChatRoom(roomId) {
 
   _currentRoomId = roomId;
   _photoRefreshedThisView = new Set();  // 이 채팅 진입 시 발신자 사진 최신 갱신
+  _userInfoWarmed = false;              // 이름/직분도 다시 불러와 최신 반영
   _markRoomAsRead(roomId); // 읽음 처리
 
   // 패널 표시
@@ -7208,6 +7212,7 @@ async function _renderRoomMsgs(msgs) {
   const el = document.getElementById('room-panel-msgs');
   if (!el) return;
   await _ensureSenderPhotos(msgs);
+  await warmUserInfoCache();   // 발신자 현재 이름/직분 확보 (박제된 옛 값 대신)
   msgs = (msgs || []).filter(m => !isBlocked(m.senderId));   // 차단한 사용자 메시지 숨김
 
   if (!msgs.length) {
@@ -7241,7 +7246,7 @@ async function _renderRoomMsgs(msgs) {
     html += `<div class="chat-bubble-wrap ${isMine ? 'mine' : ''}">
       ${!isMine ? `<div class="chat-avatar">${avatarHtml}</div>` : ''}
       <div class="chat-bubble-col">
-        ${!isMine ? `<div class="chat-sender">${escHtml(msg.senderName)}</div>` : ''}
+        ${!isMine ? `<div class="chat-sender">${escHtml(getUserName(msg.senderId, msg.senderName))}</div>` : ''}
         <div class="chat-bubble${isImg ? ' img' : ''}">${bubbleInner}</div>
         <div class="chat-time">${timeStr}</div>
       </div>
@@ -8117,6 +8122,7 @@ function openOpenChannel(channelId, name, sub) {
   if (room) room.style.display = 'flex';
   _currentOpenChannelId = channelId;
   _photoRefreshedThisView = new Set();  // 이 채널 진입 시 발신자 사진 최신 갱신
+  _userInfoWarmed = false;              // 이름/직분도 다시 불러와 최신 반영
   document.getElementById('openchat-room-name').textContent = name;
   document.getElementById('openchat-room-sub').textContent  = sub || '실시간 채팅';
   document.getElementById('openchat-msgs').innerHTML =
@@ -8193,6 +8199,7 @@ async function _renderOpenChatMsgs(msgs) {
   const el = document.getElementById('openchat-msgs');
   if (!el) return;
   await _ensureSenderPhotos(msgs);
+  await warmUserInfoCache();   // 발신자 현재 이름/직분 확보 (박제된 옛 값 대신)
   msgs = (msgs || []).filter(m => !isBlocked(m.senderId));   // 차단한 사용자 메시지 숨김
 
   if (!msgs.length) {
@@ -8231,7 +8238,7 @@ async function _renderOpenChatMsgs(msgs) {
     html += `<div class="chat-bubble-wrap ${isMine ? 'mine' : ''}">
       ${!isMine ? `<div class="chat-avatar">${avatarHtml}</div>` : ''}
       <div class="chat-bubble-col">
-        ${!isMine ? `<div class="chat-sender">${escHtml(msg.senderName)} · ${escHtml(msg.senderRole||'성도')}</div>` : ''}
+        ${!isMine ? `<div class="chat-sender">${escHtml(getUserName(msg.senderId, msg.senderName))} · ${escHtml(getUserRole(msg.senderId, msg.senderRole||'성도'))}</div>` : ''}
         <div class="chat-bubble${isImg ? ' img' : ''}">${bubbleInner}</div>
         <div class="chat-time">${timeStr}</div>
       </div>
@@ -8346,6 +8353,21 @@ async function _ensureSenderPhotos(msgs) {
   ids.forEach(id => _photoRefreshedThisView.add(id));
   await Promise.all(ids.map(id => ensurePhotoCached(id, true)));   // 강제 = 캐시가 있어도 최신으로 갱신
 }
+
+// ── 발신자 이름/직분 캐시 (채팅에 박제된 옛 값 대신 현재 값 표시) ──
+var _userInfoCache = {};    // uid -> { name, role }
+var _userInfoWarmed = false;
+async function warmUserInfoCache(force) {
+  if (_userInfoWarmed && !force) return;
+  if (!window._fbReady || !window._fb || !me || !me.churchCode) return;
+  try {
+    const snap = await window._fb.getUsersByChurch(me.churchCode);
+    snap.forEach(d => { const u = d.data(); _userInfoCache[d.id] = { name: u.name || '', role: u.role || '' }; });
+    _userInfoWarmed = true;
+  } catch (e) {}
+}
+function getUserName(uid, fb) { return (_userInfoCache[uid] && _userInfoCache[uid].name) || fb || ''; }
+function getUserRole(uid, fb) { return (_userInfoCache[uid] && _userInfoCache[uid].role) || fb || ''; }
 
 // ── 이미지 base64 유틸 (Firebase Storage 미사용 → Firestore 문서에 압축본 저장) ──
 function _readFileAsDataUrl(file) {
