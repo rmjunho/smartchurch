@@ -241,7 +241,7 @@ function approveMinor(userId) {
       update.churchStatus = 'active';
       update.orgType      = u.orgType;
     }
-    window._fb.updateUser(userId, update).catch(() => {});
+    window._fb.updateUser(userId, update).catch(() => toast('⚠ 서버 동기화 실패 — 잠시 후 다시 승인해 주세요'));
   }
   toast(`✅ ${u.name || '회원'}님의 계정을 승인했어요`);
   const cur = document.getElementById('subscreen')?.dataset?.current;
@@ -814,7 +814,7 @@ function approveChurchMember(userId) {
       churchStatus:     'active',
       churchApprovedBy: u.churchApprovedBy,
       churchApprovedAt: u.churchApprovedAt
-    }).catch(() => {});
+    }).catch(() => toast('⚠ 서버 동기화 실패 — 잠시 후 다시 승인해 주세요'));
   }
 
   toast(`✅ ${u.name || '교인'}님의 교회 가입을 승인했어요`);
@@ -842,7 +842,7 @@ function rejectChurchMember(userId) {
       churchStatus:     'rejected',
       churchRejectedAt: u.churchRejectedAt,
       churchRejectedBy: u.churchRejectedBy
-    }).catch(() => {});
+    }).catch(() => toast('⚠ 서버 동기화 실패 — 잠시 후 다시 거절해 주세요'));
   }
 
   toast(`${u.name || '교인'}님의 교회 가입을 거절했어요`);
