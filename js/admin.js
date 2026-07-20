@@ -135,13 +135,13 @@ function adminToggleDisable(userId) {
 }
 
 function adminDeleteUser(userId, name) {
-  if (!confirm(`"${name}"님의 계정을 삭제할까요?\n이 작업은 되돌릴 수 없어요.`)) return;
+  if (!confirm(`"${name}"님의 계정을 삭제할까요?\n\n· 앱 데이터(Firestore)는 바로 삭제되고, 이 사용자는 앱에서 자동 로그아웃돼요.\n· 로그인 계정(Authentication)은 보안상 앱에서 지울 수 없어, Firebase 콘솔에서 직접 삭제해야 완전히 지워져요.\n\n이 작업은 되돌릴 수 없어요.`)) return;
   // 로컬/UI 제거는 Firestore 삭제 성공 후에만 (이전: 소프트 플래그만 남겨 새로고침 시 재등장)
   const removeLocal = () => {
     DB.set('users', DB.get('users', []).filter(u => u.id !== userId));
     _adminUsersData = (_adminUsersData || []).filter(u => u.id !== userId);
     _membersCache   = (_membersCache   || []).filter(u => u.id !== userId);
-    toast('계정을 삭제했어요');
+    toast('앱 데이터를 삭제했어요. 로그인 계정은 Firebase 콘솔 → Authentication 에서 삭제해 주세요');
     setTimeout(() => openSubscreen('admin-users'), 150);
   };
   if (window._fbReady && window._fb) {
