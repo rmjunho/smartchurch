@@ -601,6 +601,9 @@ function adminSwitchChurch(code) {
     }).catch(() => {});
   }
 
+  if (typeof _photoCacheWarmed !== 'undefined') _photoCacheWarmed = false;
+  if (typeof _userInfoWarmed !== 'undefined') _userInfoWarmed = false;
+  if (typeof startChurchMembersWatch === 'function') startChurchMembersWatch();   // 새 교회 교인 실시간 감시
   updateProfileDisplay();
   initSideMenu();
 

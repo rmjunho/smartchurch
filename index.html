@@ -3406,6 +3406,8 @@ function bootApp() {
   warmPhotoCache();
   // 발신자 이름/직분 캐시 예열 (채팅에 현재 값 표시)
   warmUserInfoCache();
+  // 교인 프로필(이름·직분) 실시간 감시 → 모든 화면 자동 갱신
+  startChurchMembersWatch();
 
   // 차단 목록 기기 간 동기화 (Firestore me.blocked → 로컬)
   syncBlockedFromMe();
@@ -6153,6 +6155,8 @@ function closeLogoutModal(e) {
   }
 }
 function doLogout() {
+  if (typeof stopChurchMembersWatch === 'function') stopChurchMembersWatch();
+  if (_selfDocUnsub) { _selfDocUnsub(); _selfDocUnsub = null; }
   DB.clearSession();
   me = null;
   go('login');
@@ -8368,6 +8372,38 @@ async function warmUserInfoCache(force) {
 }
 function getUserName(uid, fb) { return (_userInfoCache[uid] && _userInfoCache[uid].name) || fb || ''; }
 function getUserRole(uid, fb) { return (_userInfoCache[uid] && _userInfoCache[uid].role) || fb || ''; }
+
+// ── 교회 교인 실시간 감시 → 이름·직분 변경을 모든 화면에 실시간 반영 ──
+var _membersUnsub = null;
+var _membersSig   = '';
+function startChurchMembersWatch() {
+  if (!window._fbReady || !window._fb || !me || !me.churchCode) return;
+  if (_membersUnsub) { _membersUnsub(); _membersUnsub = null; }
+  _membersSig = '';
+  _membersUnsub = window._fb.watchChurch(me.churchCode, snap => {
+    const members = [];
+    snap.forEach(d => members.push({ id: d.id, ...d.data() }));
+    // 공용 캐시 갱신 (교인목록 · 채팅 이름/직분 · 사진 · 승인 핸들러)
+    _membersCache = members.filter(u => !u.deleted);
+    if (typeof _cacheUserPhotos === 'function') _cacheUserPhotos(members);
+    members.forEach(u => { _userInfoCache[u.id] = { name: u.name || '', role: u.role || '' }; });
+    _userInfoWarmed = true;
+    // 이름/직분/사진이 실제로 바뀐 경우에만 화면 갱신 (lastActiveAt 등 잡음 무시)
+    const sig = members.map(u => `${u.id}:${u.name}:${u.role}:${u.photoURL || ''}`).sort().join('|');
+    if (sig !== _membersSig) { _membersSig = sig; _refreshVisibleMemberViews(); }
+  });
+}
+function stopChurchMembersWatch() {
+  if (_membersUnsub) { _membersUnsub(); _membersUnsub = null; }
+  _membersSig = '';
+}
+function _refreshVisibleMemberViews() {
+  const cur = document.getElementById('subscreen')?.dataset?.current;
+  if ((cur === 'members' || cur === 'my-church') && typeof openSubscreen === 'function') { openSubscreen(cur); return; }
+  if (document.getElementById('nav-church')?.classList.contains('active') && typeof renderChurchMembers === 'function') {
+    renderChurchMembers();
+  }
+}
 
 // ── 이미지 base64 유틸 (Firebase Storage 미사용 → Firestore 문서에 압축본 저장) ──
 function _readFileAsDataUrl(file) {

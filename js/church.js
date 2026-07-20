@@ -2437,6 +2437,8 @@ function changeChurchCode() {
   }
   // 새 교회 사진 캐시를 다시 로드하도록 예열 가드 해제
   if (typeof _photoCacheWarmed !== 'undefined') _photoCacheWarmed = false;
+  if (typeof _userInfoWarmed !== 'undefined') _userInfoWarmed = false;
+  if (typeof startChurchMembersWatch === 'function') startChurchMembersWatch();   // 새 교회 교인 실시간 감시
 
   updateProfileDisplay();
   initSideMenu();
