@@ -986,6 +986,7 @@
             + 친구 추가
           </button>
         </div>
+        <div id="friend-requests-wrap" style="margin-top:8px"></div>
         <div id="chat-friends-list" style="margin-top:8px"></div>
       </div>
 
@@ -6754,7 +6755,7 @@ function setChatInnerTab(tab) {
 
   // 탭별 초기화
   if (tab === 'rooms')   renderChatRooms();
-  if (tab === 'friends') renderFriendsList();
+  if (tab === 'friends') { syncFriendsFromFirestore().then(renderFriendsList); renderFriendRequests(); }
   if (tab === 'open')    initOpenChat();
   if (tab === 'meeting') { renderMeetingList(); initMeetingsListener(); }
 }
@@ -7382,7 +7383,7 @@ async function searchByFriendCode() {
         : `<button onclick="addFriend('${found.id}','${escHtml(found.name||'')}','${escHtml(found.role||'')}','${escHtml(found.church||'')}',this)"
             style="height:32px;padding:0 14px;border-radius:20px;border:none;
                    background:var(--black);color:white;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">
-            + 추가
+            친구 요청
           </button>`}
     </div>`;
   } catch(e) {
@@ -7440,20 +7441,105 @@ function renderFriendSearch() {
         <button onclick="addFriend('${u.id}','${escHtml(u.name)}','${escHtml(u.role||'')}','${escHtml(u.church||'')}',this)"
           style="height:32px;padding:0 14px;border-radius:20px;border:none;
                  background:var(--black);color:white;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">
-          + 추가
+          친구 요청
         </button>
       </div>`;
     }).join('');
   });
 }
+// 친구 추가 = 요청 전송 (상대 수락 시 양쪽 등록). DM 은 수락과 무관하게 가능.
 function addFriend(userId, name, role, church, btn) {
+  if (userId === me.id) return;
+  if (getFriends().find(f => f.userId === userId)) { toast('이미 친구예요'); return; }
+  if (!window._fbReady || !window._fb) { toast('연결 중입니다. 잠시 후 시도해 주세요'); return; }
+  const reqId = `fr_${me.id}_${userId}`;   // 방향성 결정적 ID → 중복 요청 방지
+  const req = {
+    id: reqId,
+    fromId: me.id, fromName: me.name, fromRole: me.role || '성도', fromChurch: me.church || '',
+    toId: userId,  toName: name,     toRole: role || '성도',       toChurch: church || '',
+    status: 'pending', createdAt: new Date().toISOString()
+  };
+  window._fb.setFriendRequest(reqId, req)
+    .then(() => {
+      if (btn) { btn.textContent = '요청됨'; btn.disabled = true; btn.style.opacity = '0.5'; }
+      toast(`${name}님께 친구 요청을 보냈어요 📨`);
+    })
+    .catch(() => toast('요청 전송 실패 — 다시 시도해 주세요'));
+}
+
+// 받은 친구 요청 렌더링 (친구 패널 상단)
+async function renderFriendRequests() {
+  const wrap = document.getElementById('friend-requests-wrap');
+  if (!wrap) return;
+  if (!window._fbReady || !window._fb) { wrap.innerHTML = ''; return; }
+  let reqs = [];
+  try {
+    const snap = await window._fb.getFriendRequestsTo(me.id);
+    snap.forEach(d => { const r = d.data(); if (r.status === 'pending') reqs.push(r); });
+  } catch(e) { wrap.innerHTML = ''; return; }
+  if (!reqs.length) { wrap.innerHTML = ''; return; }
+  wrap.innerHTML = `
+    <div style="padding:0 20px 6px;font-size:12px;font-weight:800;color:var(--gold)">📨 받은 친구 요청 (${reqs.length})</div>
+    ${reqs.map(r => `
+      <div class="friend-item">
+        <div class="friend-avatar">${getUserPhoto(r.fromId) ? `<img src="${getUserPhoto(r.fromId)}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">` : '👤'}</div>
+        <div style="flex:1;min-width:0">
+          <div class="friend-name">${escHtml(r.fromName || '이름 없음')}</div>
+          <div class="friend-sub">${escHtml(r.fromRole||'성도')} · ${escHtml(r.fromChurch||'')}</div>
+        </div>
+        <button onclick="acceptFriendRequest('${r.fromId}','${escHtml(r.fromName||'')}','${escHtml(r.fromRole||'')}','${escHtml(r.fromChurch||'')}')"
+          style="height:32px;padding:0 12px;border-radius:20px;border:none;background:var(--black);color:white;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">수락</button>
+        <button onclick="rejectFriendRequest('${r.fromId}')"
+          style="height:32px;padding:0 10px;margin-left:6px;border-radius:20px;border:1.5px solid var(--border);background:white;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">거절</button>
+      </div>`).join('')}
+    <div style="height:1px;background:var(--border);margin:10px 20px"></div>`;
+}
+
+function acceptFriendRequest(fromId, fromName, fromRole, fromChurch) {
+  // 나에게 친구 추가
   const friends = getFriends();
-  if (friends.find(f => f.userId === userId)) { toast('이미 친구예요'); return; }
-  // 추가 시점의 사진을 저장 → 다른 교회 친구도 사진 표시 (검색 시 _photoCache 에 심어둠)
-  friends.push({ userId, name, role, church, photoURL: getUserPhoto(userId) || null, addedAt: new Date().toISOString() });
-  saveFriends(friends);
-  if (btn) { btn.textContent = '✅ 추가됨'; btn.disabled = true; btn.style.opacity = '0.5'; }
-  toast(`${name}님을 친구로 추가했어요!`);
+  if (!friends.find(f => f.userId === fromId)) {
+    friends.push({ userId: fromId, name: fromName, role: fromRole, church: fromChurch, photoURL: getUserPhoto(fromId) || null, addedAt: new Date().toISOString() });
+    saveFriends(friends);
+  }
+  // 요청 accepted → 상대는 syncFriendsFromFirestore 로 나를 친구로 추가
+  if (window._fbReady && window._fb) {
+    window._fb.setFriendRequest(`fr_${fromId}_${me.id}`, { status: 'accepted', acceptedAt: new Date().toISOString() })
+      .catch(() => toast('⚠ 동기화 실패 — 잠시 후 다시 시도해 주세요'));
+  }
+  toast(`${fromName}님과 친구가 됐어요! 🤝`);
+  renderFriendRequests();
+  renderFriendsList();
+}
+
+function rejectFriendRequest(fromId) {
+  if (window._fbReady && window._fb) {
+    window._fb.deleteFriendRequest(`fr_${fromId}_${me.id}`).catch(() => {});
+  }
+  toast('요청을 거절했어요');
+  renderFriendRequests();
+}
+
+// 수락된 요청을 로컬 친구 목록에 병합 (양방향) — 다른 기기/상대 수락 반영
+async function syncFriendsFromFirestore() {
+  if (!window._fbReady || !window._fb || !me) return;
+  try {
+    const [sent, recv] = await Promise.all([
+      window._fb.getFriendRequestsFrom(me.id),
+      window._fb.getFriendRequestsTo(me.id)
+    ]);
+    const friends = getFriends();
+    let changed = false;
+    const addIfNew = (id, name, role, church) => {
+      if (id && id !== me.id && !friends.find(f => f.userId === id)) {
+        friends.push({ userId: id, name, role: role || '성도', church: church || '', photoURL: getUserPhoto(id) || null, addedAt: new Date().toISOString() });
+        changed = true;
+      }
+    };
+    sent.forEach(d => { const r = d.data(); if (r.status === 'accepted') addIfNew(r.toId, r.toName, r.toRole, r.toChurch); });
+    recv.forEach(d => { const r = d.data(); if (r.status === 'accepted') addIfNew(r.fromId, r.fromName, r.fromRole, r.fromChurch); });
+    if (changed) saveFriends(friends);
+  } catch(e) { console.warn('친구 동기화 실패:', e); }
 }
 
 // ================================================

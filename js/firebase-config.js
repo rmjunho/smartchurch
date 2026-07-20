@@ -96,6 +96,11 @@ window._fb = {
         update[`lastReadAt.${userId}`] = new Date().toISOString();
         return updateDoc(doc(fbDb, 'chatRooms', roomId), update);
       },
+      // ── 친구 요청 (수락제) ──
+      setFriendRequest:    (id, data) => setDoc(doc(fbDb, 'friendRequests', id), data, { merge: true }),
+      deleteFriendRequest: (id)       => deleteDoc(doc(fbDb, 'friendRequests', id)),
+      getFriendRequestsTo:   (uid) => getDocs(query(collection(fbDb, 'friendRequests'), where('toId','==',uid))),
+      getFriendRequestsFrom: (uid) => getDocs(query(collection(fbDb, 'friendRequests'), where('fromId','==',uid))),
       // 친구 코드로 사용자 검색
       getUserByFriendCode: (code) =>
         getDocs(query(collection(fbDb, 'users'), where('friendCode', '==', code))),
