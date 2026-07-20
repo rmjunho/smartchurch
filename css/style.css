@@ -614,7 +614,8 @@
     .subscreen-title {
       font-size: 15px; font-weight: 700; color: white; text-align: center; flex: 1;
     }
-    .subscreen-body { flex: 1; overflow-y: auto; padding-bottom: calc(48px + env(safe-area-inset-bottom, 0px)); }
+    /* 하단 여백 = 고정 하단 내비(72px) + 여유 → 마지막 내용이 내비에 안 가림 */
+    .subscreen-body { flex: 1; overflow-y: auto; padding-bottom: calc(88px + env(safe-area-inset-bottom, 0px)); }
     .subscreen-body::-webkit-scrollbar { display: none; }
 
     /* 서브스크린 공통 카드 스타일 */
