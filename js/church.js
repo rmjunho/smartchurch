@@ -842,6 +842,43 @@ function approveChurchJoin(userId) { approveChurchMember(userId); }
 
 function rejectChurchJoin(userId)  { rejectChurchMember(userId);  }
 
+// ── 직분 부여/신청 처리 (리더 전용) ──
+function assignRole(userId, role) {
+  if (!isLeader()) { toast('권한이 없어요'); return; }
+  const users = DB.get('users', []);
+  const u = _resolveMemberForAction(users, userId);
+  if (!u) return;
+  u.role = role;
+  delete u.requestedRole;
+  DB.set('users', users);
+  const cached = _membersCache.find(x => x.id === userId);
+  if (cached) { cached.role = role; delete cached.requestedRole; }
+  if (window._fbReady && window._fb) {
+    window._fb.updateUser(userId, { role, requestedRole: '' }).catch(() => toast('동기화 실패 — 다시 시도해 주세요'));
+  }
+  toast(`${u.name || '교인'}님을 "${role}"(으)로 지정했어요`);
+  const cur = document.getElementById('subscreen')?.dataset?.current;
+  if (cur) setTimeout(() => openSubscreen(cur), 150);
+}
+function approveRoleRequest(userId) {
+  const u = (_membersCache || []).find(x => x.id === userId) || DB.get('users', []).find(x => x.id === userId);
+  if (u && u.requestedRole) assignRole(userId, u.requestedRole);
+}
+function rejectRoleRequest(userId) {
+  if (!isLeader()) { toast('권한이 없어요'); return; }
+  const users = DB.get('users', []);
+  const u = _resolveMemberForAction(users, userId);
+  if (!u) return;
+  delete u.requestedRole;
+  DB.set('users', users);
+  const cached = _membersCache.find(x => x.id === userId);
+  if (cached) delete cached.requestedRole;
+  if (window._fbReady && window._fb) window._fb.updateUser(userId, { requestedRole: '' }).catch(() => {});
+  toast('직분 신청을 반려했어요');
+  const cur = document.getElementById('subscreen')?.dataset?.current;
+  if (cur) setTimeout(() => openSubscreen(cur), 150);
+}
+
 function renderMembersScreen() {
   setTimeout(loadMembersScreenData, 80);
   return `<div id="members-screen-body" style="padding:40px 16px;text-align:center;color:var(--muted)">
@@ -936,11 +973,19 @@ function renderMembersScreenHtml(allUsers) {
                 ${appointed ? `<span class="appointed-badge" style="margin-left:4px">임명 리더</span>` : ''}
               </div>
               <div class="member-role">${escHtml(u.role||'성도')} · ${escHtml(u.church||'')}</div>
+              ${u.requestedRole && u.requestedRole !== (u.role||'') ? `<div style="font-size:11px;color:#E67E22;font-weight:700;margin-top:2px">직분 신청: ${escHtml(u.requestedRole)}</div>` : ''}
               ${appointed ? `<div style="font-size:11px;color:var(--muted);margin-top:2px">${escHtml(permSummary)}</div>` : ''}
             </div>
           </div>
           ${!isMe && isLeader() ? `
-          <div style="display:flex;gap:6px;flex-shrink:0">
+          <div style="display:flex;gap:6px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end;margin-top:6px;width:100%">
+            ${u.requestedRole && u.requestedRole !== (u.role||'') ? `
+            <button onclick="approveRoleRequest('${u.id}')"
+              style="height:34px;padding:0 12px;border-radius:8px;border:none;background:var(--gold);color:#1a0e00;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;flex-shrink:0">신청 부여</button>
+            <button onclick="rejectRoleRequest('${u.id}')"
+              style="height:34px;padding:0 10px;border-radius:8px;border:1.5px solid var(--border);background:white;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;flex-shrink:0">반려</button>` : ''}
+            <button onclick="openAssignRole('${u.id}','${escHtml(u.name)}')"
+              style="height:34px;padding:0 12px;border-radius:8px;border:1.5px solid var(--border);background:white;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;flex-shrink:0">직분 변경</button>
             ${hasLeaderPerm('binder') && u.binderShareEnabled ? `
             <button onclick="openMemberBinder('${u.id}','${escHtml(u.name)}')"
               style="height:34px;padding:0 10px;border-radius:8px;border:1.5px solid rgba(41,128,185,0.4);

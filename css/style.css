@@ -790,7 +790,7 @@
     }
     #img-lightbox img { max-width:96%; max-height:96%; border-radius:10px; }
     /* 채팅 액션 시트 / 차단 목록 모달 */
-    #room-action-menu, #blocked-modal {
+    #room-action-menu, #blocked-modal, #role-sheet {
       position:fixed; inset:0; z-index:9998; display:none;
       align-items:flex-end; justify-content:center; background:rgba(0,0,0,0.4);
     }

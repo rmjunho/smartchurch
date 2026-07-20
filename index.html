@@ -2195,8 +2195,13 @@
         </div>
       </div>
       <div class="form-group" id="edit-role-wrap">
-        <label class="form-label">직분 <span style="font-weight:400;font-size:11.5px;color:var(--muted)">= 리더 권한</span></label>
-        <select id="edit-role" class="form-select"></select>
+        <label class="form-label">직분 <span style="font-weight:400;font-size:11.5px;color:var(--muted)">가입 시 지정 · 변경은 리더 승인</span></label>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--cream2);border-radius:10px;padding:10px 14px">
+          <span id="edit-role-display" style="font-size:14px;font-weight:700">-</span>
+          <button type="button" onclick="openRoleRequest()"
+            style="height:32px;padding:0 14px;border-radius:16px;border:1.5px solid var(--border);background:white;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit;flex-shrink:0">직분 변경 신청</button>
+        </div>
+        <div id="edit-role-req-note" style="font-size:11.5px;color:var(--gold);margin-top:5px;display:none"></div>
       </div>
       <div class="form-group" id="edit-church-wrap">
         <label class="form-label">소속 교회/기관</label>
@@ -3423,7 +3428,7 @@ function bootApp() {
       const wasActive = me.churchStatus === 'active';
       const wasLeader = (typeof isLeader === 'function') ? isLeader() : false;
       let changed = false;
-      ['status', 'churchStatus', 'role', 'orgType', 'isAppointedLeader', 'isAppAdmin'].forEach(f => {
+      ['status', 'churchStatus', 'role', 'orgType', 'isAppointedLeader', 'isAppAdmin', 'requestedRole'].forEach(f => {
         if (data[f] !== undefined && me[f] !== data[f]) { me[f] = data[f]; changed = true; }
       });
       // leaderPerms (배열) 비교
@@ -8405,13 +8410,57 @@ function setEditOrgType(type) {
   const churchWrap = document.getElementById('edit-church-wrap');
   if (wrap)       wrap.style.display       = type === 'personal' ? 'none' : 'block';
   if (churchWrap) churchWrap.style.display = type === 'personal' ? 'none' : 'block';
-  // 직분 목록 업데이트
-  const sel = document.getElementById('edit-role');
-  if (sel && type !== 'personal') {
-    const curRole = sel.value || me.role || getDefaultRole(type);
-    sel.innerHTML = ORG_ROLES[type].map(r =>
-      `<option value="${r.value}"${r.value === curRole ? ' selected' : ''}>${r.label}</option>`).join('');
+  // 직분 표시 (사용자는 직접 변경 불가 — 신청/리더 부여만)
+  const disp = document.getElementById('edit-role-display');
+  if (disp) disp.textContent = type === 'personal' ? '개인' : (me.role || getDefaultRole(type));
+}
+
+// ── 직분 선택 시트 (사용자 신청 / 리더 부여 공용) ──
+var _rolePickCb = null;
+function _openRoleSheet(title, orgType, onPick) {
+  const roles = ORG_ROLES[orgType] || ORG_ROLES.church;
+  _rolePickCb = onPick;
+  let sheet = document.getElementById('role-sheet');
+  if (!sheet) {
+    sheet = document.createElement('div');
+    sheet.id = 'role-sheet';
+    sheet.onclick = e => { if (e.target.id === 'role-sheet') sheet.style.display = 'none'; };
+    document.body.appendChild(sheet);
   }
+  sheet.innerHTML = `<div class="ram-sheet">
+    <div class="ram-title">${escHtml(title)}</div>
+    ${roles.map(r => `<button class="ram-item" onclick="_pickRole('${r.value}')">${escHtml(r.value)}${r.leader ? ' · 리더' : ''}</button>`).join('')}
+    <button class="ram-item" onclick="document.getElementById('role-sheet').style.display='none'">취소</button>
+  </div>`;
+  sheet.style.display = 'flex';
+}
+function _pickRole(role) {
+  const sheet = document.getElementById('role-sheet');
+  if (sheet) sheet.style.display = 'none';
+  if (_rolePickCb) _rolePickCb(role);
+}
+
+// 사용자: 직분 변경 신청
+function openRoleRequest() {
+  const orgType = me.orgType || 'church';
+  if (orgType === 'personal' || !me.church) { toast('공동체에 가입해야 직분을 신청할 수 있어요'); return; }
+  _openRoleSheet('신청할 직분 선택', orgType, (role) => {
+    if (role === me.role) { toast('이미 해당 직분이에요'); return; }
+    me.requestedRole = role;
+    const users = DB.get('users', []); const u = users.find(x => x.id === me.id);
+    if (u) { u.requestedRole = role; DB.set('users', users); }
+    if (window._fbReady && window._fb) window._fb.updateUser(me.id, { requestedRole: role }).catch(() => {});
+    toast(`"${role}" 직분을 신청했어요 — 리더 승인 후 반영돼요`);
+    const note = document.getElementById('edit-role-req-note');
+    if (note) { note.textContent = `신청 중: ${role} (리더 승인 대기)`; note.style.display = 'block'; }
+  });
+}
+
+// 리더: 교인 직분 직접 지정
+function openAssignRole(userId, name) {
+  if (!isLeader()) { toast('권한이 없어요'); return; }
+  const orgType = (typeof getOrgTypeForChurch === 'function' && getOrgTypeForChurch(me.churchCode)) || me.orgType || 'church';
+  _openRoleSheet(`${name}님 직분 지정`, orgType, (role) => assignRole(userId, role));
 }
 
 function openProfileEdit() {
@@ -8437,11 +8486,15 @@ function openProfileEdit() {
   const churchWrap = document.getElementById('edit-church-wrap');
   if (roleWrap)   roleWrap.style.display   = orgType === 'personal' ? 'none' : 'block';
   if (churchWrap) churchWrap.style.display = orgType === 'personal' ? 'none' : 'block';
-  // 직분 목록
-  const sel = document.getElementById('edit-role');
-  if (sel && orgType !== 'personal') {
-    sel.innerHTML = (ORG_ROLES[orgType] || ORG_ROLES.church)
-      .map(r => `<option value="${r.value}"${r.value === me.role ? ' selected' : ''}>${r.label}</option>`).join('');
+  // 직분 표시 (읽기 전용) + 신청 중 표시
+  const disp = document.getElementById('edit-role-display');
+  if (disp) disp.textContent = orgType === 'personal' ? '개인' : (me.role || getDefaultRole(orgType));
+  const note = document.getElementById('edit-role-req-note');
+  if (note) {
+    if (me.requestedRole && me.requestedRole !== me.role) {
+      note.textContent = `신청 중: ${me.requestedRole} (리더 승인 대기)`;
+      note.style.display = 'block';
+    } else { note.style.display = 'none'; }
   }
 
   // 사진 피커 초기화
@@ -8530,9 +8583,11 @@ function saveProfileEdit() {
   const name    = document.getElementById('edit-name').value.trim();
   const bio     = document.getElementById('edit-bio').value.trim().slice(0, 50);
   const orgType = _editOrgType || me.orgType || 'church';
-  const role    = orgType === 'personal'
-    ? '개인'
-    : (document.getElementById('edit-role').value || getDefaultRole(orgType));
+  // 직분은 사용자가 직접 못 바꿈 — 기존 직분 유지. 단, 개인↔공동체 전환 시에만 기본 직분 자동 지정.
+  let role;
+  if (orgType === 'personal')                              role = '개인';
+  else if (me.orgType === 'personal' || !me.role)          role = getDefaultRole(orgType);   // 신규/전환 → 기본 직분
+  else                                                     role = me.role;                    // 공동체 내에서는 그대로
   if (!name) { toast('이름을 입력해 주세요'); return; }
 
   // 사진 저장: 로컬(원본) + Firestore(압축본 photoURL) → 전 기기·타 사용자 공유
