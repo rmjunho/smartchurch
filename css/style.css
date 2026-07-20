@@ -614,7 +614,7 @@
     .subscreen-title {
       font-size: 15px; font-weight: 700; color: white; text-align: center; flex: 1;
     }
-    .subscreen-body { flex: 1; overflow-y: auto; }
+    .subscreen-body { flex: 1; overflow-y: auto; padding-bottom: calc(48px + env(safe-area-inset-bottom, 0px)); }
     .subscreen-body::-webkit-scrollbar { display: none; }
 
     /* 서브스크린 공통 카드 스타일 */
@@ -992,7 +992,7 @@
     }
     .cal-strip-day.selected .cal-strip-dow,
     .cal-strip-day.selected .cal-strip-num { color: white; }
-    .cal-strip-day.future { opacity: 0.25; pointer-events: none; }
+    .cal-strip-day.future { opacity: 0.5; }
     .cal-strip-day.sunday .cal-strip-dow,
     .cal-strip-day.sunday .cal-strip-num { color: #E8665A; }
     .cal-strip-day.sunday.selected .cal-strip-dow,

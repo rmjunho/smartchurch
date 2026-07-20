@@ -868,25 +868,18 @@ async function loadMembersScreenData() {
 
   let allUsers = [];
   try {
-    if (window._fbReady && window._fb) {
-      if (me.isAppAdmin) {
-        // 관리자: 전체 사용자
-        const snap = await window._fb.getAllUsers();
-        snap.forEach(d => allUsers.push({ id: d.id, ...d.data() }));
-      } else if (me.churchCode) {
-        // 교인: 같은 교회만
-        const snap = await window._fb.getUsersByChurch(me.churchCode);
-        snap.forEach(d => allUsers.push({ id: d.id, ...d.data() }));
-      }
+    // 관리자 포함 — '교인 관리'는 항상 현재 소속 교회만 (전체 사용자는 관리자 패널에서)
+    if (window._fbReady && window._fb && me.churchCode) {
+      const snap = await window._fb.getUsersByChurch(me.churchCode);
+      snap.forEach(d => allUsers.push({ id: d.id, ...d.data() }));
     }
   } catch(e) {
     console.warn('Firestore 교인 로드 실패:', e);
   }
 
-  // fallback
-  if (!allUsers.length) {
-    const localAll = DB.get('users', []);
-    allUsers = me.isAppAdmin ? localAll : localAll.filter(u => u.church === me.church);
+  // fallback — 현재 교회로 제한
+  if (!allUsers.length && me.church) {
+    allUsers = DB.get('users', []).filter(u => u.church === me.church);
   }
 
   allUsers = allUsers.filter(u => !u.deleted);   // 삭제된 계정 제외
