@@ -1327,6 +1327,10 @@
           <span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span>
         </div>
         <div class="cal-day-grid" id="cal-day-grid"></div>
+        <div style="display:flex;align-items:center;justify-content:center;gap:5px;margin-top:10px;font-size:11px;color:var(--muted);opacity:0.7">
+          <span style="width:4px;height:4px;border-radius:50%;background:var(--gold);display:inline-block"></span>
+          삶의 예배 기록이 있는 날
+        </div>
       </div>
 
       <!-- Month grid view -->
@@ -3312,6 +3316,7 @@ function ensureFriendCode() {
   return me.friendCode;
 }
 
+var _selfDocUnsub = null;   // 내 사용자 문서 실시간 감시 (삭제 시 자동 로그아웃)
 function bootApp() {
   // 저장된 글자 크기 적용
   const sz = DB.get('fontSize_' + me.id, 'md');
@@ -3362,6 +3367,20 @@ function bootApp() {
 
   // 프로필 사진 캐시 예열 (userPhotos 컬렉션 → 교회 단위 1회 벌크 로드)
   warmPhotoCache();
+
+  // 계정 삭제 감지 — 서버(Firebase)에서 내 사용자 문서가 삭제되면 자동 로그아웃
+  if (window._fbReady && window._fb && me) {
+    if (_selfDocUnsub) { _selfDocUnsub(); _selfDocUnsub = null; }
+    let _selfSeen = false;
+    _selfDocUnsub = window._fb.listenUser(me.id, snap => {
+      if (snap.exists()) { _selfSeen = true; return; }
+      if (!_selfSeen || !me) return;              // 최초 스냅샷이 '없음'이면 동기화 지연으로 보고 무시
+      if (_selfDocUnsub) { _selfDocUnsub(); _selfDocUnsub = null; }
+      _clearAllLocalData();
+      toast('계정이 삭제되었습니다.');
+      setTimeout(() => { doLogout(); location.reload(); }, 900);
+    });
+  }
 
   // Date
   updateDateSegments();
