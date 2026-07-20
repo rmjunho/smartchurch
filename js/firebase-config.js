@@ -96,6 +96,10 @@ window._fb = {
         update[`lastReadAt.${userId}`] = new Date().toISOString();
         return updateDoc(doc(fbDb, 'chatRooms', roomId), update);
       },
+      // ── 오픈채팅 채널 (리더 승인제) ──
+      setOpenChannel:    (id, data) => setDoc(doc(fbDb, 'openChannels', id), data, { merge: true }),
+      deleteOpenChannel: (id)       => deleteDoc(doc(fbDb, 'openChannels', id)),
+      getOpenChannels:   (churchCode) => getDocs(query(collection(fbDb, 'openChannels'), where('churchCode','==',churchCode))),
       // ── 친구 요청 (수락제) ──
       setFriendRequest:    (id, data) => setDoc(doc(fbDb, 'friendRequests', id), data, { merge: true }),
       deleteFriendRequest: (id)       => deleteDoc(doc(fbDb, 'friendRequests', id)),

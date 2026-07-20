@@ -998,11 +998,26 @@
           <div style="font-size:14px;font-weight:700">교회에 가입 후 이용할 수 있어요</div>
           <div style="font-size:12.5px;color:var(--muted)">메뉴 → 교회 정보에서 코드를 등록해보세요</div>
         </div>
+        <!-- 채널 목록 -->
+        <div id="openchat-list" style="display:none;flex-direction:column;height:100%">
+          <div style="padding:14px 20px 6px;display:flex;justify-content:space-between;align-items:center">
+            <span style="font-size:13px;font-weight:700;color:var(--muted)">오픈채팅 채널</span>
+            <button onclick="requestOpenChannel()"
+              style="height:32px;padding:0 14px;border-radius:20px;border:1.5px solid var(--border);
+                     background:white;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit">+ 채널</button>
+          </div>
+          <div id="openchat-channels" style="flex:1;overflow-y:auto;padding-bottom:12px">
+            <div style="text-align:center;padding:20px;color:var(--muted);font-size:13px">🔄 불러오는 중...</div>
+          </div>
+        </div>
         <!-- 채팅 UI -->
         <div id="openchat-room" style="display:none;flex-direction:column;height:100%">
-          <div class="openchat-header">
-            <div class="openchat-header-title" id="openchat-room-name">교회 오픈채팅</div>
-            <div class="openchat-header-sub" id="openchat-room-sub">실시간 채팅</div>
+          <div class="openchat-header" style="display:flex;align-items:center;gap:6px">
+            <button onclick="backToOpenList()" style="background:none;border:none;color:inherit;font-size:22px;line-height:1;cursor:pointer;padding:0 4px">‹</button>
+            <div style="flex:1;min-width:0">
+              <div class="openchat-header-title" id="openchat-room-name">교회 오픈채팅</div>
+              <div class="openchat-header-sub" id="openchat-room-sub">실시간 채팅</div>
+            </div>
           </div>
           <div class="openchat-msgs" id="openchat-msgs">
             <div style="text-align:center;padding:20px;color:var(--muted);font-size:13px">🔄 메시지 불러오는 중...</div>
@@ -7069,7 +7084,7 @@ async function sendChatImage(kind, event) {
   if (kind === 'open') {
     if (!me.church || !me.churchCode) { toast('교회에 가입해야 채팅할 수 있어요'); return; }
     if (me.churchStatus === 'pending') { toast('교회 가입 승인 후 메시지를 보낼 수 있어요'); return; }
-    roomId = `${me.churchCode}_open`;
+    roomId = _currentOpenChannelId || `${me.churchCode}_open`;
   } else {
     if (!_currentRoomId) return;
     roomId = _currentRoomId;
@@ -7644,52 +7659,158 @@ function getRecurrenceLabel(meeting) {
 // ── 오픈채팅 실시간 채팅 ──
 var _ocUnsubscribe = null; // Firestore 리스너 해제 함수
 
+var _currentOpenChannelId = null;   // 현재 열려있는 오픈 채널 (교회 전체 = {churchCode}_open)
+
+function _canApproveChannel() {
+  return (typeof isLeader === 'function' && isLeader()) || me.isAppAdmin;
+}
+
 function initOpenChat() {
-  const noChurch  = document.getElementById('openchat-no-church');
-  const room      = document.getElementById('openchat-room');
-  if (!noChurch || !room) return;
+  const noChurch = document.getElementById('openchat-no-church');
+  const list     = document.getElementById('openchat-list');
+  const room     = document.getElementById('openchat-room');
+  if (!noChurch || !list || !room) return;
+
+  if (_ocUnsubscribe) { _ocUnsubscribe(); _ocUnsubscribe = null; }
+  _currentOpenChannelId = null;
 
   if (!me.church || !me.churchCode) {
     noChurch.style.display = 'flex';
-    room.style.display     = 'none';
+    list.style.display = 'none';
+    room.style.display = 'none';
     return;
   }
-
   noChurch.style.display = 'none';
-  room.style.display     = 'flex';
+  room.style.display     = 'none';
+  list.style.display     = 'flex';
+  renderOpenChannels();
+}
 
-  const roomId = `${me.churchCode}_open`;
+async function renderOpenChannels() {
+  const el = document.getElementById('openchat-channels');
+  if (!el) return;
+  const canApprove = _canApproveChannel();
 
-  // 채팅방 이름 설정
-  document.getElementById('openchat-room-name').textContent = `${me.church} 오픈채팅`;
-  document.getElementById('openchat-room-sub').textContent  = '교회 전체 공개 채팅방';
+  // 고정: 교회 전체 채널
+  let html = `
+    <div class="friend-item" style="cursor:pointer" onclick="openOpenChannel('${me.churchCode}_open','🌍 ${escHtml(me.church)} 전체','교회 전체 공개 채팅방')">
+      <div class="friend-avatar" style="background:var(--gold)">🌍</div>
+      <div style="flex:1;min-width:0">
+        <div class="friend-name">🌍 ${escHtml(me.church)} 전체</div>
+        <div class="friend-sub">모든 교인이 참여하는 공개 채팅</div>
+      </div>
+    </div>`;
 
-  // 기존 리스너 해제
-  if (_ocUnsubscribe) { _ocUnsubscribe(); _ocUnsubscribe = null; }
-  // 오픈채팅 읽음 처리
-  _markRoomAsRead(`${me.churchCode}_open`);
-
-  if (!window._fbReady || !window._fb) {
-    document.getElementById('openchat-msgs').innerHTML =
-      `<div style="text-align:center;padding:20px;color:var(--muted);font-size:13px">
-        Firebase 연결 중... 잠시 후 다시 시도해 주세요</div>`;
-    return;
+  let channels = [];
+  if (window._fbReady && window._fb) {
+    try { const snap = await window._fb.getOpenChannels(me.churchCode); snap.forEach(d => channels.push({ id: d.id, ...d.data() })); }
+    catch(e) { console.warn('채널 로드 실패:', e); }
   }
+  const active  = channels.filter(c => c.status === 'active');
+  const pending = channels.filter(c => c.status === 'pending');
 
-  // 채팅방 문서 생성 (없으면)
-  window._fb.ensureChatRoom(roomId, {
-    name: `${me.church} 오픈채팅`,
-    type: 'open',
-    churchCode: me.churchCode,
-    church: me.church
+  active.forEach(c => {
+    const canDel = canApprove || c.createdBy === me.id;
+    html += `<div class="friend-item" style="cursor:pointer">
+      <div class="friend-avatar" onclick="openOpenChannel('${c.id}','#️⃣ ${escHtml(c.name)}','오픈 채널')" style="background:var(--cream2)">#️⃣</div>
+      <div style="flex:1;min-width:0" onclick="openOpenChannel('${c.id}','#️⃣ ${escHtml(c.name)}','오픈 채널')">
+        <div class="friend-name">${escHtml(c.name)}</div>
+        <div class="friend-sub">${escHtml(c.createdByName||'')} 개설</div>
+      </div>
+      ${canDel ? `<button onclick="event.stopPropagation();deleteOpenChannel('${c.id}')" style="height:30px;padding:0 10px;border-radius:16px;border:1.5px solid rgba(192,57,43,0.25);background:#FBE5E5;color:#C0392B;font-size:11.5px;font-weight:700;cursor:pointer;font-family:inherit">삭제</button>` : ''}
+    </div>`;
+  });
+
+  // 승인 대기 채널 (리더에게만 승인/거절, 신청자에겐 '승인 대기' 표시)
+  pending.forEach(c => {
+    if (!(canApprove || c.createdBy === me.id)) return;
+    html += `<div class="friend-item">
+      <div class="friend-avatar" style="background:var(--cream2);opacity:.55">#️⃣</div>
+      <div style="flex:1;min-width:0">
+        <div class="friend-name">${escHtml(c.name)} <span style="font-size:11px;color:#E67E22;font-weight:700">승인 대기</span></div>
+        <div class="friend-sub">${escHtml(c.createdByName||'')} 신청</div>
+      </div>
+      ${canApprove
+        ? `<button onclick="approveOpenChannel('${c.id}')" style="height:30px;padding:0 12px;border-radius:16px;border:none;background:var(--black);color:white;font-size:11.5px;font-weight:700;cursor:pointer;font-family:inherit">승인</button>
+           <button onclick="rejectOpenChannel('${c.id}')" style="height:30px;padding:0 10px;margin-left:6px;border-radius:16px;border:1.5px solid var(--border);background:white;font-size:11.5px;font-weight:600;cursor:pointer;font-family:inherit">거절</button>`
+        : '<span style="font-size:11.5px;color:var(--muted)">리더 승인 대기중</span>'}
+    </div>`;
+  });
+
+  el.innerHTML = html;
+}
+
+function openOpenChannel(channelId, name, sub) {
+  const list = document.getElementById('openchat-list');
+  const room = document.getElementById('openchat-room');
+  if (list) list.style.display = 'none';
+  if (room) room.style.display = 'flex';
+  _currentOpenChannelId = channelId;
+  document.getElementById('openchat-room-name').textContent = name;
+  document.getElementById('openchat-room-sub').textContent  = sub || '실시간 채팅';
+  document.getElementById('openchat-msgs').innerHTML =
+    `<div style="text-align:center;padding:20px;color:var(--muted);font-size:13px">🔄 메시지 불러오는 중...</div>`;
+
+  if (_ocUnsubscribe) { _ocUnsubscribe(); _ocUnsubscribe = null; }
+  _markRoomAsRead(channelId);
+  if (!window._fbReady || !window._fb) return;
+
+  window._fb.ensureChatRoom(channelId, {
+    name, type: 'open', churchCode: me.churchCode, church: me.church
   }).catch(() => {});
 
-  // 실시간 메시지 구독
-  _ocUnsubscribe = window._fb.listenChatMsgs(roomId, 100, snap => {
+  _ocUnsubscribe = window._fb.listenChatMsgs(channelId, 100, snap => {
     const msgs = [];
     snap.forEach(d => msgs.push({ id: d.id, ...d.data() }));
     _renderOpenChatMsgs(msgs);
   });
+}
+
+function backToOpenList() {
+  if (_ocUnsubscribe) { _ocUnsubscribe(); _ocUnsubscribe = null; }
+  _currentOpenChannelId = null;
+  document.getElementById('openchat-room').style.display = 'none';
+  document.getElementById('openchat-list').style.display = 'flex';
+  renderOpenChannels();
+}
+
+function requestOpenChannel() {
+  if (!me.church || !me.churchCode) { toast('교회에 가입해야 이용할 수 있어요'); return; }
+  if (me.churchStatus === 'pending') { toast('교회 가입 승인 후 이용할 수 있어요'); return; }
+  if (!window._fbReady || !window._fb) { toast('연결 중입니다. 잠시 후 시도해 주세요'); return; }
+  const name = (prompt('새 오픈채팅 채널 이름을 입력하세요') || '').trim().slice(0, 20);
+  if (!name) return;
+  const canApprove = _canApproveChannel();
+  const id = `ch_${me.churchCode}_${Date.now()}`;
+  window._fb.setOpenChannel(id, {
+    id, churchCode: me.churchCode, name,
+    createdBy: me.id, createdByName: me.name,
+    status: canApprove ? 'active' : 'pending',
+    createdAt: new Date().toISOString()
+  }).then(() => {
+    toast(canApprove ? `채널 "${name}" 이 개설됐어요` : `채널 "${name}" 신청 완료 — 리더 승인 후 열려요 🙏`);
+    renderOpenChannels();
+  }).catch(() => toast('채널 생성 실패 — 다시 시도해 주세요'));
+}
+
+function approveOpenChannel(id) {
+  if (!_canApproveChannel()) { toast('승인 권한이 없어요'); return; }
+  window._fb.setOpenChannel(id, { status: 'active' })
+    .then(() => { toast('채널을 승인했어요 ✅'); renderOpenChannels(); })
+    .catch(() => toast('실패 — 다시 시도해 주세요'));
+}
+
+function rejectOpenChannel(id) {
+  if (!_canApproveChannel()) { toast('권한이 없어요'); return; }
+  window._fb.deleteOpenChannel(id)
+    .then(() => { toast('채널 신청을 거절했어요'); renderOpenChannels(); })
+    .catch(() => {});
+}
+
+function deleteOpenChannel(id) {
+  window._fb.deleteOpenChannel(id)
+    .then(() => { toast('채널을 삭제했어요'); renderOpenChannels(); })
+    .catch(() => toast('삭제 실패 — 다시 시도해 주세요'));
 }
 
 function _renderOpenChatMsgs(msgs) {
@@ -7752,13 +7873,14 @@ async function sendOpenChatMsg() {
   if (me.churchStatus === 'pending') { toast('교회 가입 승인 후 메시지를 보낼 수 있어요'); return; }
   if (!window._fbReady || !window._fb) { toast('연결 중입니다. 잠시 후 시도해 주세요'); return; }
 
+  const roomId = _currentOpenChannelId || `${me.churchCode}_open`;
   const btn = document.getElementById('openchat-send-btn');
   if (btn) btn.disabled = true;
   input.value = '';
   input.style.height = 'auto';
 
   try {
-    await window._fb.sendChatMsg(`${me.churchCode}_open`, {
+    await window._fb.sendChatMsg(roomId, {
       text,
       senderId:    me.id,
       senderName:  me.name,
@@ -7766,7 +7888,7 @@ async function sendOpenChatMsg() {
       senderPhoto: getMyPhoto()
     });
     // 오픈채팅방 lastMessage 업데이트
-    window._fb.ensureChatRoom(`${me.churchCode}_open`, {
+    window._fb.ensureChatRoom(roomId, {
       lastMessage:   text,
       lastMessageAt: new Date().toISOString(),
       lastSenderId:  me.id
