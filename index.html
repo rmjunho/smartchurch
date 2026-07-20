@@ -3150,10 +3150,15 @@ async function doRegister() {
         'auth/network-request-failed': '네트워크 오류예요.',
       }[e.code] || null;
       if (msg) { showErr('r-email-err', msg); return; }
+      // Firebase 는 켜져 있는데 알 수 없는 오류 → 로컬 전용 '유령 계정'을 만들지 않고 실패 처리
+      // (서버 계정 없이 가입되면 이후 채팅 등 모든 서버 쓰기가 규칙에서 거부됨)
+      console.error('가입 실패(Firebase):', e);
+      showErr('r-email-err', '가입 중 오류가 발생했어요. 인터넷 연결을 확인하고 다시 시도해 주세요.');
+      return;
     }
   }
 
-  // ── localStorage fallback ──
+  // ── localStorage fallback (Firebase 미연결 시에만) ──
   if (DB.findByEmail(email)) { showErr('r-email-err', '이미 사용 중인 이메일입니다.'); return; }
   const user = {
     id: uid(), name, email, password: pw, birthdate: birth,
