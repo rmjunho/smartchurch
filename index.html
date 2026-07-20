@@ -6909,6 +6909,8 @@ function initChatRoomsList() {
   _roomsUnsubscribe = window._fb.listenMyRooms(me.id, snap => {
     const newRooms = [];
     snap.forEach(d => newRooms.push({ id: d.id, ...d.data() }));
+    // orderBy 제거로 서버 정렬 없음 → 최근 메시지 순으로 클라이언트 정렬
+    newRooms.sort((a, b) => (b.lastMessageAt || '').localeCompare(a.lastMessageAt || ''));
     // 새 메시지 감지 → 인앱 알림
     _detectNewMessages(newRooms);
     _allRooms = newRooms;
@@ -7008,9 +7010,10 @@ function openChatRoom(roomId) {
   });
 }
 
-function _renderRoomMsgs(msgs) {
+async function _renderRoomMsgs(msgs) {
   const el = document.getElementById('room-panel-msgs');
   if (!el) return;
+  await _ensureSenderPhotos(msgs);
 
   if (!msgs.length) {
     el.innerHTML = `<div style="text-align:center;padding:40px 16px;color:var(--muted)">
@@ -7832,9 +7835,10 @@ function deleteOpenChannel(id) {
     .catch(() => toast('삭제 실패 — 다시 시도해 주세요'));
 }
 
-function _renderOpenChatMsgs(msgs) {
+async function _renderOpenChatMsgs(msgs) {
   const el = document.getElementById('openchat-msgs');
   if (!el) return;
+  await _ensureSenderPhotos(msgs);
 
   if (!msgs.length) {
     el.innerHTML = `<div class="openchat-empty" style="flex:1;margin:auto">
@@ -7974,6 +7978,12 @@ async function ensurePhotoCached(uid) {
     const d = await window._fb.getUserPhotoDoc(uid);
     if (d.exists() && d.data().photoURL) _photoCache[uid] = d.data().photoURL;
   } catch(e) {}
+}
+// 메시지 발신자들의 최신 사진 확보 → 옛 메시지에 박제된 사진 대신 현재 프로필 표시
+async function _ensureSenderPhotos(msgs) {
+  const ids = [...new Set((msgs || []).map(m => m.senderId)
+    .filter(id => id && id !== 'system' && !_photoCache[id]))];
+  if (ids.length) await Promise.all(ids.map(id => ensurePhotoCached(id)));
 }
 
 // ── 이미지 base64 유틸 (Firebase Storage 미사용 → Firestore 문서에 압축본 저장) ──

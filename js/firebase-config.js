@@ -83,11 +83,13 @@ window._fb = {
       ensureChatRoom: (roomId, data) =>
         setDoc(doc(fbDb, 'chatRooms', roomId), data, { merge: true }),
       // DM/그룹 채팅방 목록 (내가 멤버인 방)
+      // orderBy 제거 → array-contains 단일 인덱스만 사용(복합 인덱스 불필요), 정렬은 클라이언트에서
       listenMyRooms: (uid, cb) =>
         onSnapshot(
           query(collection(fbDb, 'chatRooms'),
-            where('members', 'array-contains', uid),
-            orderBy('lastMessageAt', 'desc'), limit(50)), cb),
+            where('members', 'array-contains', uid), limit(50)),
+          cb,
+          err => console.warn('listenMyRooms 오류:', err)),
       updateChatRoom: (roomId, data) =>
         updateDoc(doc(fbDb, 'chatRooms', roomId), data),
       // 채팅방 읽음 처리 (lastReadAt.userId 업데이트)
