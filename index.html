@@ -6,7 +6,7 @@
     // 전역 에러 잡기 — JS 오류를 화면에 표시
     window.addEventListener('error', function(e) {
       const box = document.getElementById('_err_overlay');
-      if (box) { box.style.display = 'block'; box.textContent = '⚠ JS Error: ' + e.message + ' (line ' + e.lineno + ')'; }
+      if (box) { box.style.display = 'block'; box.textContent = 'JS Error: ' + e.message + ' (line ' + e.lineno + ')'; }
     });
   </script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -204,7 +204,7 @@
 
           <!-- 보호자 정보 (14세 미만 선택 시 표시) -->
           <div id="guardian-fields" style="display:none;background:#FFF8F0;border:1.5px solid rgba(201,169,110,0.4);border-radius:12px;padding:14px 14px 6px;margin-top:4px;margin-bottom:4px">
-            <div style="font-size:12px;font-weight:700;color:var(--gold);margin-bottom:10px">📋 보호자 정보 입력 (필수)</div>
+            <div style="font-size:12px;font-weight:700;color:var(--gold);margin-bottom:10px">보호자 정보 입력 (필수)</div>
             <div class="form-group" style="margin-bottom:10px">
               <label class="form-label">보호자(법정대리인) 이름</label>
               <input id="r-guardian-name" type="text" class="form-input" placeholder="부모님 또는 보호자 성함">
@@ -215,7 +215,7 @@
             </div>
           </div>
 
-          <button class="btn-main" onclick="doRegister()" style="margin-top:16px">가입하기 🙏</button>
+          <button class="btn-main" onclick="doRegister()" style="margin-top:16px">가입하기 </button>
           <p style="text-align:center;font-size:13px;color:var(--muted);margin-top:14px">
             이미 계정이 있으신가요?
             <span style="color:var(--black);font-weight:700;cursor:pointer" onclick="showAuthTab('login')">로그인 →</span>
@@ -240,28 +240,28 @@
           <span id="pending-user-name"></span>님<br>승인 대기 중이에요
         </div>
         <div style="color:rgba(255,255,255,0.55);font-size:14px;line-height:1.7;margin-bottom:18px">
-          소속 교회 담당 교역자가<br>가입을 승인하면 자동으로 입장돼요 🙏
+          소속 교회 담당 교역자가<br>가입을 승인하면 자동으로 입장돼요 
         </div>
         <div id="pending-guardian-box" style="background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.12);
                   border-radius:16px;padding:20px 22px;width:100%;box-sizing:border-box;text-align:left;margin-bottom:18px">
           <div style="color:rgba(255,255,255,0.45);font-size:11.5px;font-weight:700;
                       letter-spacing:0.5px;margin-bottom:12px">등록된 보호자 정보</div>
           <div style="color:white;font-size:14px;margin-bottom:8px">
-            👤 보호자&nbsp; <span id="pending-guardian-name" style="font-weight:700;color:#C9A96E"></span>
+            보호자&nbsp; <span id="pending-guardian-name" style="font-weight:700;color:#C9A96E"></span>
           </div>
           <div style="color:white;font-size:14px">
-            📞 연락처&nbsp; <span id="pending-guardian-contact" style="font-weight:700;color:#C9A96E"></span>
+            연락처&nbsp; <span id="pending-guardian-contact" style="font-weight:700;color:#C9A96E"></span>
           </div>
         </div>
         <!-- 자동 감지 상태 표시 -->
         <div id="pending-listen-status" style="color:rgba(255,255,255,0.35);font-size:12px;margin-bottom:16px">
-          🔄 승인 상태를 실시간으로 확인 중이에요...
+          승인 상태를 실시간으로 확인 중이에요...
         </div>
         <button onclick="checkPendingStatusNow()"
           style="background:rgba(255,255,255,0.1);border:1.5px solid rgba(255,255,255,0.2);
                  color:white;border-radius:20px;padding:10px 24px;
                  font-size:13px;cursor:pointer;font-family:inherit;margin-bottom:8px;width:100%">
-          🔍 지금 상태 확인하기
+          지금 상태 확인하기
         </button>
         <button onclick="doLogout()"
           style="background:none;border:1.5px solid rgba(255,255,255,0.18);
@@ -313,7 +313,7 @@
       <div class="ob-welcome">
         <img id="ob-welcome-logo-img" class="ob-welcome-logo" width="78" height="78" style="object-fit:contain" alt="스마트처치">
         <div class="ob-welcome-tag">WELCOME</div>
-        <div class="ob-welcome-name" id="ob-welcome-name">환영합니다 🙏</div>
+        <div class="ob-welcome-name" id="ob-welcome-name">환영합니다 </div>
         <div class="ob-welcome-sub">스마트처치와 함께<br>신앙 여정을 시작해보세요</div>
         <button class="ob-btn-main" onclick="obGo(2)">시작하기 →</button>
         <span class="ob-skip" onclick="obSkipAll()">건너뛰기</span>
@@ -336,9 +336,9 @@
         <!-- ① 유형 선택 (항상 표시) -->
         <div class="form-label" style="margin-bottom:10px;font-size:14px;font-weight:800">① 소속 유형 선택</div>
         <div class="org-type-row" style="margin-bottom:20px">
-          <button class="org-type-btn on" id="ob-org-church"   onclick="setObOrgType('church')">⛪ 교회</button>
-          <button class="org-type-btn"    id="ob-org-org"      onclick="setObOrgType('org')">🏢 기관·단체</button>
-          <button class="org-type-btn"    id="ob-org-personal" onclick="setObOrgType('personal')">👤 개인</button>
+          <button class="org-type-btn on" id="ob-org-church"   onclick="setObOrgType('church')">교회</button>
+          <button class="org-type-btn"    id="ob-org-org"      onclick="setObOrgType('org')">기관·단체</button>
+          <button class="org-type-btn"    id="ob-org-personal" onclick="setObOrgType('personal')">개인</button>
         </div>
 
         <!-- ② 교회/기관 섹션 (교회·기관 선택 시만) -->
@@ -361,7 +361,7 @@
                    style="margin-top:4px">
             <button onclick="obRegisterNewChurch()"
                     style="width:100%;height:44px;border-radius:12px;border:1.5px solid var(--gold);background:rgba(201,169,110,0.1);color:var(--gold);font-size:13.5px;font-weight:700;font-family:inherit;cursor:pointer;">
-              ⛪ 입력한 코드로 교회/기관 등록하기
+              입력한 코드로 교회/기관 등록하기
             </button>
             <div style="font-size:11px;color:var(--muted);text-align:center">
               교인은 담임 목사님께 코드를 받아 입력하면 돼요
@@ -371,7 +371,7 @@
           <!-- 초대 코드로 입장 -->
           <div class="ob-or" style="margin-top:16px"><span class="ob-or-text">초대 코드가 있다면</span></div>
           <div style="background:var(--white);border:1.5px solid rgba(201,169,110,0.4);border-radius:14px;padding:14px 16px">
-            <div style="font-size:13px;font-weight:600;color:var(--black);margin-bottom:8px">🎫 초대 코드로 바로 입장</div>
+            <div style="font-size:13px;font-weight:600;color:var(--black);margin-bottom:8px">초대 코드로 바로 입장</div>
             <div style="font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.5">
               리더에게 받은 초대 코드를 입력하면<br>승인 없이 바로 교회에 입장해요
             </div>
@@ -396,7 +396,7 @@
           <div id="ob-role-wrap" style="margin-top:18px;padding-top:16px;border-top:1px solid var(--border)">
             <div class="form-label" style="margin-bottom:8px;font-size:14px;font-weight:800">
               ③ 직분 선택
-              <span style="font-size:11.5px;color:var(--muted);font-weight:400"> 👑 = 리더 권한</span>
+              <span style="font-size:11.5px;color:var(--muted);font-weight:400"> = 리더 권한</span>
             </div>
             <select id="ob-role-select" class="form-select"></select>
           </div>
@@ -539,13 +539,13 @@
         <button id="mode-text" class="mode-chip on" onclick="setMode('text')">텍스트형</button>
         <button id="mode-draw" class="mode-chip" onclick="setMode('draw')">드로잉형</button>
         <button id="mode-upload" class="mode-chip" onclick="setMode('upload')">업로드형</button>
-        <button id="mode-share" class="mode-chip" onclick="setMode('share')" style="display:none">📤 나눔</button>
+        <button id="mode-share" class="mode-chip" onclick="setMode('share')" style="display:none">나눔</button>
         <button onclick="openBinderSettings()"
           style="margin-left:auto;background:none;border:1.5px solid var(--border);border-radius:20px;
                  padding:5px 11px;font-size:12px;font-weight:600;color:var(--muted);cursor:pointer;
                  font-family:inherit;display:flex;align-items:center;gap:4px;flex-shrink:0"
           id="binder-share-status-btn">
-          🔒 비공개
+          비공개
         </button>
       </div>
       <div class="verse-block" style="background-image:url('data:image/jpeg;base64,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');background-size:cover;background-position:center top;">
@@ -565,24 +565,24 @@
               <span class="binder-sec-icon">📖</span>말씀 묵상
             </div>
             <div class="binder-sec-right">
-              <span class="binder-saved" id="qt-saved">저장됨 ✓</span>
+              <span class="binder-saved" id="qt-saved">저장됨 </span>
               <span class="binder-chevron open" id="qt-chev">∨</span>
             </div>
           </div>
           <div class="binder-sec-body open" id="qt-body">
             <div class="binder-sec-inner">
               <input id="qt-verse" class="qt-verse-input" type="text"
-                     placeholder="📖 성경 본문 (예: 요한복음 3:16)"
+                     placeholder="성경 본문 (예: 요한복음 3:16)"
                      oninput="autoSave('qt')">
-              <div class="qt-label">✍ 묵상</div>
+              <div class="qt-label">묵상</div>
               <textarea id="qt-meditation" class="qt-ta" rows="3"
                         placeholder="오늘 말씀에서 깨달은 것을 자유롭게 적어보세요..."
                         oninput="autoSave('qt');autoGrow(this)"></textarea>
-              <div class="qt-label">🌱 오늘의 적용</div>
+              <div class="qt-label">오늘의 적용</div>
               <textarea id="qt-application" class="qt-ta" rows="2"
                         placeholder="말씀을 어떻게 삶에 적용하시겠어요?"
                         oninput="autoSave('qt');autoGrow(this)"></textarea>
-              <div class="qt-label">🙏 기도 제목</div>
+              <div class="qt-label">기도 제목</div>
               <textarea id="qt-prayer" class="qt-ta" rows="2"
                         placeholder="오늘 하나님께 올려드릴 기도를 적어보세요"
                         oninput="autoSave('qt');autoGrow(this)"></textarea>
@@ -617,7 +617,7 @@
             </div>
             <div class="binder-sec-right">
               <span class="sch-date-badge" id="sch-date-badge" style="display:none">날짜별</span>
-              <span class="binder-saved" id="schedule-saved">저장됨 ✓</span>
+              <span class="binder-saved" id="schedule-saved">저장됨 </span>
               <span class="todo-gear-btn" onclick="event.stopPropagation();openSchSettingsModal()" title="시간표 설정">⚙</span>
               <span class="binder-chevron" id="schedule-chev">∨</span>
             </div>
@@ -646,7 +646,7 @@
               <span class="binder-sec-icon">📓</span>일기
             </div>
             <div class="binder-sec-right">
-              <span class="binder-saved" id="diary-saved">저장됨 ✓</span>
+              <span class="binder-saved" id="diary-saved">저장됨 </span>
               <span class="binder-chevron" id="diary-chev">∨</span>
             </div>
           </div>
@@ -673,7 +673,7 @@
           <div class="draw-cell-wrap" id="dcell-qt-wrap">
             <canvas id="draw-canvas-qt" class="draw-cell-canvas lined"></canvas>
             <canvas id="draw-sel-qt" class="draw-sel-canvas"></canvas>
-            <span class="binder-saved canvas-saved" id="draw-qt-saved">저장됨 ✓</span>
+            <span class="binder-saved canvas-saved" id="draw-qt-saved">저장됨 </span>
             <div class="draw-resize-grip" onpointerdown="startCellResize(event,'qt')"></div>
           </div>
           <!-- 크기 기본값 저장 버튼 -->
@@ -708,7 +708,7 @@
               <canvas id="draw-sel-schedule" class="draw-sel-canvas"></canvas>
               <div class="draw-sch-divider"></div>
               <div class="draw-sch-row-overlay" id="draw-sch-row-overlay"></div>
-              <span class="binder-saved canvas-saved" id="draw-schedule-saved">저장됨 ✓</span>
+              <span class="binder-saved canvas-saved" id="draw-schedule-saved">저장됨 </span>
             </div>
             <!-- 행 추가 + 기본값 저장 + 전체 행 높이 조절 (내용 고정) -->
             <div class="draw-sch-footer">
@@ -726,7 +726,7 @@
           <div class="draw-cell-wrap" id="dcell-diary-wrap">
             <canvas id="draw-canvas-diary" class="draw-cell-canvas lined"></canvas>
             <canvas id="draw-sel-diary" class="draw-sel-canvas"></canvas>
-            <span class="binder-saved canvas-saved" id="draw-diary-saved">저장됨 ✓</span>
+            <span class="binder-saved canvas-saved" id="draw-diary-saved">저장됨 </span>
             <div class="draw-resize-grip" onpointerdown="startCellResize(event,'diary')"></div>
           </div>
           <!-- 크기 기본값 저장 버튼 -->
@@ -813,7 +813,7 @@
         <textarea id="photo-caption" class="qt-ta" rows="2"
                   placeholder="사진에 대한 짧은 기록을 남겨보세요 (선택)"
                   oninput="autoSave('photo');autoGrow(this)" style="margin-top:14px"></textarea>
-        <span class="binder-saved" id="photo-saved">저장됨 ✓</span>
+        <span class="binder-saved" id="photo-saved">저장됨 </span>
       </div>
 
       <!-- Community binder (교인 묵상 나눔 — 리더 전용) -->
@@ -872,7 +872,7 @@
             <div class="profile-church-badge" id="church-badge"></div>
             <div class="profile-greeting" id="greeting-text"></div>
           </div>
-          <div class="profile-edit-link" onclick="openProfileEdit()">✏️ 편집</div>
+          <div class="profile-edit-link" onclick="openProfileEdit()">편집</div>
         </div>
 
         <div class="church-box">
@@ -896,7 +896,7 @@
         <div style="background:white;border-radius:16px;padding:16px 18px;margin-top:10px;
                     border:1.5px solid var(--border)">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-            <div style="font-size:13px;font-weight:800;color:var(--black)">🪪 나의 친구 코드</div>
+            <div style="font-size:13px;font-weight:800;color:var(--black)">나의 친구 코드</div>
             <div style="display:flex;align-items:center;gap:8px">
               <span style="font-size:11.5px;color:var(--muted)">프로필 공개</span>
               <div id="profile-public-toggle" class="toggle-switch" onclick="toggleProfilePublic()"
@@ -940,10 +940,10 @@
       <!-- 내부 탭 -->
       <div style="padding:16px 20px 0">
         <div class="chat-inner-tabs">
-          <button class="chat-inner-tab"    id="chat-tab-friends" onclick="setChatInnerTab('friends')">👥 친구</button>
-          <button class="chat-inner-tab on" id="chat-tab-rooms"   onclick="setChatInnerTab('rooms')">💬 채팅</button>
-          <button class="chat-inner-tab"    id="chat-tab-open"    onclick="setChatInnerTab('open')">🌐 오픈채팅</button>
-          <button class="chat-inner-tab"    id="chat-tab-meeting" onclick="setChatInnerTab('meeting')">🎥 회의</button>
+          <button class="chat-inner-tab"    id="chat-tab-friends" onclick="setChatInnerTab('friends')">친구</button>
+          <button class="chat-inner-tab on" id="chat-tab-rooms"   onclick="setChatInnerTab('rooms')">채팅</button>
+          <button class="chat-inner-tab"    id="chat-tab-open"    onclick="setChatInnerTab('open')">오픈채팅</button>
+          <button class="chat-inner-tab"    id="chat-tab-meeting" onclick="setChatInnerTab('meeting')">회의</button>
         </div>
       </div>
 
@@ -963,7 +963,7 @@
           <button onclick="openRoomMenu()" style="background:none;border:none;font-size:22px;cursor:pointer;padding:0 4px;color:var(--black)">⋮</button>
         </div>
         <div class="openchat-msgs" id="room-panel-msgs">
-          <div style="text-align:center;padding:20px;color:var(--muted);font-size:13px">🔄 불러오는 중...</div>
+          <div style="text-align:center;padding:20px;color:var(--muted);font-size:13px">불러오는 중...</div>
         </div>
         <div class="openchat-input-bar">
           <input type="file" id="room-panel-img-input" accept="image/*" style="display:none" onchange="sendChatImage('room',event)">
@@ -984,7 +984,7 @@
           <div style="display:flex;gap:6px">
             <button onclick="openBlockedList()"
               style="height:32px;padding:0 12px;border-radius:20px;border:1.5px solid var(--border);
-                     background:white;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit">🚫 차단</button>
+                     background:white;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit">차단</button>
             <button onclick="openAddFriendModal()"
               style="height:32px;padding:0 14px;border-radius:20px;border:1.5px solid var(--border);
                      background:white;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit">
@@ -1013,7 +1013,7 @@
                      background:white;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit">+ 채널</button>
           </div>
           <div id="openchat-channels" style="flex:1;overflow-y:auto;padding-bottom:12px">
-            <div style="text-align:center;padding:20px;color:var(--muted);font-size:13px">🔄 불러오는 중...</div>
+            <div style="text-align:center;padding:20px;color:var(--muted);font-size:13px">불러오는 중...</div>
           </div>
         </div>
         <!-- 채팅 UI -->
@@ -1026,7 +1026,7 @@
             </div>
           </div>
           <div class="openchat-msgs" id="openchat-msgs">
-            <div style="text-align:center;padding:20px;color:var(--muted);font-size:13px">🔄 메시지 불러오는 중...</div>
+            <div style="text-align:center;padding:20px;color:var(--muted);font-size:13px">메시지 불러오는 중...</div>
           </div>
           <div class="openchat-input-bar">
             <input type="file" id="openchat-img-input" accept="image/*" style="display:none" onchange="sendChatImage('open',event)">
@@ -1045,7 +1045,7 @@
       <!-- 회의 탭 패널 -->
       <div id="chat-panel-meeting" style="display:none;height:100%;overflow-y:auto">
         <div style="padding:14px 16px 0;display:flex;justify-content:space-between;align-items:center">
-          <span style="font-size:13px;font-weight:800;color:var(--black)">🎥 회의</span>
+          <span style="font-size:13px;font-weight:800;color:var(--black)">회의</span>
           <span id="meeting-create-btn" style="display:none;font-size:12.5px;font-weight:700;
             color:var(--muted);cursor:pointer;background:var(--cream2);border-radius:16px;padding:4px 12px"
             onclick="openCreateMeetingModal()">+ 회의 만들기</span>
@@ -1267,7 +1267,7 @@
 
       <!-- 앱 관리자 전용 -->
       <div class="sm-section" id="sm-admin-section" style="display:none">
-        <div class="sm-section-label" style="color:#E63946">🔑 앱 전체 관리</div>
+        <div class="sm-section-label" style="color:#E63946">앱 전체 관리</div>
         <div class="sm-item" onclick="openSubscreen('admin-panel');closeSideMenu()">
           <span class="sm-icon">🛡</span>
           <span class="sm-text">앱 관리자 패널</span>
@@ -1278,7 +1278,7 @@
 
       <!-- 리더 전용 -->
       <div class="sm-section sm-leader-section" id="sm-leader-section" style="display:none">
-        <div class="sm-section-label">👑 리더 전용</div>
+        <div class="sm-section-label">리더 전용</div>
         <div class="sm-item" onclick="openSubscreen('members');closeSideMenu()">
           <span class="sm-icon">📋</span>
           <span class="sm-text">교인 관리</span>
@@ -1446,7 +1446,7 @@
         <button class="btn-cancel" onclick="closeTodoEditModal()">취소</button>
         <button class="btn-confirm" onclick="saveTodoEdit()">저장하기</button>
       </div>
-      <button class="btn-delete-full" onclick="deleteTodoFromEdit()">🗑 삭제하기</button>
+      <button class="btn-delete-full" onclick="deleteTodoFromEdit()">삭제하기</button>
     </div>
   </div>
 
@@ -1455,7 +1455,7 @@
   ============================================= -->
   <div class="modal-backdrop" id="modal-todo-settings" onclick="closeTodoSettingsModal(event)">
     <div class="modal-sheet">
-      <div class="modal-title">Todo List 설정 ⚙</div>
+      <div class="modal-title">Todo List 설정 </div>
 
       <!-- 할 일 지속 활성화 -->
       <div class="settings-section-label">할 일 지속 활성화</div>
@@ -1545,7 +1545,7 @@
   ============================================= -->
   <div class="modal-backdrop" id="modal-sch-settings" onclick="closeSchSettingsModal(event)">
     <div class="modal-sheet" style="max-height:90vh;overflow-y:auto">
-      <div class="modal-title">시간표 설정 ⚙</div>
+      <div class="modal-title">시간표 설정 </div>
 
       <div style="font-size:14px;color:#666;font-weight:500;margin-top:6px;margin-bottom:14px">시간표 시간 설정</div>
 
@@ -1603,7 +1603,7 @@
       <div class="mc-desc" id="mc-desc"></div>
       <div class="modal-actions">
         <button class="btn-cancel" onclick="closeChallengeModal()">취소</button>
-        <button class="btn-confirm" onclick="confirmStartChallenge()">시작하기 🌱</button>
+        <button class="btn-confirm" onclick="confirmStartChallenge()">시작하기 </button>
       </div>
     </div>
   </div>
@@ -1613,7 +1613,7 @@
   ============================================= -->
   <div class="modal-backdrop" id="modal-create-challenge" onclick="closeCreateChallengeModal(event)">
     <div class="modal-sheet">
-      <div class="modal-title">새 챌린지 만들기 ✨</div>
+      <div class="modal-title">새 챌린지 만들기 </div>
       <div class="form-group">
         <label class="form-label">카테고리</label>
         <select id="cc-tag" class="form-select"></select>
@@ -1655,12 +1655,12 @@
       <div class="form-group">
         <label class="form-label">공개 범위</label>
         <div class="cc-type-row" style="flex-wrap:wrap;gap:6px">
-          <button class="cc-type-btn on" id="cc-scope-personal" onclick="ccSetScope('personal')">🔐 개인</button>
-          <button class="cc-type-btn"    id="cc-scope-church"   onclick="ccSetScope('church')">🔒 우리 교회</button>
-          <button class="cc-type-btn"    id="cc-scope-public"   onclick="ccSetScope('public')">🌐 전체 공개</button>
+          <button class="cc-type-btn on" id="cc-scope-personal" onclick="ccSetScope('personal')">개인</button>
+          <button class="cc-type-btn"    id="cc-scope-church"   onclick="ccSetScope('church')">우리 교회</button>
+          <button class="cc-type-btn"    id="cc-scope-public"   onclick="ccSetScope('public')">전체 공개</button>
         </div>
         <div style="font-size:11.5px;color:var(--muted);margin-top:6px;line-height:1.5">
-          🔐 개인: 나만 보기 · 🔒 교회: 우리 교회 교인만 · 🌐 공개: 모든 교회와 공유
+          개인: 나만 보기 · 교회: 우리 교회 교인만 · 공개: 모든 교회와 공유
         </div>
       </div>
       <div class="modal-actions">
@@ -1675,7 +1675,7 @@
   ============================================= -->
   <div class="modal-backdrop" id="modal-challenge-picker" onclick="closeChallengePicker(event)">
     <div class="modal-sheet" style="padding-bottom:8px">
-      <div class="modal-title">🚩 챌린지 연동</div>
+      <div class="modal-title">챌린지 연동</div>
       <div style="font-size:13px;color:var(--muted);margin:-8px 0 14px;text-align:center">
         이 할 일을 연동할 챌린지를 선택해요
       </div>
@@ -1692,7 +1692,7 @@
   <div class="meeting-room-overlay" id="meeting-room-overlay">
     <div class="meeting-room-topbar">
       <div class="meeting-room-title" id="meeting-room-title">회의</div>
-      <button class="meeting-room-close" onclick="closeMeetingRoom()">✕ 나가기</button>
+      <button class="meeting-room-close" onclick="closeMeetingRoom()">나가기</button>
     </div>
     <iframe class="meeting-room-frame" id="meeting-room-frame"
             allow="camera; microphone; fullscreen; display-capture; autoplay"
@@ -1704,7 +1704,7 @@
   ============================================= -->
   <div class="modal-backdrop" id="modal-create-event" onclick="closeCreateEventModal(event)">
     <div class="modal-sheet" style="max-height:92vh;overflow-y:auto">
-      <div class="modal-title">행사 등록 🎪</div>
+      <div class="modal-title">행사 등록 </div>
       <!-- 포스터 업로드 -->
       <div class="event-poster-picker" id="event-poster-picker"
            onclick="document.getElementById('event-poster-input').click()">
@@ -1762,7 +1762,7 @@
           일정, 특징, 강사, 준비물 등 자유롭게 작성하세요
         </div>
         <textarea id="ev-desc" class="qt-ta" rows="7"
-          placeholder="📅 일정&#10;8/1 오후 2시 — 집결&#10;8/2 오전 — 말씀 집회&#10;&#10;✨ 강사&#10;김OO 목사&#10;&#10;📋 준비물&#10;성경책, 필기도구"
+          placeholder="일정&#10;8/1 오후 2시 — 집결&#10;8/2 오전 — 말씀 집회&#10;&#10;강사&#10;김OO 목사&#10;&#10;준비물&#10;성경책, 필기도구"
           style="font-size:13px;line-height:1.7;resize:none"></textarea>
       </div>
       <div class="modal-actions">
@@ -1792,7 +1792,7 @@
   <!-- 매칭 신청 모달 -->
   <div class="modal-backdrop" id="modal-match-req" onclick="closeMatchReqModal(event)">
     <div class="modal-sheet">
-      <div class="modal-title">🤝 매칭 신청</div>
+      <div class="modal-title">매칭 신청</div>
       <div style="background:var(--cream2);border-radius:10px;padding:10px 14px;margin-bottom:16px;font-size:13.5px;font-weight:700" id="match-req-to-name"></div>
       <div style="font-size:11.5px;color:var(--muted);margin-bottom:4px" id="match-req-type-label"></div>
       <div class="form-group">
@@ -1811,7 +1811,7 @@
   <!-- 취미 매칭 프로필 모달 -->
   <div class="modal-backdrop" id="modal-hobby-profile" onclick="closeHobbyProfileModal(event)">
     <div class="modal-sheet" style="max-height:88vh;overflow-y:auto">
-      <div class="modal-title">🎯 취미 매칭 프로필</div>
+      <div class="modal-title">취미 매칭 프로필</div>
       <div class="form-group">
         <label class="form-label">취미 선택 <span style="font-weight:400;font-size:11.5px;color:var(--muted)">여러 개 가능</span></label>
         <div id="hobby-chips" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px"></div>
@@ -1827,7 +1827,7 @@
       <div class="form-group">
         <label class="form-label">한줄 소개 <span style="font-weight:400;font-size:11.5px;color:var(--muted)">선택</span></label>
         <textarea id="hobby-bio" class="qt-ta" rows="2"
-          placeholder="예: 같이 북클럽 하실 분 찾아요! 매월 1권씩 읽고 싶어요 😊"
+          placeholder="예: 같이 북클럽 하실 분 찾아요! 매월 1권씩 읽고 싶어요 "
           style="font-size:13px;line-height:1.7;resize:none"></textarea>
       </div>
       <div class="modal-actions">
@@ -1843,7 +1843,7 @@
   <!-- 기도 파트너 프로필 모달 -->
   <div class="modal-backdrop" id="modal-prayer-profile" onclick="closePrayerProfileModal(event)">
     <div class="modal-sheet" style="max-height:88vh;overflow-y:auto">
-      <div class="modal-title">🙏 기도 파트너 프로필</div>
+      <div class="modal-title">기도 파트너 프로필</div>
       <div class="form-group">
         <label class="form-label">주요 기도 제목</label>
         <div id="prayer-topic-chips" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px"></div>
@@ -1852,7 +1852,7 @@
       <div class="form-group">
         <label class="form-label">한줄 소개 <span style="font-weight:400;font-size:11.5px;color:var(--muted)">선택</span></label>
         <textarea id="prayer-bio" class="qt-ta" rows="2"
-          placeholder="예: 대학원 진로로 기도 중인 청년입니다. 함께 기도해요 🙏"
+          placeholder="예: 대학원 진로로 기도 중인 청년입니다. 함께 기도해요 "
           style="font-size:13px;line-height:1.7;resize:none"></textarea>
       </div>
       <div class="modal-actions">
@@ -1868,21 +1868,21 @@
   <!-- 멘토링 프로필 모달 -->
   <div class="modal-backdrop" id="modal-mentor-profile" onclick="closeMentorProfileModal(event)">
     <div class="modal-sheet" style="max-height:88vh;overflow-y:auto">
-      <div class="modal-title">🌱 멘토링 프로필</div>
+      <div class="modal-title">멘토링 프로필</div>
       <div class="form-group">
         <label class="form-label">역할</label>
         <div style="display:flex;gap:10px">
           <label style="flex:1;display:flex;align-items:center;gap:8px;padding:12px;border-radius:10px;border:1.5px solid var(--border);cursor:pointer;background:white">
             <input type="radio" name="mentor-role" id="mentor-role-mentor" value="mentor" style="accent-color:var(--black)">
             <div>
-              <div style="font-size:13.5px;font-weight:700">🎓 멘토</div>
+              <div style="font-size:13.5px;font-weight:700">멘토</div>
               <div style="font-size:11.5px;color:var(--muted)">신앙 경험 나눔</div>
             </div>
           </label>
           <label style="flex:1;display:flex;align-items:center;gap:8px;padding:12px;border-radius:10px;border:1.5px solid var(--border);cursor:pointer;background:white">
             <input type="radio" name="mentor-role" id="mentor-role-mentee" value="mentee" style="accent-color:var(--black)">
             <div>
-              <div style="font-size:13.5px;font-weight:700">🌱 멘티</div>
+              <div style="font-size:13.5px;font-weight:700">멘티</div>
               <div style="font-size:11.5px;color:var(--muted)">배우고 성장</div>
             </div>
           </label>
@@ -1912,27 +1912,27 @@
   <!-- 이성 교제 프로필 모달 (성인 전용) -->
   <div class="modal-backdrop" id="modal-romance-profile" onclick="closeRomanceProfileModal(event)">
     <div class="modal-sheet" style="max-height:88vh;overflow-y:auto">
-      <div class="modal-title">💑 이성 교제 프로필</div>
+      <div class="modal-title">이성 교제 프로필</div>
       <div style="background:var(--cream2);border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:12px;color:var(--muted);line-height:1.6">
-        🔞 성인(만 19세 이상) 인증 회원만 이용할 수 있어요.<br>진실한 만남을 위해 예의를 지켜주세요 🙏
+        성인(만 19세 이상) 인증 회원만 이용할 수 있어요.<br>진실한 만남을 위해 예의를 지켜주세요 
       </div>
       <div class="form-group">
         <label class="form-label">성별</label>
         <div style="display:flex;gap:10px">
           <label style="flex:1;display:flex;align-items:center;gap:8px;padding:12px;border-radius:10px;border:1.5px solid var(--border);cursor:pointer;background:white">
             <input type="radio" name="romance-gender" id="romance-gender-m" value="brother" style="accent-color:var(--black)">
-            <div style="font-size:13.5px;font-weight:700">🙋‍♂️ 형제</div>
+            <div style="font-size:13.5px;font-weight:700">형제</div>
           </label>
           <label style="flex:1;display:flex;align-items:center;gap:8px;padding:12px;border-radius:10px;border:1.5px solid var(--border);cursor:pointer;background:white">
             <input type="radio" name="romance-gender" id="romance-gender-f" value="sister" style="accent-color:var(--black)">
-            <div style="font-size:13.5px;font-weight:700">🙋‍♀️ 자매</div>
+            <div style="font-size:13.5px;font-weight:700">자매</div>
           </label>
         </div>
       </div>
       <div class="form-group">
         <label class="form-label">자기소개</label>
         <textarea id="romance-bio" class="qt-ta" rows="3"
-          placeholder="예: 찬양팀에서 섬기는 청년입니다. 신앙 안에서 함께 성장할 동역자를 만나고 싶어요 😊"
+          placeholder="예: 찬양팀에서 섬기는 청년입니다. 신앙 안에서 함께 성장할 동역자를 만나고 싶어요 "
           style="font-size:13px;line-height:1.7;resize:none"></textarea>
       </div>
       <div class="form-group">
@@ -1955,7 +1955,7 @@
   <!-- 게시글 작성 모달 -->
   <div class="modal-backdrop" id="modal-board-post" onclick="closeBoardPostModal(event)">
     <div class="modal-sheet" style="max-height:90vh;overflow-y:auto">
-      <div class="modal-title" id="board-post-modal-title">📝 글 쓰기</div>
+      <div class="modal-title" id="board-post-modal-title">글 쓰기</div>
       <div class="form-group">
         <label class="form-label">카테고리</label>
         <select id="bp-category" class="form-select"></select>
@@ -1973,13 +1973,13 @@
       <div id="bp-pin-row" class="form-group" style="display:none">
         <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
           <input type="checkbox" id="bp-pinned" style="accent-color:var(--black);width:16px;height:16px">
-          <span style="font-size:13.5px;font-weight:600">📌 상단 고정</span>
+          <span style="font-size:13.5px;font-weight:600">상단 고정</span>
         </label>
       </div>
       <div id="bp-private-row" class="form-group" style="display:none">
         <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
           <input type="checkbox" id="bp-private" style="accent-color:var(--gold);width:16px;height:16px">
-          <span style="font-size:13.5px;font-weight:600">🔒 비공개로 보내기</span>
+          <span style="font-size:13.5px;font-weight:600">비공개로 보내기</span>
         </label>
         <div style="font-size:11.5px;color:var(--muted);margin-top:4px;padding-left:26px">나와 앱 관리자만 볼 수 있어요</div>
       </div>
@@ -1996,7 +1996,7 @@
   ============================================= -->
   <div class="modal-backdrop" id="modal-create-meeting" onclick="closeCreateMeetingModal(event)">
     <div class="modal-sheet">
-      <div class="modal-title">회의 만들기 🎥</div>
+      <div class="modal-title">회의 만들기 </div>
       <div class="form-group">
         <label class="form-label">회의 이름</label>
         <input id="mtg-name" type="text" class="form-input" placeholder="예: 청년부 주간 기도모임">
@@ -2058,7 +2058,7 @@
           placeholder="회의 안건 또는 참고사항" style="resize:none"></textarea>
       </div>
       <div style="background:var(--cream2);border-radius:12px;padding:12px 14px">
-        <div style="font-size:11.5px;color:var(--muted);margin-bottom:4px">🔑 자동 생성 회의 코드</div>
+        <div style="font-size:11.5px;color:var(--muted);margin-bottom:4px">자동 생성 회의 코드</div>
         <div style="font-size:20px;font-weight:800;letter-spacing:3px;font-family:monospace;color:var(--black)"
              id="mtg-preview-code">—</div>
         <div style="font-size:11.5px;color:var(--muted);margin-top:4px">
@@ -2077,12 +2077,12 @@
   ============================================= -->
   <div class="modal-backdrop" id="modal-create-chatroom" onclick="closeCreateChatRoomModal(event)">
     <div class="modal-sheet">
-      <div class="modal-title">새 채팅방 만들기 💬</div>
+      <div class="modal-title">새 채팅방 만들기 </div>
       <div class="form-group">
         <label class="form-label">채팅 유형</label>
         <div class="cc-type-row">
-          <button class="cc-type-btn on" id="cr-type-dm"    onclick="setChatRoomType('dm')">👤 1:1 채팅</button>
-          <button class="cc-type-btn"    id="cr-type-group" onclick="setChatRoomType('group')">👥 그룹 채팅</button>
+          <button class="cc-type-btn on" id="cr-type-dm"    onclick="setChatRoomType('dm')">1:1 채팅</button>
+          <button class="cc-type-btn"    id="cr-type-group" onclick="setChatRoomType('group')">그룹 채팅</button>
         </div>
       </div>
       <div class="form-group" id="cr-name-field" style="display:none">
@@ -2105,7 +2105,7 @@
   ============================================= -->
   <div class="modal-backdrop" id="modal-add-friend" onclick="closeAddFriendModal(event)">
     <div class="modal-sheet">
-      <div class="modal-title">친구 추가 👥</div>
+      <div class="modal-title">친구 추가 </div>
 
       <!-- 탭 전환 -->
       <div style="display:flex;gap:6px;margin-bottom:14px;background:var(--cream2);
@@ -2114,18 +2114,18 @@
           style="flex:1;height:34px;border:none;border-radius:9px;font-size:13px;
                  font-weight:700;cursor:pointer;font-family:inherit;
                  background:var(--black);color:white;transition:all 0.15s"
-          class="on">⛪ 교회 교인</button>
+          class="on">교회 교인</button>
         <button id="fmtab-code" onclick="_setFriendModalTab('code')"
           style="flex:1;height:34px;border:none;border-radius:9px;font-size:13px;
                  font-weight:700;cursor:pointer;font-family:inherit;
                  background:transparent;color:var(--muted);transition:all 0.15s">
-          🪪 코드로 추가</button>
+          코드로 추가</button>
       </div>
 
       <!-- 교회 교인 패널 -->
       <div id="friend-church-panel">
         <div style="font-size:12px;color:var(--muted);text-align:center;margin-bottom:10px">
-          같은 교회 교인 + 🌐 공개 프로필 사용자
+          같은 교회 교인 + 공개 프로필 사용자
         </div>
         <input id="friend-search" type="text" class="form-input" placeholder="이름으로 검색"
                oninput="renderFriendSearch()" style="margin-bottom:10px">
@@ -2163,7 +2163,7 @@
   ============================================= -->
   <div class="modal-backdrop" id="modal-profile-edit" onclick="closeProfileEdit(event)">
     <div class="modal-sheet" style="max-height:90vh;overflow-y:auto">
-      <div class="modal-title">프로필 편집 ✏️</div>
+      <div class="modal-title">프로필 편집 </div>
 
       <!-- 사진 업로드 -->
       <div class="photo-picker-wrap" id="photo-picker" onclick="document.getElementById('photo-file-input').click()">
@@ -2179,7 +2179,7 @@
       <div class="form-group">
         <label class="form-label">한줄 소개 <span style="font-weight:400;font-size:11.5px;color:var(--muted)">선택 · 최대 50자</span></label>
         <textarea id="edit-bio" class="qt-ta" rows="2"
-          placeholder="예: 믿음으로 하루하루 살아가는 중입니다 🙏"
+          placeholder="예: 믿음으로 하루하루 살아가는 중입니다 "
           oninput="document.getElementById('bio-char-count').textContent=this.value.length"
           style="resize:none;max-height:80px"></textarea>
         <div style="text-align:right;font-size:11.5px;color:var(--muted);margin-top:4px">
@@ -2189,13 +2189,13 @@
       <div class="form-group">
         <label class="form-label">소속 유형</label>
         <div class="org-type-row" style="margin-bottom:0">
-          <button class="org-type-btn" id="edit-org-church"   onclick="setEditOrgType('church')">⛪ 교회</button>
-          <button class="org-type-btn" id="edit-org-org"      onclick="setEditOrgType('org')">🏢 기관·단체</button>
-          <button class="org-type-btn" id="edit-org-personal" onclick="setEditOrgType('personal')">👤 개인</button>
+          <button class="org-type-btn" id="edit-org-church"   onclick="setEditOrgType('church')">교회</button>
+          <button class="org-type-btn" id="edit-org-org"      onclick="setEditOrgType('org')">기관·단체</button>
+          <button class="org-type-btn" id="edit-org-personal" onclick="setEditOrgType('personal')">개인</button>
         </div>
       </div>
       <div class="form-group" id="edit-role-wrap">
-        <label class="form-label">직분 <span style="font-weight:400;font-size:11.5px;color:var(--muted)">👑 = 리더 권한</span></label>
+        <label class="form-label">직분 <span style="font-weight:400;font-size:11.5px;color:var(--muted)">= 리더 권한</span></label>
         <select id="edit-role" class="form-select"></select>
       </div>
       <div class="form-group" id="edit-church-wrap">
@@ -2213,7 +2213,7 @@
 
       <!-- 계정 정보 변경 (구분선) -->
       <div style="border-top:1px solid var(--border);margin-top:16px;padding-top:16px">
-        <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:12px;letter-spacing:0.5px">🔐 계정 정보 변경</div>
+        <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:12px;letter-spacing:0.5px">계정 정보 변경</div>
         <div class="form-group">
           <label class="form-label">새 이메일</label>
           <input id="edit-email" type="email" class="form-input" placeholder="변경할 이메일 입력 (선택)">
@@ -2237,11 +2237,11 @@
   ============================================= -->
   <div class="modal-backdrop" id="modal-binder-settings" onclick="closeBinderSettings(event)">
     <div class="modal-sheet">
-      <div class="modal-title">삶의 예배 설정 ⚙️</div>
+      <div class="modal-title">삶의 예배 설정 </div>
       <div class="ss-setting-row" onclick="toggleBinderShare()"
            style="cursor:pointer;padding:14px 0;border-bottom:1px solid var(--border)">
         <div style="flex:1">
-          <div class="ss-setting-label">📤 리더에게 공유</div>
+          <div class="ss-setting-label">리더에게 공유</div>
           <div class="ss-setting-sub" style="margin-top:3px;line-height:1.5">
             교회 리더가 내 바인더를 열람할 수 있어요<br>
             <span style="color:#E63946;font-size:11px">기본값: 비공개</span>
@@ -2257,8 +2257,8 @@
       </div>
       <div style="font-size:12px;color:var(--muted);margin-top:14px;line-height:1.7;
                   background:var(--cream2);border-radius:10px;padding:12px 14px">
-        🔒 <b>비공개</b> — 나만 볼 수 있어요<br>
-        📤 <b>공개</b> — 우리 교회 리더가 볼 수 있어요<br>
+        <b>비공개</b> — 나만 볼 수 있어요<br>
+        <b>공개</b> — 우리 교회 리더가 볼 수 있어요<br>
         언제든지 다시 끌 수 있어요
       </div>
       <div class="modal-actions" style="margin-top:16px">
@@ -2270,7 +2270,7 @@
   <!-- 사진 소스 선택 모달 (카메라 / 갤러리) -->
   <div class="modal-backdrop" id="modal-photo-source" onclick="closePhotoSourceModal(event)">
     <div class="modal-sheet">
-      <div class="modal-title">📷 사진 추가</div>
+      <div class="modal-title">사진 추가</div>
       <div style="display:flex;flex-direction:column;gap:10px;margin:6px 0 2px">
         <button onclick="choosePhotoCamera()"
           style="display:flex;align-items:center;gap:12px;width:100%;padding:16px;border-radius:12px;border:1.5px solid var(--border);background:white;font-size:14.5px;font-weight:700;cursor:pointer;font-family:inherit;text-align:left">
@@ -2290,7 +2290,7 @@
   <!-- 갤러리 접근 권한 안내 모달 -->
   <div class="modal-backdrop" id="modal-photo-perm" onclick="closePhotoPermModal(event)">
     <div class="modal-sheet">
-      <div class="modal-title">🖼️ 갤러리 접근</div>
+      <div class="modal-title">갤러리 접근</div>
       <div style="font-size:13.5px;color:var(--dark);line-height:1.75;margin:4px 0 16px">
         사진을 업로드하려면 갤러리 접근을 허용해주세요.
       </div>
@@ -2323,10 +2323,10 @@
       <!-- 삭제 항목 안내 -->
       <div style="background:rgba(192,57,43,0.07);border-radius:12px;padding:14px 16px;margin-bottom:16px">
         <div style="font-size:12.5px;color:#C0392B;line-height:1.9">
-          🗑 Firebase 계정 삭제<br>
-          🗑 프로필 / 교회 정보<br>
-          🗑 챌린지 / 바인더 / 일정<br>
-          💬 채팅 메시지 → "탈퇴한 사용자"로 익명화
+          Firebase 계정 삭제<br>
+          프로필 / 교회 정보<br>
+          챌린지 / 바인더 / 일정<br>
+          채팅 메시지 → "탈퇴한 사용자"로 익명화
         </div>
       </div>
 
@@ -2375,7 +2375,7 @@
 
   <div class="modal-backdrop" id="modal-create-church" onclick="closeCreateChurchModal(event)">
     <div class="modal-sheet" style="max-height:90vh;overflow-y:auto">
-      <div class="modal-title" id="create-church-modal-title">⛪ 새 교회/기관 만들기</div>
+      <div class="modal-title" id="create-church-modal-title">새 교회/기관 만들기</div>
 
       <!-- 이모지 선택 -->
       <div class="form-group">
@@ -2408,10 +2408,10 @@
       <div class="form-group">
         <label class="form-label">유형</label>
         <select id="nc-type" class="form-select" onchange="onChurchTypeChange()">
-          <option value="church">⛪ 교회</option>
-          <option value="org">🏢 기관·단체</option>
-          <option value="camp">🏕 캠프·수련원</option>
-          <option value="cell">🌿 셀·소모임</option>
+          <option value="church">교회</option>
+          <option value="org">기관·단체</option>
+          <option value="camp">캠프·수련원</option>
+          <option value="cell">셀·소모임</option>
         </select>
       </div>
 
@@ -2444,19 +2444,19 @@
 
   <div class="modal-backdrop" id="modal-church-info-edit" onclick="closeChurchInfoEdit(event)">
     <div class="modal-sheet" style="max-height:90vh;overflow-y:auto">
-      <div class="modal-title">⛪ 교회 정보 편집</div>
+      <div class="modal-title">교회 정보 편집</div>
       <div class="form-group">
-        <label class="form-label">📍 교회 주소</label>
+        <label class="form-label">교회 주소</label>
         <input id="ci-address" type="text" class="form-input" placeholder="예: 경기도 안성시 ○○동 ○○번지">
       </div>
       <div class="form-group">
-        <label class="form-label">📝 교회 소개 <span style="font-weight:400;font-size:11.5px;color:var(--muted)">선택</span></label>
+        <label class="form-label">교회 소개 <span style="font-weight:400;font-size:11.5px;color:var(--muted)">선택</span></label>
         <textarea id="ci-description" class="qt-ta" rows="4"
           placeholder="교회 비전, 역사, 분위기 등을 소개해보세요"
           style="resize:none"></textarea>
       </div>
       <div class="form-group">
-        <label class="form-label">👨‍⚕️ 담임 목사 이름 <span style="font-weight:400;font-size:11.5px;color:var(--muted)">선택</span></label>
+        <label class="form-label">담임 목사 이름 <span style="font-weight:400;font-size:11.5px;color:var(--muted)">선택</span></label>
         <input id="ci-pastor-name" type="text" class="form-input" placeholder="예: 홍길동">
       </div>
       <div class="form-group">
@@ -2474,14 +2474,14 @@
 
   <div class="modal-backdrop" id="modal-appoint-leader" onclick="closeAppointModal(event)">
     <div class="modal-sheet">
-      <div class="modal-title">리더 임명 ✨</div>
+      <div class="modal-title">리더 임명 </div>
       <div style="text-align:center;margin:-6px 0 16px">
         <span id="appoint-user-name" style="font-size:15px;font-weight:700;color:var(--black)"></span>
         <span style="font-size:13px;color:var(--muted)">님에게 권한을 부여해요</span>
       </div>
 
       <!-- 챌린지 -->
-      <div class="perm-category">📌 챌린지</div>
+      <div class="perm-category">챌린지</div>
       <div class="perm-item" onclick="togglePermCb('challenge')">
         <div class="perm-cb" id="perm-challenge"></div>
         <div class="perm-info">
@@ -2491,7 +2491,7 @@
       </div>
 
       <!-- 교인 관리 -->
-      <div class="perm-category">📌 교인 관리</div>
+      <div class="perm-category">교인 관리</div>
       <div class="perm-item" onclick="togglePermCb('approve')">
         <div class="perm-cb" id="perm-approve"></div>
         <div class="perm-info">
@@ -2594,7 +2594,7 @@ var DB = {
 // ================================================
 var _deferredInstallPrompt = null;
 function _pwaMakeIcon(size) {
-  // 앱 아이콘을 캔버스로 그려 dataURL 반환 (골드 배경 + 🙏 + SmartChurch)
+  // 앱 아이콘을 캔버스로 그려 dataURL 반환 (골드 배경 + + SmartChurch)
   const c = document.createElement('canvas');
   c.width = c.height = size;
   const x = c.getContext('2d');
@@ -2680,11 +2680,11 @@ async function promptPWAInstall() {
     _deferredInstallPrompt.prompt();
     const { outcome } = await _deferredInstallPrompt.userChoice;
     _deferredInstallPrompt = null;
-    toast(outcome === 'accepted' ? '홈 화면에 설치됐어요! 🎉' : '언제든 다시 설치할 수 있어요');
+    toast(outcome === 'accepted' ? '홈 화면에 설치됐어요! ' : '언제든 다시 설치할 수 있어요');
   } else if (/iphone|ipad|ipod/i.test(navigator.userAgent)) {
-    toast('사파리 공유 버튼 → "홈 화면에 추가"를 눌러주세요 📲');
+    toast('사파리 공유 버튼 → "홈 화면에 추가"를 눌러주세요 ');
   } else {
-    toast('브라우저 메뉴 → "홈 화면에 추가"를 선택해 주세요 📲');
+    toast('브라우저 메뉴 → "홈 화면에 추가"를 선택해 주세요 ');
   }
 }
 setupPWA();
@@ -2785,18 +2785,18 @@ function showErr(id, msg) {
 // ── 소속 유형 & 직분 ──
 var ORG_ROLES = {
   church: [
-    { value:'담임목사', label:'담임목사 👑', leader:true  },
-    { value:'부목사',   label:'부목사 👑',   leader:true  },
-    { value:'전도사',   label:'전도사 👑',   leader:true  },
+    { value:'담임목사', label:'담임목사 ', leader:true  },
+    { value:'부목사',   label:'부목사 ',   leader:true  },
+    { value:'전도사',   label:'전도사 ',   leader:true  },
     { value:'장로',     label:'장로',         leader:false },
     { value:'권사',     label:'권사',         leader:false },
     { value:'집사',     label:'집사',         leader:false },
     { value:'성도',     label:'성도',         leader:false },
   ],
   org: [
-    { value:'원장',   label:'원장 👑',   leader:true  },
-    { value:'부원장', label:'부원장 👑', leader:true  },
-    { value:'관리자', label:'관리자 👑', leader:true  },
+    { value:'원장',   label:'원장 ',   leader:true  },
+    { value:'부원장', label:'부원장 ', leader:true  },
+    { value:'관리자', label:'관리자 ', leader:true  },
     { value:'간사',   label:'간사',       leader:false },
     { value:'회원',   label:'회원',       leader:false },
   ],
@@ -3019,7 +3019,7 @@ async function doLogin() {
         if (fbUser.status === 'pending') {
           updatePendingScreen(fbUser); setTimeout(() => go('pending'), 200); return;
         }
-        toast('로그인됐어요 🙏');
+        toast('로그인됐어요 ');
         // 새로고침 시 온보딩이 다시 뜨지 않도록 플래그 설정
         if (!DB.get('onboarded_' + uid, false)) {
           DB.set('onboarded_' + uid, true);
@@ -3097,7 +3097,7 @@ async function doRegister() {
   if (isMinor) {
     guardianName    = document.getElementById('r-guardian-name')?.value.trim()    || '';
     guardianContact = document.getElementById('r-guardian-contact')?.value.trim() || '';
-    if (!guardianName || !guardianContact) { toast('보호자 이름과 연락처를 입력해 주세요 📋'); return; }
+    if (!guardianName || !guardianContact) { toast('보호자 이름과 연락처를 입력해 주세요 '); return; }
   }
 
   const marketing = document.getElementById('cb-marketing')?.classList.contains('checked') || false;
@@ -3134,11 +3134,11 @@ async function doRegister() {
 
       hideLoadingOverlay();
       if (isMinor) {
-        toast(name + '님, 가입 신청이 접수됐어요! 교역자 승인 후 이용 가능해요 🙏');
+        toast(name + '님, 가입 신청이 접수됐어요! 교역자 승인 후 이용 가능해요 ');
         updatePendingScreen(userData);
         setTimeout(() => go('pending'), 400);
       } else {
-        toast(name + '님, 가입을 축하해요! 🎉');
+        toast(name + '님, 가입을 축하해요! ');
         setTimeout(() => startOnboarding(), 400);
       }
       return;
@@ -3175,11 +3175,11 @@ async function doRegister() {
   DB.setSession(user.id);
   me = user;
   if (isMinor) {
-    toast(name + '님, 가입 신청이 접수됐어요! 교역자 승인 후 이용 가능해요 🙏');
+    toast(name + '님, 가입 신청이 접수됐어요! 교역자 승인 후 이용 가능해요 ');
     updatePendingScreen(user);
     setTimeout(() => go('pending'), 400);
   } else {
-    toast(name + '님, 가입을 축하해요! 🎉');
+    toast(name + '님, 가입을 축하해요! ');
     setTimeout(() => startOnboarding(), 400);
   }
 }
@@ -3296,10 +3296,10 @@ var VERSES = [
 ];
 
 var GREETINGS = [
-  n => `안녕하세요, ${n}님 🌅\n오늘도 주님의 은혜로 하루를 시작해요.`,
-  n => `${n}님, 오늘 하루도\n하나님과 동행하는 복된 날이 되길 기도합니다 🙏`,
-  n => `좋은 아침이에요, ${n}님!\n오늘의 말씀이 마음의 힘이 되길 바랍니다 ✨`,
-  n => `${n}님, 주님이 오늘도\n당신과 함께하십니다 💛`,
+  n => `안녕하세요, ${n}님 \n오늘도 주님의 은혜로 하루를 시작해요.`,
+  n => `${n}님, 오늘 하루도\n하나님과 동행하는 복된 날이 되길 기도합니다 `,
+  n => `좋은 아침이에요, ${n}님!\n오늘의 말씀이 마음의 힘이 되길 바랍니다 `,
+  n => `${n}님, 주님이 오늘도\n당신과 함께하십니다 `,
 ];
 
 // 교회 가입 상태를 Firestore에서 재확인
@@ -3406,7 +3406,7 @@ function bootApp() {
       });
       if (changed) {
         DB.saveUser(me);
-        if (!wasActive && me.churchStatus === 'active') toast('✅ 교회 가입이 승인됐어요!');
+        if (!wasActive && me.churchStatus === 'active') toast('교회 가입이 승인됐어요!');
         if (typeof updateProfileDisplay === 'function') updateProfileDisplay();
       }
     });
@@ -3813,7 +3813,7 @@ var activeDrawKey = null;
 var currentColor = '#000000';
 var currentSize  = 4;
 var eraserSize   = 30;      // 지우개 지름(px)
-var handMode     = false;   // ✋ 손 이동 모드 (드로잉 비활성 + 스크롤)
+var handMode     = false;   // 손 이동 모드 (드로잉 비활성 + 스크롤)
 var currentTool  = 'pen'; // 'pen' | 'highlighter' | 'eraser' | 'select'
 var lastX = 0, lastY = 0;
 
@@ -3931,7 +3931,7 @@ function addSchDrawRow() {
   saveSchDrawCfg(cfg);
   applySchLayout(true);
   saveDrawingFor('schedule');
-  toast(`✅ 행 추가 — 총 ${cfg.rows}행`);
+  toast(`행 추가 — 총 ${cfg.rows}행`);
 }
 
 function setSchDrawDefault() {
@@ -3939,7 +3939,7 @@ function setSchDrawDefault() {
   const cfg = getSchDrawCfg();
   // 크기(행 수, 행 높이)만 기본값으로 저장 — 그림 내용은 저장 안 함
   DB.set('schCfgDefault_' + me.id, { rows: cfg.rows, rowH: cfg.rowH });
-  toast('✅ 시간표 크기를 기본값으로 저장했어요 — 다음 날부터 자동 적용돼요');
+  toast('시간표 크기를 기본값으로 저장했어요 — 다음 날부터 자동 적용돼요');
 }
 
 function startSchResize(e) {
@@ -4085,7 +4085,7 @@ function setEraserSize(v) {
   eraserSize = Math.max(10, Math.min(60, parseInt(v) || 30));
   const vv = document.getElementById('eraser-size-val'); if (vv) vv.textContent = eraserSize;
 }
-// ✋ 손 이동 모드 토글
+// 손 이동 모드 토글
 function toggleHandMode() {
   handMode = !handMode;
   const btn = document.getElementById('tool-hand');
@@ -4093,7 +4093,7 @@ function toggleHandMode() {
   document.querySelectorAll('.draw-cell-canvas, .draw-sel-canvas').forEach(c => {
     c.style.touchAction = handMode ? 'auto' : 'none';   // 손 모드: 스크롤 허용
   });
-  toast(handMode ? '✋ 손 이동 모드 — 드래그로 스크롤해요' : '✏️ 그리기 모드');
+  toast(handMode ? '손 이동 모드 — 드래그로 스크롤해요' : '그리기 모드');
 }
 
 function setDrawTool(tool) {
@@ -4207,10 +4207,10 @@ function clearAllCanvases() {
     entry.ctx.fillRect(0, 0, entry.canvas.width, entry.canvas.height);
     saveDrawingFor(key);
   });
-  toast('모든 칸을 지웠어요 🧹');
+  toast('모든 칸을 지웠어요 ');
 }
 
-// 🗑 버튼: 마지막으로 편집한 항목만 삭제
+// 버튼: 마지막으로 편집한 항목만 삭제
 function clearActiveCanvas() {
   const key = activeDrawKey;
   if (!key) { toast('먼저 지우고 싶은 칸에 그려보세요'); return; }
@@ -4228,7 +4228,7 @@ function clearActiveCanvas() {
   if (!label && key.startsWith('tdraw_cat_')) {
     label = 'Todo — ' + key.replace('tdraw_cat_', '');
   }
-  toast(`🗑 ${label || key} 칸을 지웠어요`);
+  toast(`${label || key} 칸을 지웠어요`);
 }
 
 // ── 칸 크기 조절 — 내용 보존 ──
@@ -4617,13 +4617,13 @@ function saveDrawTodoCard() {
     saveDrawTodoCards(cards);
     closeDrawTodoAddModal();
     renderDrawTodoSection();
-    toast('✏ 카테고리를 수정했어요');
+    toast('카테고리를 수정했어요');
   } else {
     cards.push({ id: uid(), cat, createdAt: new Date().toISOString() });
     saveDrawTodoCards(cards);
     closeDrawTodoAddModal();
     renderDrawTodoSection();
-    toast('✅ 할 일 칸을 추가했어요');
+    toast('할 일 칸을 추가했어요');
   }
 }
 
@@ -4639,7 +4639,7 @@ function deleteDrawTodoCard(e, id) {
   toast('할 일을 삭제했어요');
 }
 
-// ── 카테고리 이름 수정 (드로잉형에서 직접, ⚙로 위임) ──
+// ── 카테고리 이름 수정 (드로잉형에서 직접, 로 위임) ──
 var _editingCatIdx = -1;
 
 function openDrawCatEditModal(e, idx) {
@@ -4690,7 +4690,7 @@ function setQtDrawDefault() {
   const wrap = document.getElementById('dcell-qt-wrap');
   if (!wrap) return;
   saveDrawSizeDefault('qt', wrap.offsetHeight);
-  toast('✅ 말씀 묵상 칸 크기를 기본값으로 저장했어요 — 다음 날부터 자동 적용돼요');
+  toast('말씀 묵상 칸 크기를 기본값으로 저장했어요 — 다음 날부터 자동 적용돼요');
 }
 
 // 일기 칸 크기만 기본값으로 저장 (글씨 내용 X)
@@ -4699,7 +4699,7 @@ function setDiaryDefault() {
   const wrap = document.getElementById('dcell-diary-wrap');
   if (!wrap) return;
   saveDrawSizeDefault('diary', wrap.offsetHeight);
-  toast('✅ 일기 칸 크기를 기본값으로 저장했어요 — 다음 날부터 자동 적용돼요');
+  toast('일기 칸 크기를 기본값으로 저장했어요 — 다음 날부터 자동 적용돼요');
 }
 
 // ── 할 일 날짜별 저장 + 미완료 이월 ──
@@ -4738,7 +4738,7 @@ function carryOverTodosIfNeeded() {
     linkedChallengeUid: t.linkedChallengeUid || undefined
   }));
   DB.set(binderKey(), todayData);
-  toast(`📋 할 일 ${todayData.todos.length}개를 오늘로 이월했어요`);
+  toast(`할 일 ${todayData.todos.length}개를 오늘로 이월했어요`);
 }
 
 // 드로잉 Todo 카드 이월 — 체크 안 된 카드 + 칸 높이 그대로
@@ -4774,7 +4774,7 @@ function carryOverDrawTodosIfNeeded() {
   if (keepDone) DB.set('drawInv_' + me.id, newInv);
   todayData.drawTodoCards = carried;
   DB.set(binderKey(), todayData);
-  toast(`✏ 드로잉 할 일 ${carried.length}칸을 오늘로 이월했어요`);
+  toast(`드로잉 할 일 ${carried.length}칸을 오늘로 이월했어요`);
 }
 
 // ── 선택 도구 ──
@@ -4823,7 +4823,7 @@ function selCopy() {
   SEL.clipboard = { data: SEL.cutData, w: SEL.w, h: SEL.h };
   const btn = document.getElementById('btn-sel-paste');
   if (btn) btn.style.display = 'flex';
-  toast('📋 복사했어요 — 붙여넣기로 사용하세요');
+  toast('복사했어요 — 붙여넣기로 사용하세요');
 }
 
 function selPaste() {
@@ -4849,7 +4849,7 @@ function selPaste() {
     drawSelRect(sCtx, px, py, SEL.w, SEL.h);
   }
   updateSelActionUI(true);
-  toast('📌 붙여넣기 완료 — 드래그로 위치를 조정하고 ✓ 확정하세요');
+  toast('붙여넣기 완료 — 드래그로 위치를 조정하고 확정하세요');
 }
 
 function selDelete() {
@@ -4867,7 +4867,7 @@ function selDuplicate() {
   if (!SEL.active || !SEL.cutData) { toast('선택 영역이 없어요'); return; }
   SEL.clipboard = { data: SEL.cutData, w: SEL.w, h: SEL.h };
   selPaste();
-  toast('➕ 복제했어요 — 드래그로 이동 후 ✓ 확정하세요');
+  toast('복제했어요 — 드래그로 이동 후 확정하세요');
 }
 // 선택 영역 색상 변경 (불투명 픽셀을 현재 색으로 치환)
 function hexToRgb(hex) {
@@ -4890,7 +4890,7 @@ function selRecolor() {
     sCtx.putImageData(SEL.cutData, Math.round(SEL.curX), Math.round(SEL.curY));
     drawSelRect(sCtx, Math.round(SEL.curX), Math.round(SEL.curY), SEL.w, SEL.h);
   }
-  toast('🎨 색상을 바꿨어요 — ✓ 확정하세요');
+  toast('색상을 바꿨어요 — 확정하세요');
 }
 
 // ================================================
@@ -4952,7 +4952,7 @@ function handlePhotoSelect(event) {
       savePhoto(dataUrl);
       showPhotoPreview(dataUrl);
       flashSaved('photo-saved');
-      toast('📷 사진을 저장했어요');
+      toast('사진을 저장했어요');
       input.value = '';                      // 같은 파일 재선택 가능하도록 초기화 (item 8)
     };
     img.onerror = () => { toast('이미지를 불러오지 못했어요'); input.value = ''; };
@@ -5282,7 +5282,7 @@ function toggleTodo(id) {
   renderTodos();
 }
 
-// ── 🚩 연동된 챌린지 자동 체크/해제 ──
+// ── 연동된 챌린지 자동 체크/해제 ──
 // 오늘 날짜의 할 일이 완료되면 연동 챌린지를 오늘 체크, 해제되면 오늘 체크 취소
 
 // ── renderTodos ──
@@ -5294,7 +5294,7 @@ function renderTodos() {
   const align = getTodoCatAlign();
 
   if (!todos.length) {
-    container.innerHTML = '<div class="todo-empty">아직 할 일이 없어요. 추가해볼까요? 🌱</div>';
+    container.innerHTML = '<div class="todo-empty">아직 할 일이 없어요. 추가해볼까요? </div>';
     return;
   }
 
@@ -5311,7 +5311,7 @@ function renderTodos() {
         ? `<svg width="12" height="9" viewBox="0 0 12 9" fill="none"><path d="M1 4.5L4.5 8L11 1" stroke="${done?'#0D0D0D':'white'}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`
         : '';
 
-      // 🚩 챌린지 연동 버튼
+      // 챌린지 연동 버튼
       const linked = t.linkedChallengeUid;
       const linkedChal = linked ? myChals.find(c => c.uid === linked) : null;
       const flagBtn = `<button class="todo-flag-btn${linkedChal ? ' linked' : ''}"
@@ -5368,7 +5368,7 @@ function delTodo(e, id) {
   toast('할 일을 삭제했습니다');
 }
 
-// ── 🚩 챌린지 연동 ──
+// ── 챌린지 연동 ──
 var _flagTargetTodoId = null;
 
 
@@ -5479,7 +5479,7 @@ function saveTodo() {
   saveDayTodos(todos);
   renderTodos();
   closeTodoModal();
-  toast('✅ 할 일이 추가되었습니다');
+  toast('할 일이 추가되었습니다');
 }
 
 // ── 수정 모달 ──
@@ -5543,7 +5543,7 @@ function saveTodoEdit() {
   saveDayTodos(todos);
   renderTodos();
   closeTodoEditModal();
-  toast('✏ 할 일을 수정했어요');
+  toast('할 일을 수정했어요');
 }
 
 function deleteTodoFromEdit() {
@@ -5610,7 +5610,7 @@ function applySchSettings() {
   DB.set(binderKey(), data);
   buildScheduleRows(data);
   const slots = generateSchSlots(cfg);
-  toast(`✅ 시간표 적용 — ${slots.length}개 슬롯`);
+  toast(`시간표 적용 — ${slots.length}개 슬롯`);
 }
 
 // ── 설정 모달 — 카테고리 관리 ──
@@ -5685,7 +5685,7 @@ function addCategory() {
   renderCategoryManager();
   renderTodos();
   inp.value = '';
-  toast(`✅ "${name}" 카테고리를 추가했어요`);
+  toast(`"${name}" 카테고리를 추가했어요`);
 }
 
 function removeCategory(idx) {
@@ -5738,7 +5738,7 @@ function updatePendingScreen(user) {
         _handlePendingStatusChange(data);
       });
       const listenEl = document.getElementById('pending-listen-status');
-      if (listenEl) listenEl.textContent = '🟢 실시간으로 승인 상태를 감지하고 있어요';
+      if (listenEl) listenEl.textContent = '실시간으로 승인 상태를 감지하고 있어요';
     } catch(e) {
       console.warn('실시간 리스너 실패, 폴링으로 전환:', e);
       _startPendingPoll(user.id);
@@ -5751,7 +5751,7 @@ function updatePendingScreen(user) {
 
 function _startPendingPoll(userId) {
   const listenEl = document.getElementById('pending-listen-status');
-  if (listenEl) listenEl.textContent = '🔄 10초마다 승인 상태를 확인해요';
+  if (listenEl) listenEl.textContent = '10초마다 승인 상태를 확인해요';
   _pendingPollTimer = setInterval(() => checkPendingStatusNow(userId), 10000);
 }
 
@@ -5788,7 +5788,7 @@ function _handlePendingStatusChange(data) {
     // 승인 UI 표시 후 자동 입장
     document.getElementById('pending-state-waiting')?.style.setProperty('display','none');
     document.getElementById('pending-state-approved')?.style.setProperty('display','block');
-    setTimeout(() => { bootApp(); go('main'); toast('🎉 가입이 승인됐어요! 환영합니다!'); }, 1800);
+    setTimeout(() => { bootApp(); go('main'); toast('가입이 승인됐어요! 환영합니다!'); }, 1800);
     return;
   }
 
@@ -5805,9 +5805,9 @@ function _handlePendingStatusChange(data) {
 // ── 리더 임명 시스템 ──
 var ALL_PERMS = ['challenge','approve','newfamily','invite','binder','ticketing'];
 var PERM_LABELS = {
-  'board'       : '📋 게시판',
-  'board-post'  : '📄 게시글',
-  'challenge-manage': '📣 챌린지 관리',
+  'board'       : '게시판',
+  'board-post'  : '게시글',
+  'challenge-manage': '챌린지 관리',
   approve:    '교인 가입 허용',
   newfamily:  '새가족 등록',
   invite:     '초대 코드 발급',
@@ -5883,7 +5883,7 @@ function saveAppointLeader() {
   if (revoked || perms.length === 0) {
     toast(`${u.name}님의 리더 임명이 해제됐어요`);
   } else {
-    toast(`✅ ${u.name}님을 리더로 임명했어요 (${perms.length}개 권한)`);
+    toast(`${u.name}님을 리더로 임명했어요 (${perms.length}개 권한)`);
   }
 }
 
@@ -6010,23 +6010,23 @@ var SUBSCREEN_TITLES = {
   'my-challenges'  : '내가 신청한 챌린지',
   'my-events'      : '내가 예약한 행사',
   'my-matches'     : '내가 함께하는 매칭',
-  'my-church'      : '⛪ 나의 교회',
+  'my-church'      : '나의 교회',
   'members'        : '교인 관리',
   'event-manage'   : '행사 관리',
-  'event-browse'   : '🎫 행사 · 티켓팅',
-  'event-detail'   : '🎪 행사 상세',
-  'matching-browse': '🤝 매칭',
-  'hobby-match'    : '🎯 취미 매칭',
-  'prayer-match'   : '🙏 기도 파트너',
-  'mentor-match'   : '🌱 멘토링',
-  'romance-match'  : '💑 이성 교제',
-  'match-inbox'    : '📬 받은 매칭 신청',
-  'invite-codes'   : '🎫 초대 코드 관리',
-  'member-binder'  : '📖 삶의 예배 열람',
+  'event-browse'   : '행사 · 티켓팅',
+  'event-detail'   : '행사 상세',
+  'matching-browse': '매칭',
+  'hobby-match'    : '취미 매칭',
+  'prayer-match'   : '기도 파트너',
+  'mentor-match'   : '멘토링',
+  'romance-match'  : '이성 교제',
+  'match-inbox'    : '받은 매칭 신청',
+  'invite-codes'   : '초대 코드 관리',
+  'member-binder'  : '삶의 예배 열람',
   'app-settings'   : '앱 설정',
-  'admin-panel'    : '🔑 앱 관리자 패널',
-  'admin-users'    : '👥 전체 사용자 관리',
-  'church-manage'  : '⛪ 교회/기관 관리',
+  'admin-panel'    : '앱 관리자 패널',
+  'admin-users'    : '전체 사용자 관리',
+  'church-manage'  : '교회/기관 관리',
 };
 
 // ── 서브스크린 히스토리: 뒤로가기 = 내부 화면 한 단계씩 (관리자 패널 등) ──
@@ -6228,14 +6228,14 @@ function renderAppSettings() {
         <button onclick="openProfileEdit()"
           style="height:34px;padding:0 14px;border-radius:20px;border:1.5px solid rgba(255,255,255,0.2);
                  background:rgba(255,255,255,0.08);color:white;font-size:12.5px;font-weight:700;
-                 cursor:pointer;font-family:inherit;flex-shrink:0">✏️ 편집</button>
+                 cursor:pointer;font-family:inherit;flex-shrink:0">편집</button>
       </div>
     </div>
 
     <div style="padding:0 16px">
 
       <!-- 계정 정보 -->
-      <div style="font-size:12px;font-weight:700;color:var(--muted);letter-spacing:0.5px;margin:16px 0 8px">👤 계정 정보</div>
+      <div style="font-size:12px;font-weight:700;color:var(--muted);letter-spacing:0.5px;margin:16px 0 8px">계정 정보</div>
       <div style="background:white;border-radius:14px;border:1.5px solid var(--border);overflow:hidden;margin-bottom:16px">
         <div class="ss-setting-row">
           <div>
@@ -6267,7 +6267,7 @@ function renderAppSettings() {
       </div>
 
       <!-- 알림 설정 -->
-      <div style="font-size:12px;font-weight:700;color:var(--muted);letter-spacing:0.5px;margin-bottom:8px">🔔 알림 설정</div>
+      <div style="font-size:12px;font-weight:700;color:var(--muted);letter-spacing:0.5px;margin-bottom:8px">알림 설정</div>
       <div style="background:white;border-radius:14px;border:1.5px solid var(--border);overflow:hidden;margin-bottom:16px">
         ${toggleRow('notifChallenge','챌린지 알림','오늘 체크 독려 알림',notifChallenge)}
         <div style="border-top:1px solid var(--border)">${toggleRow('notifChat','채팅 알림','새 메시지 알림',notifChat)}</div>
@@ -6276,7 +6276,7 @@ function renderAppSettings() {
       </div>
 
       <!-- 홈 화면 설치 (PWA) -->
-      <div style="font-size:12px;font-weight:700;color:var(--muted);letter-spacing:0.5px;margin-bottom:8px">📲 앱 설치</div>
+      <div style="font-size:12px;font-weight:700;color:var(--muted);letter-spacing:0.5px;margin-bottom:8px">앱 설치</div>
       <div style="background:white;border-radius:14px;border:1.5px solid var(--border);padding:14px 16px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;gap:12px">
         <div>
           <div style="font-size:13.5px;font-weight:700">홈 화면에 설치</div>
@@ -6287,7 +6287,7 @@ function renderAppSettings() {
       </div>
 
       <!-- 화면 설정 -->
-      <div style="font-size:12px;font-weight:700;color:var(--muted);letter-spacing:0.5px;margin-bottom:8px">🖥 화면 설정</div>
+      <div style="font-size:12px;font-weight:700;color:var(--muted);letter-spacing:0.5px;margin-bottom:8px">화면 설정</div>
       <div style="background:white;border-radius:14px;border:1.5px solid var(--border);padding:14px 16px;margin-bottom:16px">
         <div style="font-size:13.5px;font-weight:700;margin-bottom:10px">글자 크기</div>
         <div style="display:flex;gap:8px">
@@ -6303,7 +6303,7 @@ function renderAppSettings() {
       </div>
 
       <!-- 앱 정보 -->
-      <div style="font-size:12px;font-weight:700;color:var(--muted);letter-spacing:0.5px;margin-bottom:8px">ℹ️ 앱 정보</div>
+      <div style="font-size:12px;font-weight:700;color:var(--muted);letter-spacing:0.5px;margin-bottom:8px">ℹ앱 정보</div>
       <div style="background:white;border-radius:14px;border:1.5px solid var(--border);overflow:hidden;margin-bottom:16px">
         <div class="ss-setting-row">
           <div><div class="ss-setting-label">앱 버전</div><div class="ss-setting-sub">SmartChurch v1.2.0</div></div>
@@ -6311,16 +6311,16 @@ function renderAppSettings() {
         </div>
         <div class="ss-setting-row" style="border-top:1px solid var(--border);cursor:pointer"
           onclick="closeSubscreen();setTimeout(()=>openBoardScreen('app'),100)">
-          <div class="ss-setting-label">📢 업데이트 소식 보기</div><span class="sm-arrow">›</span>
+          <div class="ss-setting-label">업데이트 소식 보기</div><span class="sm-arrow">›</span>
         </div>
         <div class="ss-setting-row" style="border-top:1px solid var(--border);cursor:pointer"
           onclick="closeSubscreen();setTimeout(()=>openBoardScreen('user'),100)">
-          <div class="ss-setting-label">💡 건의하기</div><span class="sm-arrow">›</span>
+          <div class="ss-setting-label">건의하기</div><span class="sm-arrow">›</span>
         </div>
       </div>
 
       <!-- 데이터 -->
-      <div style="font-size:12px;font-weight:700;color:var(--muted);letter-spacing:0.5px;margin-bottom:8px">🗂 데이터</div>
+      <div style="font-size:12px;font-weight:700;color:var(--muted);letter-spacing:0.5px;margin-bottom:8px">데이터</div>
       <div style="background:white;border-radius:14px;border:1.5px solid var(--border);overflow:hidden;margin-bottom:16px">
         <div class="ss-setting-row" onclick="clearAppCache()" style="cursor:pointer">
           <div><div class="ss-setting-label">캐시 초기화</div><div class="ss-setting-sub">드로잉 등 임시 데이터를 지워요</div></div>
@@ -6333,7 +6333,7 @@ function renderAppSettings() {
       </div>
 
       <!-- 계정 -->
-      <div style="font-size:12px;font-weight:700;color:var(--muted);letter-spacing:0.5px;margin-bottom:8px">🔐 계정</div>
+      <div style="font-size:12px;font-weight:700;color:var(--muted);letter-spacing:0.5px;margin-bottom:8px">계정</div>
       <div style="background:white;border-radius:14px;border:1.5px solid var(--border);overflow:hidden;margin-bottom:16px">
         <div class="ss-setting-row" onclick="confirmLogout()" style="cursor:pointer">
           <div class="ss-setting-label" style="color:#C0392B">로그아웃</div><span class="sm-arrow" style="color:#C0392B">›</span>
@@ -6347,11 +6347,11 @@ function renderAppSettings() {
       <!-- 관리자 -->
       ${me.isAppAdmin ? `
         <div style="background:rgba(231,76,60,0.05);border:1.5px solid rgba(231,76,60,0.15);border-radius:14px;padding:14px 16px;margin-bottom:16px">
-          <div style="font-size:12.5px;font-weight:700;color:#C0392B;margin-bottom:4px">🔑 앱 관리자 모드 활성화됨</div>
+          <div style="font-size:12.5px;font-weight:700;color:#C0392B;margin-bottom:4px">앱 관리자 모드 활성화됨</div>
           <div style="font-size:12px;color:var(--muted)">관리자 패널에서 모든 기능을 사용할 수 있어요</div>
         </div>` : `
         <div style="background:white;border-radius:14px;border:1.5px solid var(--border);padding:14px 16px;margin-bottom:16px">
-          <div style="font-size:13px;font-weight:700;margin-bottom:4px">🔑 관리자 코드 입력</div>
+          <div style="font-size:13px;font-weight:700;margin-bottom:4px">관리자 코드 입력</div>
           <div style="font-size:12px;color:var(--muted);margin-bottom:10px">개발자에게 받은 코드로 관리자 권한을 활성화해요</div>
           <input id="admin-code-input" type="password" class="form-input" placeholder="관리자 코드">
           <button class="btn-main" onclick="activateAdminCode()" style="margin-top:8px;height:44px">활성화</button>
@@ -6419,7 +6419,7 @@ async function deleteAccount() {
     _clearAllLocalData();
 
     closeDeleteAccountModal();
-    toast('탈퇴가 완료됐어요. 그동안 감사했습니다 🙏');
+    toast('탈퇴가 완료됐어요. 그동안 감사했습니다 ');
     setTimeout(() => { go('login'); location.reload(); }, 1500);
 
   } catch(e) {
@@ -6480,7 +6480,7 @@ function toggleSetting(storageKey, toggle) {
   DB.set(storageKey, on);
   // 알림 토글을 켜면 브라우저 알림 권한 요청 (사용자 제스처)
   if (on && storageKey.indexOf('notif') === 0) ensureNotifPermission();
-  toast(on ? '켰어요 ✅' : '껐어요');
+  toast(on ? '켰어요 ' : '껐어요');
 }
 // 글자 크기 설정
 function setFontSize(sz) {
@@ -6755,10 +6755,10 @@ var OB_CHURCHES = {
 
 // ── 교회/기관 타입 ──
 var CHURCH_TYPES = [
-  { value:'church', label:'⛪ 교회',       emoji:'⛪' },
-  { value:'org',    label:'🏢 기관·단체',  emoji:'🏢' },
-  { value:'camp',   label:'🏕 캠프·수련원', emoji:'🏕' },
-  { value:'cell',   label:'🌿 셀·소모임',   emoji:'🌿' },
+  { value:'church', label:'교회',       emoji:'⛪' },
+  { value:'org',    label:'기관·단체',  emoji:'🏢' },
+  { value:'camp',   label:'캠프·수련원', emoji:'🏕' },
+  { value:'cell',   label:'셀·소모임',   emoji:'🌿' },
 ];
 var CHURCH_EMOJIS = ['⛪','🏠','🕊','🌿','🏕','✝️','🙏','🌟','🔥','💒'];
 
@@ -7128,7 +7128,7 @@ async function sendRoomMsg() {
   } catch(e) {
     console.error(e);
     toast((e && (e.code === 'permission-denied' || e.code === 'unauthenticated'))
-      ? '로그인이 만료됐어요. 로그아웃 후 다시 로그인해 주세요 🔑'
+      ? '로그인이 만료됐어요. 로그아웃 후 다시 로그인해 주세요 '
       : '전송 실패. 다시 시도해 주세요');
     input.value = text;
   } finally {
@@ -7167,7 +7167,7 @@ async function sendChatImage(kind, event) {
   if (msgsEl) {
     spin = document.createElement('div');
     spin.innerHTML = `<div class="chat-bubble-wrap mine"><div class="chat-bubble-col">
-      <div class="chat-bubble" style="opacity:.7">📤 사진 업로드 중…</div></div></div>`;
+      <div class="chat-bubble" style="opacity:.7">사진 업로드 중…</div></div></div>`;
     msgsEl.appendChild(spin);
     msgsEl.scrollTop = msgsEl.scrollHeight;
   }
@@ -7188,7 +7188,7 @@ async function sendChatImage(kind, event) {
       senderRole:  me.role || '성도',
       senderPhoto: getMyPhoto()
     });
-    const meta = { lastMessage: '📷 사진', lastMessageAt: new Date().toISOString(), lastSenderId: me.id };
+    const meta = { lastMessage: '사진', lastMessageAt: new Date().toISOString(), lastSenderId: me.id };
     if (kind === 'open') window._fb.ensureChatRoom(roomId, meta).catch(() => {});
     else                 window._fb.updateChatRoom(roomId, meta).catch(() => {});
   } catch(e) {
@@ -7276,8 +7276,8 @@ function openRoomMenu() {
   }
   menu.innerHTML = `<div class="ram-sheet">
     <div class="ram-title">${escHtml(partnerName)}</div>
-    ${isDm && partnerId ? `<button class="ram-item danger" onclick="blockFromRoom('${partnerId}','${escHtml(partnerName)}')">🚫 차단하기</button>` : ''}
-    <button class="ram-item danger" onclick="leaveChatRoom('${room.id}')">🚪 채팅방 나가기</button>
+    ${isDm && partnerId ? `<button class="ram-item danger" onclick="blockFromRoom('${partnerId}','${escHtml(partnerName)}')">차단하기</button>` : ''}
+    <button class="ram-item danger" onclick="leaveChatRoom('${room.id}')">채팅방 나가기</button>
     <button class="ram-item" onclick="closeRoomMenu()">취소</button>
   </div>`;
   menu.style.display = 'flex';
@@ -7330,7 +7330,7 @@ function renderBlockedList() {
   if (!modal) return;
   const list = blockedList();
   modal.innerHTML = `<div class="ram-sheet">
-    <div class="ram-title">🚫 차단 목록 (${list.length})</div>
+    <div class="ram-title">차단 목록 (${list.length})</div>
     ${list.length ? list.map(b => `
       <div class="ram-blocked-row">
         <div class="friend-avatar">${getUserPhoto(b.userId) ? `<img src="${getUserPhoto(b.userId)}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">` : '👤'}</div>
@@ -7370,7 +7370,7 @@ function renderFriendsList() {
         <button onclick="startDmWith('${f.userId}','${escHtml(f.name)}')"
           style="height:32px;padding:0 12px;border-radius:20px;border:1.5px solid var(--border);
                  background:white;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">
-          💬 채팅
+          채팅
         </button>
       </div>`;
   }).join('');
@@ -7400,7 +7400,7 @@ function startDmWith(userId, name) {
     window._fb.ensureChatRoom(roomId, newRoom).catch(e => console.warn('DM Firestore 저장 실패:', e));
   }
   setChatInnerTab('rooms');
-  toast(`💬 ${name}님과의 채팅방이 생겼어요`);
+  toast(`${name}님과의 채팅방이 생겼어요`);
 }
 
 // ── 채팅방 만들기 ──
@@ -7486,7 +7486,7 @@ function createChatRoom() {
 
   closeCreateChatRoomModal();
   setChatInnerTab('rooms');
-  toast(`✅ "${roomName}" 채팅방이 만들어졌어요!`);
+  toast(`"${roomName}" 채팅방이 만들어졌어요!`);
   setTimeout(() => openChatRoom(roomId), 300);
 }
 
@@ -7500,15 +7500,15 @@ function updateFriendCodeDisplay() {
   if (codeEl)   codeEl.textContent   = code;
   if (toggleEl) toggleEl.classList.toggle('on', !!me.profilePublic);
   if (statusEl) statusEl.textContent = me.profilePublic
-    ? '🌐 프로필 공개 중 — 누구든 이름으로 검색할 수 있어요'
-    : '🔒 프로필 비공개 — 친구 코드로만 추가 가능해요';
+    ? '프로필 공개 중 — 누구든 이름으로 검색할 수 있어요'
+    : '프로필 비공개 — 친구 코드로만 추가 가능해요';
 }
 
 function copyFriendCode() {
   const code = me.friendCode || '';
   if (!code) return;
   navigator.clipboard?.writeText(code)
-    .then(() => toast(`✅ "${code}" 복사됐어요! 친구에게 알려주세요`))
+    .then(() => toast(`"${code}" 복사됐어요! 친구에게 알려주세요`))
     .catch(() => toast(`내 코드: ${code}`));
 }
 
@@ -7520,7 +7520,7 @@ function toggleProfilePublic() {
       .catch(() => {});
   }
   updateFriendCodeDisplay();
-  toast(me.profilePublic ? '🌐 프로필이 공개됐어요' : '🔒 프로필이 비공개로 변경됐어요');
+  toast(me.profilePublic ? '프로필이 공개됐어요' : '프로필이 비공개로 변경됐어요');
 }
 
 function openAddFriendModal() {
@@ -7554,7 +7554,7 @@ async function searchByFriendCode() {
       올바른 형식이 아니에요 (예: SC-A3K7)</div>`;
     return;
   }
-  el.innerHTML = `<div style="text-align:center;padding:14px;color:var(--muted);font-size:13px">🔍 검색 중...</div>`;
+  el.innerHTML = `<div style="text-align:center;padding:14px;color:var(--muted);font-size:13px">검색 중...</div>`;
 
   try {
     if (!window._fbReady || !window._fb) throw new Error('Firebase 미연결');
@@ -7567,7 +7567,7 @@ async function searchByFriendCode() {
     const data  = snap.docs[0].data();
     const found = { id: snap.docs[0].id, ...data };
     if (found.id === me.id) {
-      el.innerHTML = `<div style="text-align:center;padding:14px;color:var(--muted);font-size:13px">내 코드예요 😊</div>`;
+      el.innerHTML = `<div style="text-align:center;padding:14px;color:var(--muted);font-size:13px">내 코드예요 </div>`;
       return;
     }
     const alreadyFriend = getFriends().find(f => f.userId === found.id);
@@ -7597,7 +7597,7 @@ function renderFriendSearch() {
   const el = document.getElementById('friend-search-list');
   if (!el) return;
 
-  el.innerHTML = `<div style="text-align:center;padding:20px;color:var(--muted);font-size:13px">🔄 불러오는 중...</div>`;
+  el.innerHTML = `<div style="text-align:center;padding:20px;color:var(--muted);font-size:13px">불러오는 중...</div>`;
 
   // 교회 교인 + 공개 프로필 사용자 병합
   const tasks = [_loadChurchMembers()];
@@ -7624,7 +7624,7 @@ function renderFriendSearch() {
 
     if (!combined.length) {
       el.innerHTML = `<div style="text-align:center;padding:20px;color:var(--muted);font-size:13px">
-        ${q ? '검색 결과가 없어요' : (me.church ? '모든 교인이 이미 친구예요 😊' : '교회에 가입하면 교인을 추가할 수 있어요')}</div>`;
+        ${q ? '검색 결과가 없어요' : (me.church ? '모든 교인이 이미 친구예요 ' : '교회에 가입하면 교인을 추가할 수 있어요')}</div>`;
       return;
     }
 
@@ -7633,7 +7633,7 @@ function renderFriendSearch() {
       const photo = getUserPhoto(u);
       const isPublicBadge = u.profilePublic && u.church !== me.church
         ? `<span style="font-size:10px;background:rgba(39,174,96,0.1);color:#27AE60;
-            border-radius:6px;padding:1px 6px;font-weight:700">🌐 공개</span>` : '';
+            border-radius:6px;padding:1px 6px;font-weight:700">공개</span>` : '';
       return `<div class="friend-item">
         <div class="friend-avatar">${photo ? `<img src="${photo}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">` : '👤'}</div>
         <div style="flex:1;min-width:0">
@@ -7664,7 +7664,7 @@ function addFriend(userId, name, role, church, btn) {
   window._fb.setFriendRequest(reqId, req)
     .then(() => {
       if (btn) { btn.textContent = '요청됨'; btn.disabled = true; btn.style.opacity = '0.5'; }
-      toast(`${name}님께 친구 요청을 보냈어요 📨`);
+      toast(`${name}님께 친구 요청을 보냈어요 `);
     })
     .catch(() => toast('요청 전송 실패 — 다시 시도해 주세요'));
 }
@@ -7681,7 +7681,7 @@ async function renderFriendRequests() {
   } catch(e) { wrap.innerHTML = ''; return; }
   if (!reqs.length) { wrap.innerHTML = ''; return; }
   wrap.innerHTML = `
-    <div style="padding:0 20px 6px;font-size:12px;font-weight:800;color:var(--gold)">📨 받은 친구 요청 (${reqs.length})</div>
+    <div style="padding:0 20px 6px;font-size:12px;font-weight:800;color:var(--gold)">받은 친구 요청 (${reqs.length})</div>
     ${reqs.map(r => `
       <div class="friend-item">
         <div class="friend-avatar">${getUserPhoto(r.fromId) ? `<img src="${getUserPhoto(r.fromId)}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">` : '👤'}</div>
@@ -7707,9 +7707,9 @@ function acceptFriendRequest(fromId, fromName, fromRole, fromChurch) {
   // 요청 accepted → 상대는 syncFriendsFromFirestore 로 나를 친구로 추가
   if (window._fbReady && window._fb) {
     window._fb.setFriendRequest(`fr_${fromId}_${me.id}`, { status: 'accepted', acceptedAt: new Date().toISOString() })
-      .catch(() => toast('⚠ 동기화 실패 — 잠시 후 다시 시도해 주세요'));
+      .catch(() => toast('동기화 실패 — 잠시 후 다시 시도해 주세요'));
   }
-  toast(`${fromName}님과 친구가 됐어요! 🤝`);
+  toast(`${fromName}님과 친구가 됐어요! `);
   renderFriendRequests();
   renderFriendsList();
 }
@@ -7855,7 +7855,7 @@ function _canApproveChannel() {
 // Firebase 인증 세션 확인 — 로컬 fallback 로그인(인증 없음)이면 서버 쓰기가 규칙에서 거부됨
 function _requireFbAuth() {
   if (window._fbReady && window._fbAuth && !window._fbAuth.currentUser) {
-    toast('로그인이 만료됐어요. 로그아웃 후 다시 로그인해 주세요 🔑');
+    toast('로그인이 만료됐어요. 로그아웃 후 다시 로그인해 주세요 ');
     return false;
   }
   return true;
@@ -7889,10 +7889,10 @@ async function renderOpenChannels() {
 
   // 고정: 교회 전체 채널
   let html = `
-    <div class="friend-item" style="cursor:pointer" onclick="openOpenChannel('${me.churchCode}_open','🌍 ${escHtml(me.church)} 전체','교회 전체 공개 채팅방')">
+    <div class="friend-item" style="cursor:pointer" onclick="openOpenChannel('${me.churchCode}_open','${escHtml(me.church)} 전체','교회 전체 공개 채팅방')">
       <div class="friend-avatar" style="background:var(--gold)">🌍</div>
       <div style="flex:1;min-width:0">
-        <div class="friend-name">🌍 ${escHtml(me.church)} 전체</div>
+        <div class="friend-name">${escHtml(me.church)} 전체</div>
         <div class="friend-sub">모든 교인이 참여하는 공개 채팅</div>
       </div>
     </div>`;
@@ -7919,10 +7919,10 @@ async function renderOpenChannels() {
     const canDel = c.createdBy === me.id || (canApprove && c.churchCode === me.churchCode);
     const badge  = c.scope === 'public' ? '🌐' : '🔒';
     const sub    = showChurch
-      ? `🌐 ${escHtml((typeof getChurchName === 'function' && getChurchName(c.churchCode)) || c.church || '다른 공동체')}`
+      ? `${escHtml((typeof getChurchName === 'function' && getChurchName(c.churchCode)) || c.church || '다른 공동체')}`
       : `${badge} ${escHtml(c.createdByName || '')} 개설`;
     return `<div class="friend-item" style="cursor:pointer">
-      <div class="friend-avatar" onclick="openOpenChannel('${c.id}','${badge} ${escHtml(c.name)}','${showChurch ? '전체 공개 채널' : '오픈 채널'}')" style="background:var(--cream2)">#️⃣</div>
+      <div class="friend-avatar" onclick="openOpenChannel('${c.id}','${badge} ${escHtml(c.name)}','${showChurch ? '전체 공개 채널' : '오픈 채널'}')" style="background:var(--cream2)">#</div>
       <div style="flex:1;min-width:0" onclick="openOpenChannel('${c.id}','${badge} ${escHtml(c.name)}','${showChurch ? '전체 공개 채널' : '오픈 채널'}')">
         <div class="friend-name">${escHtml(c.name)} <span style="font-size:11px">${badge}</span></div>
         <div class="friend-sub">${sub}</div>
@@ -7937,7 +7937,7 @@ async function renderOpenChannels() {
   pending.forEach(c => {
     if (!(canApprove || c.createdBy === me.id)) return;
     html += `<div class="friend-item">
-      <div class="friend-avatar" style="background:var(--cream2);opacity:.55">#️⃣</div>
+      <div class="friend-avatar" style="background:var(--cream2);opacity:.55">#</div>
       <div style="flex:1;min-width:0">
         <div class="friend-name">${escHtml(c.name)} ${c.scope === 'public' ? '🌐' : ''} <span style="font-size:11px;color:#E67E22;font-weight:700">승인 대기</span></div>
         <div class="friend-sub">${escHtml(c.createdByName||'')} 신청</div>
@@ -7951,7 +7951,7 @@ async function renderOpenChannels() {
 
   // 다른 공동체의 전체 공개 채널
   if (publicOther.length) {
-    html += `<div style="padding:12px 20px 4px;font-size:12px;font-weight:800;color:var(--gold)">🌐 전체 공개 채널 (다른 공동체)</div>`;
+    html += `<div style="padding:12px 20px 4px;font-size:12px;font-weight:800;color:var(--gold)">전체 공개 채널 (다른 공동체)</div>`;
     publicOther.forEach(c => { html += chanRow(c, true); });
   }
 
@@ -7968,7 +7968,7 @@ function openOpenChannel(channelId, name, sub) {
   document.getElementById('openchat-room-name').textContent = name;
   document.getElementById('openchat-room-sub').textContent  = sub || '실시간 채팅';
   document.getElementById('openchat-msgs').innerHTML =
-    `<div style="text-align:center;padding:20px;color:var(--muted);font-size:13px">🔄 메시지 불러오는 중...</div>`;
+    `<div style="text-align:center;padding:20px;color:var(--muted);font-size:13px">메시지 불러오는 중...</div>`;
 
   if (_ocUnsubscribe) { _ocUnsubscribe(); _ocUnsubscribe = null; }
   _markRoomAsRead(channelId);
@@ -8000,7 +8000,7 @@ function requestOpenChannel() {
   const name = (prompt('새 오픈채팅 채널 이름을 입력하세요') || '').trim().slice(0, 20);
   if (!name) return;
   // 공개 범위 선택 — 전체 공개면 다른 공동체 사용자도 참여 가능
-  const isPublic = confirm(`"${name}" 채널을 전체 공개로 만들까요?\n\n확인 = 🌐 전체 공개 (다른 공동체 사용자도 참여)\n취소 = 🔒 우리 ${escHtml(me.church || '공동체')}만`);
+  const isPublic = confirm(`"${name}" 채널을 전체 공개로 만들까요?\n\n확인 = 전체 공개 (다른 공동체 사용자도 참여)\n취소 = 우리 ${escHtml(me.church || '공동체')}만`);
   const canApprove = _canApproveChannel();
   const id = `ch_${me.churchCode}_${Date.now()}`;
   window._fb.setOpenChannel(id, {
@@ -8012,7 +8012,7 @@ function requestOpenChannel() {
   }).then(() => {
     toast(canApprove
       ? `채널 "${name}" 이 개설됐어요${isPublic ? ' 🌐' : ''}`
-      : `채널 "${name}" 신청 완료 — 리더 승인 후 열려요 🙏`);
+      : `채널 "${name}" 신청 완료 — 리더 승인 후 열려요 `);
     renderOpenChannels();
   }).catch(() => toast('채널 생성 실패 — 다시 시도해 주세요'));
 }
@@ -8020,7 +8020,7 @@ function requestOpenChannel() {
 function approveOpenChannel(id) {
   if (!_canApproveChannel()) { toast('승인 권한이 없어요'); return; }
   window._fb.setOpenChannel(id, { status: 'active' })
-    .then(() => { toast('채널을 승인했어요 ✅'); renderOpenChannels(); })
+    .then(() => { toast('채널을 승인했어요 '); renderOpenChannels(); })
     .catch(() => toast('실패 — 다시 시도해 주세요'));
 }
 
@@ -8123,7 +8123,7 @@ async function sendOpenChatMsg() {
   } catch(e) {
     console.error('메시지 전송 실패:', e);
     toast((e && (e.code === 'permission-denied' || e.code === 'unauthenticated'))
-      ? '로그인이 만료됐어요. 로그아웃 후 다시 로그인해 주세요 🔑'
+      ? '로그인이 만료됐어요. 로그아웃 후 다시 로그인해 주세요 '
       : '전송 실패. 다시 시도해 주세요');
     input.value = text; // 실패 시 복원
   } finally {
@@ -8326,7 +8326,7 @@ function handlePhotoSelect(event) {
     _editPhotoBase64 = e.target.result;
     const picker = document.getElementById('photo-picker');
     if (picker) picker.innerHTML = `<img src="${_editPhotoBase64}" alt="프로필" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
-    toast('📷 사진이 선택됐어요! 저장하기를 눌러 적용해요');
+    toast('사진이 선택됐어요! 저장하기를 눌러 적용해요');
   };
   reader.readAsDataURL(file);
   // 같은 파일 재선택 가능하도록 초기화
@@ -8369,7 +8369,7 @@ async function saveAccountEdit() {
     ['edit-email','edit-pw','edit-current-pw'].forEach(id => {
       document.getElementById(id).value = '';
     });
-    toast('✅ 계정 정보가 변경됐어요!');
+    toast('계정 정보가 변경됐어요!');
   } catch(e) {
     console.error(e);
     if (e.code === 'auth/wrong-password') toast('현재 비밀번호가 틀렸어요');
@@ -8448,7 +8448,7 @@ function saveProfileEdit() {
   updateProfileAvatarDisplay();
   initSideMenu();
   closeProfileEdit();
-  toast('✅ 프로필이 저장됐어요!');
+  toast('프로필이 저장됐어요!');
 }
 
 function updateProfileDisplay() {
@@ -8458,10 +8458,10 @@ function updateProfileDisplay() {
   if (cu) cu.textContent = me.name || '';
   if (cb) {
     if (me.church) {
-      cb.textContent = `⛪ ${me.church}${me.role ? ' · ' + me.role : ''}`;
+      cb.textContent = `${me.church}${me.role ? ' · ' + me.role : ''}`;
       cb.style.display = 'inline-flex';
     } else {
-      cb.textContent = '👤 개인';
+      cb.textContent = '개인';
       cb.style.display = 'inline-flex';
     }
   }
@@ -8581,7 +8581,7 @@ function updateBinderShareStatusBtn() {
   const enabled = getBinderShareEnabled();
   const btn = document.getElementById('binder-share-status-btn');
   if (btn) {
-    btn.textContent = enabled ? '📤 공유 중' : '🔒 비공개';
+    btn.textContent = enabled ? '공유 중' : '비공개';
     btn.style.color    = enabled ? '#2980B9' : 'var(--muted)';
     btn.style.borderColor = enabled ? 'rgba(41,128,185,0.4)' : 'var(--border)';
   }
@@ -8634,7 +8634,7 @@ function toggleBinderShare() {
   setBinderShareEnabled(!current);
   const toggle = document.getElementById('binder-share-toggle');
   if (toggle) toggle.classList.toggle('on', !current);
-  toast(!current ? '📤 리더에게 공유됩니다' : '🔒 비공개로 변경됐어요');
+  toast(!current ? '리더에게 공유됩니다' : '비공개로 변경됐어요');
 }
 
 // ── 리더: 교인 묵상 나눔 (커뮤니티 바인더) ──
@@ -8842,7 +8842,7 @@ function obSkipAll() {
 function obComplete() {
   bootApp();
   go('main');
-  setTimeout(() => toast('오늘도 주님과 함께 좋은 하루 되세요 🌿'), 350);
+  setTimeout(() => toast('오늘도 주님과 함께 좋은 하루 되세요 '), 350);
 }
 
 function spawnConfetti() {

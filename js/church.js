@@ -60,7 +60,7 @@ function _showChurchRejectedBanner() {
         <div style="display:flex;gap:8px">
           <button onclick="_reapplyChurch()" style="flex:1;height:36px;border:none;border-radius:9px;
             background:#E63946;color:white;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">
-            🔄 다시 신청하기
+            다시 신청하기
           </button>
           <button onclick="document.getElementById('church-reject-banner').remove()" 
             style="height:36px;padding:0 14px;border:1.5px solid #E63946;border-radius:9px;
@@ -97,7 +97,7 @@ function _reapplyChurch() {
 
 function bindCanvasEvents(key, canvas, ctx) {
   canvas.addEventListener('pointerdown', e => {
-    if (handMode) return;               // ✋ 손 이동 모드: 그리지 않고 스크롤 허용
+    if (handMode) return;               // 손 이동 모드: 그리지 않고 스크롤 허용
     if (currentTool === 'select') return;
     e.preventDefault();
     isDrawingNow = true; activeDrawKey = key;
@@ -229,9 +229,9 @@ function approveMinor(userId) {
   // Firestore 동기화
   if (window._fbReady && window._fb) {
     window._fb.updateUser(userId, { status: 'active', approvedBy: me.id, approvedAt: u.approvedAt })
-      .catch(() => toast('⚠ 서버 동기화 실패 — 잠시 후 다시 승인해 주세요'));
+      .catch(() => toast('서버 동기화 실패 — 잠시 후 다시 승인해 주세요'));
   }
-  toast(`✅ ${u.name || '회원'}님의 계정을 승인했어요`);
+  toast(`${u.name || '회원'}님의 계정을 승인했어요`);
   const cur = document.getElementById('subscreen')?.dataset?.current;
   if (cur) setTimeout(() => openSubscreen(cur), 200);
 }
@@ -332,19 +332,19 @@ function renderMyEvents() {
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;
                       background:var(--cream2);border-radius:10px;padding:10px 12px">
             <div>
-              <div style="font-size:10.5px;color:var(--muted);font-weight:700;margin-bottom:2px">📅 행사 일정</div>
+              <div style="font-size:10.5px;color:var(--muted);font-weight:700;margin-bottom:2px">행사 일정</div>
               <div style="font-size:12.5px;font-weight:700">${escHtml(dateStr)}</div>
             </div>
             <div>
-              <div style="font-size:10.5px;color:var(--muted);font-weight:700;margin-bottom:2px">📍 장소</div>
+              <div style="font-size:10.5px;color:var(--muted);font-weight:700;margin-bottom:2px">장소</div>
               <div style="font-size:12.5px;font-weight:700">${escHtml(e.location||'장소 미정')}</div>
             </div>
             <div>
-              <div style="font-size:10.5px;color:var(--muted);font-weight:700;margin-bottom:2px">💰 참가비</div>
+              <div style="font-size:10.5px;color:var(--muted);font-weight:700;margin-bottom:2px">참가비</div>
               <div style="font-size:12.5px;font-weight:700;color:${e.price>0?'var(--dark)':'#27AE60'}">${priceStr}</div>
             </div>
             <div>
-              <div style="font-size:10.5px;color:var(--muted);font-weight:700;margin-bottom:2px">👥 신청 현황</div>
+              <div style="font-size:10.5px;color:var(--muted);font-weight:700;margin-bottom:2px">신청 현황</div>
               <div style="font-size:12.5px;font-weight:700">
                 ${e.maxTickets>0 ? `${e.ticketCount||0}/${e.maxTickets}명` : '제한없음'}
               </div>
@@ -375,7 +375,7 @@ function renderMyEvents() {
 
   if (upcoming.length) {
     html += `<div style="font-size:12px;font-weight:700;color:var(--muted);letter-spacing:0.5px;margin-bottom:10px">
-      🎫 예정된 행사 (${upcoming.length}건)
+      예정된 행사 (${upcoming.length}건)
     </div>`;
     upcoming.forEach(e => { html += buildEventCard(e); });
   }
@@ -383,7 +383,7 @@ function renderMyEvents() {
   if (past.length) {
     html += `<div style="font-size:12px;font-weight:700;color:var(--muted);letter-spacing:0.5px;
                          margin:${upcoming.length?'20px':'0'} 0 10px">
-      📋 지난 행사 (${past.length}건)
+      지난 행사 (${past.length}건)
     </div>`;
     past.forEach(e => { html += buildEventCard(e); });
   }
@@ -400,13 +400,13 @@ function renderChurchInfo() {
   const statusBadge = me.church
     ? (me.churchStatus === 'pending'
         ? `<span style="color:#E67E22;font-size:11.5px;font-weight:700;background:rgba(230,126,34,0.1);border-radius:6px;padding:2px 7px">⏳ 승인 대기 중</span>`
-        : `<span style="color:#27AE60;font-size:11.5px;font-weight:700;background:rgba(39,174,96,0.1);border-radius:6px;padding:2px 7px">✅ 정식 교인</span>`)
+        : `<span style="color:#27AE60;font-size:11.5px;font-weight:700;background:rgba(39,174,96,0.1);border-radius:6px;padding:2px 7px">정식 교인</span>`)
     : '';
 
   const editBtn = isLeader()
     ? `<button onclick="openChurchInfoEdit()" style="height:30px;padding:0 12px;border-radius:8px;
         border:1.5px solid var(--border);background:white;font-size:12px;font-weight:600;
-        cursor:pointer;font-family:inherit;color:var(--muted)">✏️ 편집</button>`
+        cursor:pointer;font-family:inherit;color:var(--muted)">편집</button>`
     : '';
 
   let html = `
@@ -425,7 +425,7 @@ function renderChurchInfo() {
       </div>
     </div>
     <div id="church-detail-body">
-      <div style="padding:24px 16px;text-align:center;color:var(--muted);font-size:13px">🔄 교회 정보 불러오는 중...</div>
+      <div style="padding:24px 16px;text-align:center;color:var(--muted);font-size:13px">교회 정보 불러오는 중...</div>
     </div>
     <div class="ss-section-title">교회 코드 변경</div>
     <div class="ss-card">
@@ -465,18 +465,18 @@ async function _loadChurchDetail() {
   if (!address && !description && !pastorName) {
     body.innerHTML = isLeader()
       ? `<div style="padding:16px;text-align:center;color:var(--muted);font-size:13px">
-           ✏️ 위 편집 버튼으로 교회 정보를 등록해보세요!</div>`
+           위 편집 버튼으로 교회 정보를 등록해보세요!</div>`
       : '';
     return;
   }
 
   let html = '';
   if (description) html += `
-    <div class="ss-section-title">📝 교회 소개</div>
+    <div class="ss-section-title">교회 소개</div>
     <div class="ss-card"><div style="padding:16px;font-size:13.5px;color:var(--black);line-height:1.8;white-space:pre-wrap">${escHtml(description)}</div></div>`;
 
   if (address) html += `
-    <div class="ss-section-title">📍 교회 위치</div>
+    <div class="ss-section-title">교회 위치</div>
     <div class="ss-card">
       <div class="ss-card-row" onclick="window.open('https://map.kakao.com/?q=${encodeURIComponent(address)}','_blank')" style="cursor:pointer">
         <div class="ss-card-icon">📍</div>
@@ -488,7 +488,7 @@ async function _loadChurchDetail() {
     </div>`;
 
   if (pastorName) html += `
-    <div class="ss-section-title">👨‍⚕️ 담임 목사</div>
+    <div class="ss-section-title">담임 목사</div>
     <div class="ss-card">
       <div style="padding:16px">
         <div style="font-size:16px;font-weight:800;color:var(--black);margin-bottom:6px">목사 ${escHtml(pastorName)}</div>
@@ -542,7 +542,7 @@ function openCreateChurchModal() {
   document.getElementById('nc-type').value = 'church';
   document.getElementById('nc-emoji').value = '⛪';
   document.getElementById('nc-submit-btn').textContent = '만들기';
-  document.getElementById('create-church-modal-title').textContent = '⛪ 새 교회/기관 만들기';
+  document.getElementById('create-church-modal-title').textContent = '새 교회/기관 만들기';
   _ncPrevTypeEmoji = '⛪';
   _renderChurchEmojiPicker('⛪');
   document.getElementById('modal-create-church').classList.add('open');
@@ -562,7 +562,7 @@ function openEditChurchModal(code) {
   const emoji = data.emoji || getChurchEmoji(data);
   document.getElementById('nc-emoji').value   = emoji;
   document.getElementById('nc-submit-btn').textContent = '저장하기';
-  document.getElementById('create-church-modal-title').textContent = '✏️ 교회/기관 수정';
+  document.getElementById('create-church-modal-title').textContent = '교회/기관 수정';
   _ncPrevTypeEmoji = emoji;
   _renderChurchEmojiPicker(emoji);
   document.getElementById('modal-create-church').classList.add('open');
@@ -608,7 +608,7 @@ function submitCreateChurch() {
   }
 
   closeCreateChurchModal();
-  const msg = _ncEditMode ? `✅ "${name}" 정보가 수정됐어요!` : `✅ "${name}" 이(가) 만들어졌어요! 코드: ${code}`;
+  const msg = _ncEditMode ? `"${name}" 정보가 수정됐어요!` : `"${name}" 이(가) 만들어졌어요! 코드: ${code}`;
   toast(msg);
   setTimeout(() => openSubscreen('admin-panel'), 150);
 }
@@ -652,8 +652,8 @@ function renderChurchManage() {
       <div style="text-align:center;font-size:20px;font-weight:800;margin-bottom:4px">${escHtml(data.name)}</div>
       <div style="text-align:center;font-size:12.5px;color:rgba(255,255,255,0.55);margin-bottom:14px">${typeLabel}</div>
       <div style="display:flex;justify-content:center;gap:8px">
-        <span style="background:rgba(255,255,255,0.12);border-radius:8px;padding:5px 12px;font-size:12px;font-weight:700;font-family:monospace">🔑 ${escHtml(code)}</span>
-        ${data.leaderName ? `<span style="background:rgba(255,255,255,0.12);border-radius:8px;padding:5px 12px;font-size:12px;font-weight:700">👤 ${escHtml(data.leaderName)}</span>` : ''}
+        <span style="background:rgba(255,255,255,0.12);border-radius:8px;padding:5px 12px;font-size:12px;font-weight:700;font-family:monospace">${escHtml(code)}</span>
+        ${data.leaderName ? `<span style="background:rgba(255,255,255,0.12);border-radius:8px;padding:5px 12px;font-size:12px;font-weight:700">${escHtml(data.leaderName)}</span>` : ''}
       </div>
       <div style="display:flex;justify-content:center;gap:8px;margin-top:14px">
         ${me.churchCode === code
@@ -668,7 +668,7 @@ function renderChurchManage() {
 
   // 기본 정보
   if (data.address || data.desc) {
-    html += `<div style="font-size:12px;font-weight:700;color:var(--muted);letter-spacing:0.5px;margin-bottom:10px">📋 기본 정보</div>
+    html += `<div style="font-size:12px;font-weight:700;color:var(--muted);letter-spacing:0.5px;margin-bottom:10px">기본 정보</div>
       <div style="background:white;border-radius:14px;border:1.5px solid var(--border);padding:14px;margin-bottom:16px">`;
     if (data.address) html += `<div style="display:flex;gap:8px;margin-bottom:${data.desc?'10px':'0'}"><span style="font-size:13.5px">📍</span><div style="font-size:13px;color:#444">${escHtml(data.address)}</div></div>`;
     if (data.desc)    html += `<div style="display:flex;gap:8px"><span style="font-size:13.5px">📝</span><div style="font-size:13px;color:#444;line-height:1.6">${escHtml(data.desc)}</div></div>`;
@@ -687,7 +687,7 @@ function renderChurchManage() {
 
   // 멤버 목록
   if (active.length) {
-    html += `<div style="font-size:12px;font-weight:700;color:var(--muted);letter-spacing:0.5px;margin-bottom:10px">✅ 활성 멤버 (${active.length}명)</div>
+    html += `<div style="font-size:12px;font-weight:700;color:var(--muted);letter-spacing:0.5px;margin-bottom:10px">활성 멤버 (${active.length}명)</div>
       <div style="background:white;border-radius:14px;border:1.5px solid var(--border);overflow:hidden;margin-bottom:16px">`;
     active.forEach(u => {
       html += `<div style="display:flex;align-items:center;gap:12px;padding:11px 14px;border-bottom:1px solid var(--border)">
@@ -721,8 +721,8 @@ function renderChurchManage() {
 
   // 수정/삭제 버튼
   html += `<div style="display:flex;gap:10px;margin-top:4px">
-    <button onclick="openEditChurchModal('${code}')" style="flex:1;height:44px;border-radius:12px;border:1.5px solid var(--border);background:white;color:var(--dark);font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">✏️ 정보 수정</button>
-    <button onclick="deleteChurch('${code}')" style="height:44px;padding:0 18px;border-radius:12px;border:1.5px solid rgba(192,57,43,0.25);background:#FBE5E5;color:#C0392B;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">🗑 삭제</button>
+    <button onclick="openEditChurchModal('${code}')" style="flex:1;height:44px;border-radius:12px;border:1.5px solid var(--border);background:white;color:var(--dark);font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">정보 수정</button>
+    <button onclick="deleteChurch('${code}')" style="height:44px;padding:0 18px;border-radius:12px;border:1.5px solid rgba(192,57,43,0.25);background:#FBE5E5;color:#C0392B;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">삭제</button>
   </div>`;
 
   return html + '</div>';
@@ -763,7 +763,7 @@ function saveChurchInfoEdit() {
   if (window._fbReady && window._fb) {
     window._fb.setChurchInfo(me.churchCode, data)
       .then(() => {
-        toast('✅ 교회 정보를 저장했어요!');
+        toast('교회 정보를 저장했어요!');
         closeChurchInfoEdit();
         openSubscreen('church-info'); // 새로고침
       })
@@ -802,10 +802,10 @@ function approveChurchMember(userId) {
       churchStatus:     'active',
       churchApprovedBy: u.churchApprovedBy,
       churchApprovedAt: u.churchApprovedAt
-    }).catch(() => toast('⚠ 서버 동기화 실패 — 잠시 후 다시 승인해 주세요'));
+    }).catch(() => toast('서버 동기화 실패 — 잠시 후 다시 승인해 주세요'));
   }
 
-  toast(`✅ ${u.name || '교인'}님의 교회 가입을 승인했어요`);
+  toast(`${u.name || '교인'}님의 교회 가입을 승인했어요`);
   const cur = document.getElementById('subscreen')?.dataset?.current;
   if (cur) setTimeout(() => openSubscreen(cur), 150);
 }
@@ -830,7 +830,7 @@ function rejectChurchMember(userId) {
       churchStatus:     'rejected',
       churchRejectedAt: u.churchRejectedAt,
       churchRejectedBy: u.churchRejectedBy
-    }).catch(() => toast('⚠ 서버 동기화 실패 — 잠시 후 다시 거절해 주세요'));
+    }).catch(() => toast('서버 동기화 실패 — 잠시 후 다시 거절해 주세요'));
   }
 
   toast(`${u.name || '교인'}님의 교회 가입을 거절했어요`);
@@ -946,14 +946,14 @@ function renderMembersScreenHtml(allUsers) {
               style="height:34px;padding:0 10px;border-radius:8px;border:1.5px solid rgba(41,128,185,0.4);
                      background:rgba(41,128,185,0.08);font-size:12px;font-weight:600;
                      cursor:pointer;font-family:inherit;color:#2980B9;flex-shrink:0">
-              📖 바인더
+              바인더
             </button>` : ''}
             ${!(LEADER_ROLES[u.orgType||'church']||[]).includes(u.role||'') ? `
             <button onclick="openAppointModal('${u.id}')"
               style="height:34px;padding:0 12px;border:1.5px solid var(--border);border-radius:8px;
                      background:white;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;
                      color:${appointed?'var(--gold)':'var(--muted)'};flex-shrink:0">
-              ${appointed ? '✏️ 권한 수정' : '👑 리더 임명'}
+              ${appointed ? '권한 수정' : '리더 임명'}
             </button>` : ''}
           </div>` : ''}
         </div>`;
@@ -969,7 +969,7 @@ function renderMembersScreenHtml(allUsers) {
   } else {
     // 교회 가입 대기
     if (churchPending.length) {
-      html += `<div class="ss-section-title">⛪ 교회 가입 대기 (${churchPending.length}명)</div>
+      html += `<div class="ss-section-title">교회 가입 대기 (${churchPending.length}명)</div>
       <div class="ss-card">`;
       const canApprove   = isLeader() || hasLeaderPerm('approve');
       const canNewFamily = isLeader() || hasLeaderPerm('newfamily') || hasLeaderPerm('approve');
@@ -979,9 +979,9 @@ function renderMembersScreenHtml(allUsers) {
         const hasAccess   = !isSelf && (isNewFamily ? canNewFamily : canApprove);
         const typeBadge = isNewFamily
           ? `<span style="font-size:11px;background:rgba(39,174,96,0.12);color:#27AE60;
-              border-radius:6px;padding:2px 7px;font-weight:700;margin-left:6px">👋 새가족</span>`
+              border-radius:6px;padding:2px 7px;font-weight:700;margin-left:6px">새가족</span>`
           : `<span style="font-size:11px;background:rgba(52,152,219,0.12);color:#2980B9;
-              border-radius:6px;padding:2px 7px;font-weight:700;margin-left:6px">📋 가입 신청</span>`;
+              border-radius:6px;padding:2px 7px;font-weight:700;margin-left:6px">가입 신청</span>`;
         html += `
           <div style="padding:14px 16px;border-bottom:1px solid var(--border)">
             <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
@@ -995,12 +995,12 @@ function renderMembersScreenHtml(allUsers) {
               <button onclick="approveChurchMember('${u.id}')"
                 style="flex:1;height:42px;border:none;border-radius:10px;background:var(--black);
                        color:white;font-size:13.5px;font-weight:700;cursor:pointer;font-family:inherit">
-                ✅ ${isNewFamily ? '새가족 승인' : '가입 승인'}
+                ${isNewFamily ? '새가족 승인' : '가입 승인'}
               </button>
               <button onclick="rejectChurchMember('${u.id}')"
                 style="flex:1;height:42px;border:none;border-radius:10px;background:#FBE5E5;
                        color:#C0392B;font-size:13.5px;font-weight:700;cursor:pointer;font-family:inherit">
-                ✕ 거절
+                거절
               </button>
             </div>` : `<div style="font-size:12px;color:var(--muted);text-align:center;padding:6px 0">
               ${isSelf ? '본인의 가입 신청은 승인할 수 없습니다' : '승인 권한이 없어요 — 담당 리더에게 문의하세요'}
@@ -1011,7 +1011,7 @@ function renderMembersScreenHtml(allUsers) {
     }
     // 미성년자 가입 대기
     if (minorPending.length) {
-      html += `<div class="ss-section-title">🧒 미성년자 승인 대기 (${minorPending.length}명)</div>
+      html += `<div class="ss-section-title">미성년자 승인 대기 (${minorPending.length}명)</div>
       <div class="ss-card">`;
       minorPending.forEach(u => {
         html += `
@@ -1024,19 +1024,19 @@ function renderMembersScreenHtml(allUsers) {
               </div>
             </div>
             <div style="background:var(--cream2);border-radius:10px;padding:10px 12px;font-size:13px;margin-bottom:10px">
-              <div>👤 보호자&nbsp; <b>${escHtml(u.guardianName||'—')}</b></div>
-              <div style="margin-top:5px">📞 연락처&nbsp; <b>${escHtml(u.guardianContact||'—')}</b></div>
+              <div>보호자&nbsp; <b>${escHtml(u.guardianName||'—')}</b></div>
+              <div style="margin-top:5px">연락처&nbsp; <b>${escHtml(u.guardianContact||'—')}</b></div>
             </div>
             <div style="display:flex;gap:8px">
               <button onclick="approveMinor('${u.id}')"
                 style="flex:1;height:42px;border:none;border-radius:10px;background:var(--black);
                        color:white;font-size:13.5px;font-weight:700;cursor:pointer;font-family:inherit">
-                ✅ 승인하기
+                승인하기
               </button>
               <button onclick="rejectMinor('${u.id}')"
                 style="flex:1;height:42px;border:none;border-radius:10px;background:#FBE5E5;
                        color:#C0392B;font-size:13.5px;font-weight:700;cursor:pointer;font-family:inherit">
-                ✕ 거절
+                거절
               </button>
             </div>
           </div>`;
@@ -1067,7 +1067,7 @@ function renderEventManage() {
 function joinMeeting() {
   const code = document.getElementById('meeting-code').value.trim();
   if (!code) { toast('회의 코드를 입력해 주세요'); return; }
-  toast('회의 기능이 곧 오픈됩니다 🚀');
+  toast('회의 기능이 곧 오픈됩니다 ');
 }
 
 function getChurchName(code) {
@@ -1239,7 +1239,7 @@ function createMeeting() {
   closeCreateMeetingModal();
   renderMeetingList();
   const recurLabel = recurrence ? ` (${getRecurrenceLabel({recurrence})})` : '';
-  toast(`✅ "${name}" 회의 등록됐어요!${recurLabel}`);
+  toast(`"${name}" 회의 등록됐어요!${recurLabel}`);
 }
 
 function renderMeetingList() {
@@ -1297,7 +1297,7 @@ function renderMeetingList() {
                            padding:14px 16px;opacity:${isPast?'0.55':'1'}">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
           <div style="display:flex;align-items:center;gap:8px">
-            ${isLive ? '<span style="font-size:11px;background:rgba(39,174,96,0.15);color:#27AE60;border-radius:6px;padding:2px 8px;font-weight:700">🔴 LIVE</span>' : ''}
+            ${isLive ? '<span style="font-size:11px;background:rgba(39,174,96,0.15);color:#27AE60;border-radius:6px;padding:2px 8px;font-weight:700">LIVE</span>' : ''}
             <span style="font-size:14px;font-weight:800;color:var(--black)">${escHtml(m.name)}</span>
           </div>
           <div style="display:flex;gap:6px;align-items:center">
@@ -1307,7 +1307,7 @@ function renderMeetingList() {
           </div>
         </div>
         <div style="font-size:12.5px;color:var(--muted);margin-bottom:8px">
-          📅 ${dateStr} ${timeStr} · ${m.duration}분${recurLabel}
+          ${dateStr} ${timeStr} · ${m.duration}분${recurLabel}
           ${m.createdBy ? ' · ' + escHtml(m.createdBy) : ''}
         </div>
         ${m.desc ? `<div style="font-size:12.5px;color:var(--black);margin-bottom:8px;line-height:1.6">${escHtml(m.desc)}</div>` : ''}
@@ -1315,13 +1315,13 @@ function renderMeetingList() {
           <button onclick="copyMeetingCode('${m.code}')"
             style="flex:1;height:36px;border-radius:10px;border:1.5px solid var(--border);
                    background:white;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;color:var(--muted)">
-            🔑 ${m.code}
+            ${m.code}
           </button>
           <button onclick="joinMeeting('${m.code}','${escHtml(m.name)}')"
             style="flex:2;height:36px;border-radius:10px;border:none;
                    background:${isLive?'#27AE60':'var(--black)'};color:white;
                    font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">
-            ${isLive ? '🔴 지금 입장' : '▶ 참여하기'}
+            ${isLive ? '지금 입장' : '▶ 참여하기'}
           </button>
         </div>
       </div>`;
@@ -1393,7 +1393,7 @@ function closeMeetingRoom() {
 }
 
 async function copyMeetingCode(code) {
-  try { await navigator.clipboard.writeText(code); toast(`🔑 [${code}] 복사됐어요!`); }
+  try { await navigator.clipboard.writeText(code); toast(`[${code}] 복사됐어요!`); }
   catch { toast(`코드: ${code}`); }
 }
 
@@ -1450,7 +1450,7 @@ async function loadMyChurchData() {
   // ── 우리 교회 챌린지 ──
   html += `
     <div class="ss-section-title" style="display:flex;justify-content:space-between;align-items:center">
-      <span>🚩 우리 교회 챌린지</span>
+      <span>우리 교회 챌린지</span>
       ${isLeader() ? `<span style="font-size:12px;color:var(--muted);cursor:pointer;font-weight:600"
         onclick="openCreateChallengeModal()">+ 만들기</span>` : ''}
     </div>`;
@@ -1474,7 +1474,7 @@ async function loadMyChurchData() {
           <div class="ss-card-info">
             <div class="ss-card-title">${escHtml(c.label)}</div>
             <div class="ss-card-sub">${escHtml(c.tag)} · ${freqLabel}
-              ${c.isPublic ? ' · 🌐 공개' : ' · 🔒 비공개'}
+              ${c.isPublic ? ' · 공개' : ' · 비공개'}
             </div>
           </div>
           <span class="ss-card-badge ${started ? 'ss-badge-gray' : 'ss-badge-gold'}">
@@ -1488,7 +1488,7 @@ async function loadMyChurchData() {
   // ── 우리 교회 행사 ──
   html += `
     <div class="ss-section-title" style="display:flex;justify-content:space-between;align-items:center">
-      <span>🎫 우리 교회 행사</span>
+      <span>우리 교회 행사</span>
       <span style="font-size:12px;color:var(--muted);cursor:pointer;font-weight:600"
         onclick="openSubscreen('event-browse')">전체보기 ›</span>
     </div>`;
@@ -1517,7 +1517,7 @@ async function loadMyChurchData() {
   // ── 교인 현황 ──
   html += `
     <div class="ss-section-title" style="display:flex;justify-content:space-between;align-items:center">
-      <span>👥 교인 현황</span>
+      <span>교인 현황</span>
       ${isLeader() ? `<span style="font-size:12px;color:var(--muted);cursor:pointer;font-weight:600"
         onclick="openSubscreen('members');closeSideMenu()">관리 ›</span>` : ''}
     </div>
@@ -1560,7 +1560,7 @@ function renderChurchMembers() {
   if (!el) return;
 
   // 즉시 로딩 표시
-  el.innerHTML = `<div style="padding:16px;text-align:center;color:var(--muted);font-size:13px">🔄 교인 목록 불러오는 중...</div>`;
+  el.innerHTML = `<div style="padding:16px;text-align:center;color:var(--muted);font-size:13px">교인 목록 불러오는 중...</div>`;
 
   // Firestore 비동기 로드
   _loadChurchMembers().then(members => {
@@ -1655,7 +1655,7 @@ function handleEventPoster(event) {
     _eventPosterBase64 = e.target.result;
     const picker = document.getElementById('event-poster-picker');
     if (picker) picker.innerHTML = '<img src="' + _eventPosterBase64 + '">';
-    toast('📸 포스터가 선택됐어요!');
+    toast('포스터가 선택됐어요!');
   };
   reader.readAsDataURL(file);
   event.target.value = '';
@@ -1690,7 +1690,7 @@ function createEvent() {
   }
   closeCreateEventModal();
   setTimeout(() => openSubscreen('event-browse'), 150);
-  toast('✅ "' + name + '" 행사가 등록됐어요!');
+  toast('"' + name + '" 행사가 등록됐어요!');
 }
 
 function openEventBrowse() { openSubscreen('event-browse'); }
@@ -1711,7 +1711,7 @@ function renderEventBrowse() {
     const dLeft     = ticketEnd ? Math.ceil((new Date(ticketEnd)-new Date())/86400000) : null;
     const isOpen    = (!e.ticketStartDate||today>=e.ticketStartDate) && (!ticketEnd||today<=ticketEnd);
     let badge = '';
-    if (hasTicket) badge = '<span style="background:rgba(39,174,96,0.12);color:#27AE60;font-size:11px;font-weight:700;border-radius:6px;padding:3px 8px">✅ 신청완료</span>';
+    if (hasTicket) badge = '<span style="background:rgba(39,174,96,0.12);color:#27AE60;font-size:11px;font-weight:700;border-radius:6px;padding:3px 8px">신청완료</span>';
     else if (isSoldOut) badge = '<span style="background:var(--cream2);color:var(--muted);font-size:11px;font-weight:700;border-radius:6px;padding:3px 8px">마감</span>';
     else if (!isOpen)   badge = '<span style="background:rgba(243,156,18,0.12);color:#E67E22;font-size:11px;font-weight:700;border-radius:6px;padding:3px 8px">접수 예정</span>';
     else if (dLeft!==null&&dLeft<=7) badge = '<span style="background:rgba(231,76,60,0.1);color:#E74C3C;font-size:11px;font-weight:700;border-radius:6px;padding:3px 8px">D-'+dLeft+'</span>';
@@ -1720,10 +1720,10 @@ function renderEventBrowse() {
       '<div style="padding:14px 16px"><div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:6px"><div><div style="font-size:16px;font-weight:800;color:var(--black)">' + escHtml(e.name) + '</div>' +
       (e.tagline?'<div style="font-size:13px;color:var(--muted)">' + escHtml(e.tagline) + '</div>':'') + '</div>' + badge + '</div>' +
       '<div style="display:flex;flex-wrap:wrap;gap:8px;font-size:12px;color:var(--muted)">' +
-      '<span>📅 ' + escHtml(e.startDate) + (e.endDate&&e.endDate!==e.startDate?' ~ '+escHtml(e.endDate):'') + '</span>' +
-      (e.location?'<span>📍 ' + escHtml(e.location) + '</span>':'') +
-      '<span>' + (e.price>0?'💰 '+e.price.toLocaleString()+'원':'🆓 무료') + '</span>' +
-      (e.maxTickets>0?'<span>👥 잔여 '+(e.maxTickets-(e.ticketCount||0))+'/'+e.maxTickets+'</span>':'') +
+      '<span>' + escHtml(e.startDate) + (e.endDate&&e.endDate!==e.startDate?' ~ '+escHtml(e.endDate):'') + '</span>' +
+      (e.location?'<span>' + escHtml(e.location) + '</span>':'') +
+      '<span>' + (e.price>0?'💰 '+e.price.toLocaleString()+'원':'무료') + '</span>' +
+      (e.maxTickets>0?'<span>잔여 '+(e.maxTickets-(e.ticketCount||0))+'/'+e.maxTickets+'</span>':'') +
       '</div></div></div>';
   });
   return html + '</div>';
@@ -1747,7 +1747,7 @@ function renderEventDetail() {
   if (hasTicket) btn = '<button onclick="cancelTicket(\'' + e.id + '\')" style="flex:1;height:48px;border-radius:12px;border:1.5px solid rgba(220,0,0,0.25);background:#FBE5E5;color:#C0392B;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">신청 취소</button>';
   else if (isSoldOut) btn = '<button disabled style="flex:1;height:48px;border-radius:12px;border:none;background:var(--cream2);color:var(--muted);font-size:14px;font-weight:700;cursor:default;font-family:inherit">마감됨</button>';
   else if (!isOpen)   btn = '<button disabled style="flex:1;height:48px;border-radius:12px;border:none;background:var(--cream2);color:var(--muted);font-size:14px;font-weight:700;cursor:default;font-family:inherit">접수 예정</button>';
-  else btn = '<button onclick="applyTicket(\'' + e.id + '\')" style="flex:1;height:48px;border-radius:12px;border:none;background:var(--black);color:white;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">🎫 신청하기</button>';
+  else btn = '<button onclick="applyTicket(\'' + e.id + '\')" style="flex:1;height:48px;border-radius:12px;border:none;background:var(--black);color:white;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">신청하기</button>';
   return (e.poster?'<img src="'+e.poster+'" style="width:100%;max-height:260px;object-fit:cover;display:block">':'<div style="width:100%;height:130px;background:var(--black);display:flex;align-items:center;justify-content:center;font-size:56px">🎪</div>') +
   '<div style="padding:20px 18px 110px"><div style="font-size:22px;font-weight:800;margin-bottom:6px">'+escHtml(e.name)+'</div>' +
   (e.tagline?'<div style="font-size:14px;color:var(--muted);margin-bottom:16px">'+escHtml(e.tagline)+'</div>':'<div style="margin-bottom:16px"></div>') +
@@ -1759,7 +1759,7 @@ function renderEventDetail() {
   (ticketEnd?'<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)"><div style="color:var(--muted);font-size:11px;font-weight:700;margin-bottom:3px">예약 기간</div><div style="font-size:13px;font-weight:600">'+escHtml(e.ticketStartDate||'—')+' ~ '+escHtml(ticketEnd)+(dLeft!==null?'<span style="color:'+(dLeft<=7?'#E74C3C':'var(--muted)')+';margin-left:8px;font-size:12px">'+(dLeft>0?'D-'+dLeft:dLeft===0?'오늘 마감':'마감됨')+'</span>':'')+'</div></div>':'') +
   '</div>' +
   (e.desc?'<div style="margin-bottom:20px"><div style="font-size:14px;font-weight:700;margin-bottom:10px">행사 안내</div><div style="font-size:13.5px;line-height:1.8;color:#333;white-space:pre-line">'+escHtml(e.desc)+'</div></div>':'') +
-  (canManage&&e.createdById===me.id?'<button onclick="deleteEvent(\'' + e.id + '\')" style="width:100%;height:42px;border-radius:12px;border:1.5px solid rgba(220,0,0,0.25);background:#FBE5E5;color:#C0392B;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">🗑️ 행사 삭제</button>':'') +
+  (canManage&&e.createdById===me.id?'<button onclick="deleteEvent(\'' + e.id + '\')" style="width:100%;height:42px;border-radius:12px;border:1.5px solid rgba(220,0,0,0.25);background:#FBE5E5;color:#C0392B;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">행사 삭제</button>':'') +
   '</div><div style="position:fixed;bottom:0;left:0;right:0;background:white;border-top:1px solid var(--border);padding:12px 16px;display:flex;gap:10px;z-index:100;box-shadow:0 -4px 20px rgba(0,0,0,0.08)">' +
   '<button onclick="shareEvent(\'' + e.id + '\')" style="height:48px;width:52px;border-radius:12px;border:1.5px solid var(--border);background:white;font-size:20px;cursor:pointer;flex-shrink:0">📤</button>' +
   btn + '</div>';
@@ -1768,7 +1768,7 @@ function renderEventDetail() {
 async function shareEvent(eventId) {
   const e = DB.get(getChurchEventsKey(),[]).find(x=>x.id===eventId);
   if (!e) return;
-  const text = '🎪 ' + e.name + '\n📅 ' + e.startDate + (e.endDate&&e.endDate!==e.startDate?' ~ '+e.endDate:'') + '\n📍 ' + (e.location||'장소 미정') + '\n' + (e.price>0?'💰 '+e.price.toLocaleString()+'원':'🆓 무료') + '\n\n스마트처치에서 확인하세요!';
+  const text = '🎪 ' + e.name + '\n' + e.startDate + (e.endDate&&e.endDate!==e.startDate?' ~ '+e.endDate:'') + '\n' + (e.location||'장소 미정') + '\n' + (e.price>0?'💰 '+e.price.toLocaleString()+'원':'무료') + '\n\n스마트처치에서 확인하세요!';
   try {
     if (navigator.share) await navigator.share({ title: e.name, text });
     else { await navigator.clipboard.writeText(text); toast('\U0001f4cb 행사 정보가 복사됐어요!'); }
@@ -1792,7 +1792,7 @@ function applyTicket(eventId) {
     }).catch(() => {});
     window._fb.setEventDoc(e.id, { ticketCount: e.ticketCount }).catch(() => {});
   }
-  openSubscreen('event-detail'); toast('✅ "'+e.name+'" 신청 완료!');
+  openSubscreen('event-detail'); toast('"'+e.name+'" 신청 완료!');
 }
 
 function cancelTicket(eventId) {
@@ -2070,7 +2070,7 @@ function createInviteCode(expiryDays) {
   };
   saveInviteCodes(codes);
   const expLabel = expiryDays === 7 ? '7일 유효' : expiryDays === 30 ? '30일 유효' : '무제한';
-  toast(`🎫 초대 코드 [${code}] 발급됐어요! (${expLabel})`);
+  toast(`초대 코드 [${code}] 발급됐어요! (${expLabel})`);
   // Firestore에도 저장 (다른 기기에서 사용 가능하게)
   if (window._fbReady && window._fb) {
     window._fb.setInviteCode(code, codes[code]).catch(e => console.warn('초대코드 Firestore 저장 실패:', e));
@@ -2095,7 +2095,7 @@ function deleteInviteCode(code) {
 async function copyInviteCode(code) {
   try {
     await navigator.clipboard.writeText(code);
-    toast(`📋 [${code}] 복사됐어요! 교인에게 공유하세요`);
+    toast(`[${code}] 복사됐어요! 교인에게 공유하세요`);
   } catch {
     toast(`코드: ${code}  (직접 복사해 주세요)`);
   }
@@ -2131,7 +2131,7 @@ function renderInviteCodesScreen() {
     <div class="ss-card">
       <div style="padding:14px 16px">
         <div style="font-size:13px;color:var(--muted);margin-bottom:12px;line-height:1.6">
-          발급된 코드를 교인에게 공유하면<br>승인 없이 바로 교회에 입장할 수 있어요 🎫
+          발급된 코드를 교인에게 공유하면<br>승인 없이 바로 교회에 입장할 수 있어요 
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <button onclick="createInviteCode(7)"
@@ -2147,7 +2147,7 @@ function renderInviteCodesScreen() {
           <button onclick="createInviteCode(null)"
             style="flex:1;min-width:80px;height:40px;border-radius:10px;border:none;
                    background:var(--black);color:white;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit">
-            ♾ 무제한
+            무제한
           </button>
         </div>
       </div>
@@ -2164,8 +2164,8 @@ function renderInviteCodesScreen() {
       const expired = c.expiresAt && new Date(c.expiresAt) < today;
       const dLeft   = c.expiresAt
         ? Math.ceil((new Date(c.expiresAt) - today) / 86400000) : null;
-      const expLabel = expired ? '⚠️ 만료됨'
-        : dLeft === null ? '♾ 무제한'
+      const expLabel = expired ? '만료됨'
+        : dLeft === null ? '무제한'
         : `D-${dLeft}`;
       html += `
         <div style="padding:14px 16px;border-bottom:1px solid var(--border)">
@@ -2179,7 +2179,7 @@ function renderInviteCodesScreen() {
             <button onclick="copyInviteCode('${c.code}')"
               style="flex:1;height:38px;border-radius:10px;border:1.5px solid var(--border);
                      background:white;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">
-              📋 복사
+              복사
             </button>
             <button onclick="deleteInviteCode('${c.code}')"
               style="height:38px;padding:0 14px;border-radius:10px;border:1.5px solid rgba(220,0,0,0.2);
@@ -2279,7 +2279,7 @@ async function obEnterWithInviteCode() {
     window._fb.useInviteCode(code, me.id).catch(() => {});
   }
 
-  toast(`🎉 "${entry.church}"에 바로 입장했어요!`);
+  toast(`"${entry.church}"에 바로 입장했어요!`);
   obGoNextAfterChurch();
 }
 
@@ -2315,7 +2315,7 @@ function obRegisterNewChurch() {
   // UI 표시
   document.getElementById('ob-code-church-name').textContent = name;
   document.getElementById('ob-code-result').classList.add('show');
-  toast(`📋 "${name}" 등록 신청이 접수됐어요! 앱 관리자 승인 후 활성화돼요 🙏`);
+  toast(`"${name}" 등록 신청이 접수됐어요! 앱 관리자 승인 후 활성화돼요 `);
 }
 
 function obConnectChurch() {
@@ -2398,10 +2398,10 @@ function changeChurchCode() {
   closeSubscreen();
 
   const msg = me.isAppAdmin
-    ? `✅ ${churchName}으로 이동했어요!`
+    ? `${churchName}으로 이동했어요!`
     : wasPersonal
-      ? `✅ ${churchName} 새가족으로 등록됐어요! 리더 승인 후 정식 성도가 돼요 🙏`
-      : `✅ ${churchName}으로 변경됐어요! 리더 승인 후 정식 성도가 돼요 🙏`;
+      ? `${churchName} 새가족으로 등록됐어요! 리더 승인 후 정식 성도가 돼요 `
+      : `${churchName}으로 변경됐어요! 리더 승인 후 정식 성도가 돼요 `;
   toast(msg);
 }
 

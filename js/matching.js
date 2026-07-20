@@ -83,7 +83,7 @@ function respondMatchReq(reqId, accept) {
     if (profile?.maxCount) {
       const acceptedCount = reqs.filter(r => r.profileId === req.profileId && r.status === 'accepted').length;
       if (acceptedCount >= profile.maxCount - 1) {
-        toast('😅 이미 모집 인원이 다 찼어요'); return;
+        toast('이미 모집 인원이 다 찼어요'); return;
       }
     }
   }
@@ -103,7 +103,7 @@ function respondMatchReq(reqId, accept) {
     // 수락 시 채팅방 자동 생성: 2명 → 1:1 DM, 3명 이상 → 그룹 채팅
     createMatchChatRoom(req);
   }
-  toast(accept ? '✅ 수락했어요! 연결이 됐어요 🤝' : '거절했어요');
+  toast(accept ? '수락했어요! 연결이 됐어요 ' : '거절했어요');
   openSubscreen('match-inbox');
 }
 
@@ -139,7 +139,7 @@ function _createMatchGroupRoom(req, memberMap) {
     memberNames,
     createdBy:     req.toId,
     createdAt:     existing?.createdAt || new Date().toISOString(),
-    lastMessage:   `🤝 ${roomName}이 만들어졌어요`,
+    lastMessage:   `${roomName}이 만들어졌어요`,
     lastMessageAt: new Date().toISOString(),
     lastSenderId:  'system',
     fromMatch:     true
@@ -150,11 +150,11 @@ function _createMatchGroupRoom(req, memberMap) {
     // 전체 멤버 배열로 덮어써 새로 합류한 멤버도 방을 받도록 함
     window._fb.ensureChatRoom(roomId, room).catch(() => {});
     window._fb.sendChatMsg(roomId, {
-      text: `🤝 ${roomName}에 ${memberIds.length}명이 모였어요! 반갑게 인사 나눠보세요 😊`,
+      text: `${roomName}에 ${memberIds.length}명이 모였어요! 반갑게 인사 나눠보세요 `,
       senderId: 'system', senderName: '스마트처치', senderRole: '', senderPhoto: null
     }).catch(() => {});
   }
-  toast(`💬 ${roomName} 채팅방이 열렸어요! (${memberIds.length}명)`);
+  toast(`${roomName} 채팅방이 열렸어요! (${memberIds.length}명)`);
 }
 
 function createMatchDMRoom(req) {
@@ -174,7 +174,7 @@ function createMatchDMRoom(req) {
       memberNames:   [me.name, partnerName],   // members 와 인덱스 정렬 (양쪽 표시명 올바르게)
       createdBy:     me.id,
       createdAt:     new Date().toISOString(),
-      lastMessage:   `🤝 ${matchTypeLabel(req.type)}(으)로 연결되었어요`,
+      lastMessage:   `${matchTypeLabel(req.type)}(으)로 연결되었어요`,
       lastMessageAt: new Date().toISOString(),
       lastSenderId:  'system',
       fromMatch:     true
@@ -186,11 +186,11 @@ function createMatchDMRoom(req) {
   if (window._fbReady && window._fb) {
     window._fb.ensureChatRoom(room.id, room).catch(() => {});
     window._fb.sendChatMsg(room.id, {
-      text: `🤝 ${matchTypeLabel(req.type)} 매칭으로 연결되었어요! 반갑게 인사해보세요 😊`,
+      text: `${matchTypeLabel(req.type)} 매칭으로 연결되었어요! 반갑게 인사해보세요 `,
       senderId: 'system', senderName: '스마트처치', senderRole: '', senderPhoto: null
     }).catch(() => {});
   }
-  toast('💬 매칭 상대와 1:1 채팅방이 열렸어요!');
+  toast('매칭 상대와 1:1 채팅방이 열렸어요!');
 }
 
 function matchTypeLabel(type) {
@@ -250,7 +250,7 @@ function renderMatchingBrowse() {
         <div style="font-size:12.5px;color:var(--muted);line-height:1.5">${sub}</div>
         <div style="margin-top:6px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
           ${count > 0 ? `<span style="font-size:11.5px;color:#2980B9;font-weight:700">${count}명 모집중</span>` : `<span style="font-size:11.5px;color:var(--muted)">아직 없어요</span>`}
-          ${hasMe ? `<span style="font-size:11px;background:rgba(39,174,96,0.12);color:#27AE60;border-radius:6px;padding:2px 7px;font-weight:700">✅ 등록됨</span>` : ''}
+          ${hasMe ? `<span style="font-size:11px;background:rgba(39,174,96,0.12);color:#27AE60;border-radius:6px;padding:2px 7px;font-weight:700">등록됨</span>` : ''}
         </div>
       </div>
       <span style="color:var(--muted);font-size:20px">›</span>
@@ -271,11 +271,11 @@ function renderMatchingBrowse() {
     ${card('prayer-match', '🙏', '기도 파트너', '비슷한 기도 제목으로 함께 중보기도해요',   prayerCount, !!myProfiles.find(p=>p.type==='prayer'))}
     ${card('mentor-match', '🌱', '멘토링',       '신앙 선배/후배와 1:1로 연결돼요',           mentorCount, !!myProfiles.find(p=>p.type==='mentor'))}
     ${isAdult()
-      ? card('romance-match', '💑', '이성 교제 <span style="font-size:10px;background:rgba(231,76,60,0.12);color:#E74C3C;border-radius:5px;padding:1px 6px;font-weight:700;margin-left:4px">🔞 성인</span>', '신앙 안에서 진지한 만남을 찾아요', romanceCount, !!myProfiles.find(p=>p.type==='romance'))
+      ? card('romance-match', '💑', '이성 교제 <span style="font-size:10px;background:rgba(231,76,60,0.12);color:#E74C3C;border-radius:5px;padding:1px 6px;font-weight:700;margin-left:4px">성인</span>', '신앙 안에서 진지한 만남을 찾아요', romanceCount, !!myProfiles.find(p=>p.type==='romance'))
       : `<div onclick="_romanceLockedNotice()" style="background:var(--cream2);border-radius:16px;border:1.5px dashed var(--border);padding:16px;margin-bottom:12px;cursor:pointer;display:flex;align-items:center;gap:14px;opacity:0.85">
           <div style="width:52px;height:52px;border-radius:14px;background:white;display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0">🔒</div>
           <div style="flex:1;min-width:0">
-            <div style="font-size:15px;font-weight:800;margin-bottom:3px">이성 교제 <span style="font-size:10px;background:rgba(231,76,60,0.12);color:#E74C3C;border-radius:5px;padding:1px 6px;font-weight:700">🔞 성인 전용</span></div>
+            <div style="font-size:15px;font-weight:800;margin-bottom:3px">이성 교제 <span style="font-size:10px;background:rgba(231,76,60,0.12);color:#E74C3C;border-radius:5px;padding:1px 6px;font-weight:700">성인 전용</span></div>
             <div style="font-size:12.5px;color:var(--muted);line-height:1.5">만 19세 이상만 이용할 수 있어요${userAge()!==null?` · 현재 만 ${userAge()}세`:''}</div>
           </div>
           <span style="color:var(--muted);font-size:20px">›</span>
@@ -285,8 +285,8 @@ function renderMatchingBrowse() {
 
 function _romanceLockedNotice() {
   const age = userAge();
-  if (age === null) toast('마이페이지에서 생년월일을 등록하면 이용할 수 있어요 🔞');
-  else toast(`만 19세 이상만 이용할 수 있어요 (현재 만 ${age}세) 🔞`);
+  if (age === null) toast('마이페이지에서 생년월일을 등록하면 이용할 수 있어요 ');
+  else toast(`만 19세 이상만 이용할 수 있어요 (현재 만 ${age}세) `);
 }
 
 function _renderMatchProfileCard(p, sentReqs) {
@@ -303,7 +303,7 @@ function _renderMatchProfileCard(p, sentReqs) {
       <div style="margin-bottom:10px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
           <span style="font-size:12px;font-weight:700;color:${isFull?'#E74C3C':'#2980B9'}">
-            👥 ${acceptedCount + 1}/${p.maxCount}명 ${isFull ? '· 마감' : `· 잔여 ${remaining}자리`}
+            ${acceptedCount + 1}/${p.maxCount}명 ${isFull ? '· 마감' : `· 잔여 ${remaining}자리`}
           </span>
         </div>
         <div style="height:5px;background:var(--cream2);border-radius:10px;overflow:hidden">
@@ -315,9 +315,9 @@ function _renderMatchProfileCard(p, sentReqs) {
   let chips = '';
   if (p.type === 'hobby')  chips = (p.hobbies||[]).map(h=>`<span style="background:var(--cream2);border-radius:20px;padding:3px 10px;font-size:11.5px;font-weight:600">${escHtml(h)}</span>`).join('');
   if (p.type === 'prayer') chips = p.prayerTopic ? `<span style="background:rgba(41,128,185,0.1);color:#2980B9;border-radius:20px;padding:3px 10px;font-size:11.5px;font-weight:700">${escHtml(p.prayerTopic)}</span>` : '';
-  if (p.type === 'mentor') chips = `<span style="background:${p.mentorRole==='mentor'?'rgba(39,174,96,0.1)':'rgba(243,156,18,0.1)'};color:${p.mentorRole==='mentor'?'#27AE60':'#E67E22'};border-radius:20px;padding:3px 10px;font-size:11.5px;font-weight:700">${p.mentorRole==='mentor'?'🎓 멘토':'🌱 멘티'}</span>` +
+  if (p.type === 'mentor') chips = `<span style="background:${p.mentorRole==='mentor'?'rgba(39,174,96,0.1)':'rgba(243,156,18,0.1)'};color:${p.mentorRole==='mentor'?'#27AE60':'#E67E22'};border-radius:20px;padding:3px 10px;font-size:11.5px;font-weight:700">${p.mentorRole==='mentor'?'멘토':'멘티'}</span>` +
     (p.mentorArea ? ` <span style="background:var(--cream2);border-radius:20px;padding:3px 10px;font-size:11.5px;font-weight:600">${escHtml(p.mentorArea)}</span>` : '');
-  if (p.type === 'romance') chips = `<span style="background:${p.gender==='brother'?'rgba(41,128,185,0.1)':'rgba(231,76,60,0.1)'};color:${p.gender==='brother'?'#2980B9':'#E74C3C'};border-radius:20px;padding:3px 10px;font-size:11.5px;font-weight:700">${p.gender==='brother'?'🙋‍♂️ 형제':'🙋‍♀️ 자매'}</span>` +
+  if (p.type === 'romance') chips = `<span style="background:${p.gender==='brother'?'rgba(41,128,185,0.1)':'rgba(231,76,60,0.1)'};color:${p.gender==='brother'?'#2980B9':'#E74C3C'};border-radius:20px;padding:3px 10px;font-size:11.5px;font-weight:700">${p.gender==='brother'?'형제':'자매'}</span>` +
     (p.age ? ` <span style="background:var(--cream2);border-radius:20px;padding:3px 10px;font-size:11.5px;font-weight:600">만 ${p.age}세</span>` : '') +
     (p.lookingFor ? ` <span style="background:var(--cream2);border-radius:20px;padding:3px 10px;font-size:11.5px;font-weight:600">${escHtml(p.lookingFor)}</span>` : '');
 
@@ -325,13 +325,13 @@ function _renderMatchProfileCard(p, sentReqs) {
   if (p.status === 'matched') {
     actionHtml = `<div style="font-size:12px;color:var(--muted);text-align:center;padding:6px;background:var(--cream2);border-radius:8px;font-weight:600">이미 매칭 완료됨</div>`;
   } else if (isFull && (!sentReq || sentReq.status !== 'accepted')) {
-    actionHtml = `<div style="font-size:12px;color:#E74C3C;text-align:center;padding:6px;background:rgba(231,76,60,0.08);border-radius:8px;font-weight:700">🚫 모집 마감</div>`;
+    actionHtml = `<div style="font-size:12px;color:#E74C3C;text-align:center;padding:6px;background:rgba(231,76,60,0.08);border-radius:8px;font-weight:700">모집 마감</div>`;
   } else if (sentReq) {
     if (sentReq.status === 'accepted') {
       // 수락된 참여자: 수락됨 + 나가기 버튼
       actionHtml = `
         <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(39,174,96,0.06);border:1.5px solid rgba(39,174,96,0.2);border-radius:10px;padding:8px 12px">
-          <span style="font-size:12.5px;font-weight:700;color:#27AE60">✅ 참여 중</span>
+          <span style="font-size:12.5px;font-weight:700;color:#27AE60">참여 중</span>
           <button onclick="openMatchActionModal('leave','${sentReq.id}','${p.userName.replace(/'/g,"\\'")}','${p.type}')"
             style="height:28px;padding:0 12px;border-radius:7px;border:1.5px solid rgba(192,57,43,0.3);background:#FBE5E5;color:#C0392B;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">나가기</button>
         </div>`;
@@ -350,7 +350,7 @@ function _renderMatchProfileCard(p, sentReqs) {
       actionHtml = `<div style="text-align:center"><span style="font-size:12px;background:${bg};color:${color};border-radius:6px;padding:4px 12px;font-weight:700">${label}</span></div>`;
     }
   } else {
-    actionHtml = `<button onclick="openMatchReqModal('${p.id}','${p.userId}','${p.userName.replace(/'/g,"\\'")}','${p.type}')" style="width:100%;height:38px;border-radius:10px;border:none;background:var(--black);color:white;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">🤝 매칭 신청</button>`;
+    actionHtml = `<button onclick="openMatchReqModal('${p.id}','${p.userId}','${p.userName.replace(/'/g,"\\'")}','${p.type}')" style="width:100%;height:38px;border-radius:10px;border:none;background:var(--black);color:white;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">매칭 신청</button>`;
   }
   return `
     <div style="background:white;border-radius:14px;border:1.5px solid ${isFull&&(!sentReq||sentReq.status!=='accepted')?'rgba(231,76,60,0.2)':'var(--border)'};padding:14px;margin-bottom:12px">
@@ -376,8 +376,8 @@ function _renderMyMatchBanner(myProfile, type) {
   let chips = '';
   if (type === 'hobby')  chips = (myProfile.hobbies||[]).map(h=>`<span style="background:rgba(201,169,110,0.2);color:var(--dark);border-radius:20px;padding:3px 10px;font-size:11.5px;font-weight:600">${escHtml(h)}</span>`).join('');
   if (type === 'prayer') chips = myProfile.prayerTopic ? `<span style="background:rgba(201,169,110,0.2);color:var(--dark);border-radius:20px;padding:3px 10px;font-size:11.5px;font-weight:600">${escHtml(myProfile.prayerTopic)}</span>` : '';
-  if (type === 'mentor') chips = (myProfile.mentorRole==='mentor'?'🎓 멘토':'🌱 멘티') + (myProfile.mentorArea ? ` · ${myProfile.mentorArea}` : '');
-  if (type === 'romance') chips = `<span style="background:rgba(201,169,110,0.2);color:var(--dark);border-radius:20px;padding:3px 10px;font-size:11.5px;font-weight:600">${myProfile.gender==='brother'?'🙋‍♂️ 형제':'🙋‍♀️ 자매'}</span>` +
+  if (type === 'mentor') chips = (myProfile.mentorRole==='mentor'?'멘토':'멘티') + (myProfile.mentorArea ? ` · ${myProfile.mentorArea}` : '');
+  if (type === 'romance') chips = `<span style="background:rgba(201,169,110,0.2);color:var(--dark);border-radius:20px;padding:3px 10px;font-size:11.5px;font-weight:600">${myProfile.gender==='brother'?'형제':'자매'}</span>` +
     (myProfile.age ? ` <span style="background:rgba(201,169,110,0.2);color:var(--dark);border-radius:20px;padding:3px 10px;font-size:11.5px;font-weight:600">만 ${myProfile.age}세</span>` : '');
 
   // 인원 현황 바 (취미만)
@@ -390,7 +390,7 @@ function _renderMyMatchBanner(myProfile, type) {
     memberBar = `
       <div style="margin-top:8px">
         <div style="display:flex;justify-content:space-between;margin-bottom:3px">
-          <span style="font-size:12px;font-weight:700;color:var(--dark)">👥 ${total}/${max}명</span>
+          <span style="font-size:12px;font-weight:700;color:var(--dark)">${total}/${max}명</span>
           <span style="font-size:11.5px;color:var(--muted)">잔여 ${Math.max(0, max-total)}자리</span>
         </div>
         <div style="height:4px;background:rgba(0,0,0,0.08);border-radius:10px;overflow:hidden">
@@ -409,7 +409,7 @@ function _renderMyMatchBanner(myProfile, type) {
           <div style="font-size:11.5px;font-weight:700;color:var(--gold);margin-bottom:8px">참여 멤버 (${activeMembers.length}명)</div>
           ${activeMembers.map(r => `
             <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid rgba(0,0,0,0.05)">
-              <span style="font-size:13px;font-weight:600">👤 ${escHtml(r.fromName)}</span>
+              <span style="font-size:13px;font-weight:600">${escHtml(r.fromName)}</span>
               <button onclick="openMatchActionModal('kick','${r.id}','${r.fromName.replace(/'/g,"\\'")}','${type}')"
                 style="height:26px;padding:0 10px;border-radius:6px;border:1.5px solid rgba(192,57,43,0.25);background:#FBE5E5;color:#C0392B;font-size:11.5px;font-weight:700;cursor:pointer;font-family:inherit">내보내기</button>
             </div>`).join('')}
@@ -422,8 +422,8 @@ function _renderMyMatchBanner(myProfile, type) {
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
         <span style="font-size:11.5px;font-weight:700;color:var(--gold)">MY 프로필 (방장)</span>
         <div style="display:flex;gap:6px;align-items:center">
-          ${pendingReqs.length ? `<span onclick="openSubscreen('match-inbox')" style="font-size:11px;background:rgba(231,76,60,0.12);color:#E74C3C;border-radius:6px;padding:2px 8px;cursor:pointer;font-weight:700">📬 신청 ${pendingReqs.length}건</span>` : ''}
-          <button onclick="open${type.charAt(0).toUpperCase()+type.slice(1)}ProfileModal()" style="font-size:11.5px;height:26px;padding:0 10px;border-radius:6px;border:1.5px solid var(--border);background:white;cursor:pointer;font-family:inherit;font-weight:600">✏️ 수정</button>
+          ${pendingReqs.length ? `<span onclick="openSubscreen('match-inbox')" style="font-size:11px;background:rgba(231,76,60,0.12);color:#E74C3C;border-radius:6px;padding:2px 8px;cursor:pointer;font-weight:700">신청 ${pendingReqs.length}건</span>` : ''}
+          <button onclick="open${type.charAt(0).toUpperCase()+type.slice(1)}ProfileModal()" style="font-size:11.5px;height:26px;padding:0 10px;border-radius:6px;border:1.5px solid var(--border);background:white;cursor:pointer;font-family:inherit;font-weight:600">수정</button>
         </div>
       </div>
       <div style="font-size:14px;font-weight:700;margin-bottom:6px">${escHtml(me.name)}</div>
@@ -440,8 +440,8 @@ function renderHobbyMatch() {
   const sentReqs  = getMatchReqsSent('hobby');
   let html = `
     <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
-      <span style="font-size:13px;font-weight:700;color:var(--muted)">🎯 취미 매칭</span>
-      <button onclick="openHobbyProfileModal()" style="height:34px;padding:0 14px;border-radius:20px;border:none;background:var(--black);color:white;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit">${myProfile ? '✏️ 내 프로필 수정' : '+ 프로필 등록'}</button>
+      <span style="font-size:13px;font-weight:700;color:var(--muted)">취미 매칭</span>
+      <button onclick="openHobbyProfileModal()" style="height:34px;padding:0 14px;border-radius:20px;border:none;background:var(--black);color:white;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit">${myProfile ? '내 프로필 수정' : '+ 프로필 등록'}</button>
     </div>
     <div style="padding:14px 16px 24px">`;
   if (myProfile) html += _renderMyMatchBanner(myProfile, 'hobby');
@@ -459,8 +459,8 @@ function renderPrayerMatch() {
   const sentReqs  = getMatchReqsSent('prayer');
   let html = `
     <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
-      <span style="font-size:13px;font-weight:700;color:var(--muted)">🙏 기도 파트너</span>
-      <button onclick="openPrayerProfileModal()" style="height:34px;padding:0 14px;border-radius:20px;border:none;background:var(--black);color:white;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit">${myProfile ? '✏️ 내 프로필 수정' : '+ 파트너 구하기'}</button>
+      <span style="font-size:13px;font-weight:700;color:var(--muted)">기도 파트너</span>
+      <button onclick="openPrayerProfileModal()" style="height:34px;padding:0 14px;border-radius:20px;border:none;background:var(--black);color:white;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit">${myProfile ? '내 프로필 수정' : '+ 파트너 구하기'}</button>
     </div>
     <div style="padding:14px 16px 24px">`;
   if (myProfile) html += _renderMyMatchBanner(myProfile, 'prayer');
@@ -480,8 +480,8 @@ function renderMentorMatch() {
   const sentReqs  = getMatchReqsSent('mentor');
   let html = `
     <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
-      <span style="font-size:13px;font-weight:700;color:var(--muted)">🌱 멘토링</span>
-      <button onclick="openMentorProfileModal()" style="height:34px;padding:0 14px;border-radius:20px;border:none;background:var(--black);color:white;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit">${myProfile ? '✏️ 내 프로필 수정' : '+ 등록하기'}</button>
+      <span style="font-size:13px;font-weight:700;color:var(--muted)">멘토링</span>
+      <button onclick="openMentorProfileModal()" style="height:34px;padding:0 14px;border-radius:20px;border:none;background:var(--black);color:white;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit">${myProfile ? '내 프로필 수정' : '+ 등록하기'}</button>
     </div>
     <div style="padding:14px 16px 24px">`;
   if (myProfile) html += _renderMyMatchBanner(myProfile, 'mentor');
@@ -489,11 +489,11 @@ function renderMentorMatch() {
     html += `<div class="ss-empty" style="padding:24px 0"><div class="ss-empty-icon">🌱</div><div class="ss-empty-title">아직 없어요</div><div class="ss-empty-sub">${myProfile ? '다른 교인이 등록하면 보여요' : '멘토 또는 멘티로 등록해보세요!'}</div></div>`;
   } else {
     if (mentors.length) {
-      html += `<div style="font-size:12px;font-weight:700;color:var(--muted);letter-spacing:0.5px;margin-bottom:10px;padding:0 2px">🎓 멘토 (${mentors.length}명)</div>`;
+      html += `<div style="font-size:12px;font-weight:700;color:var(--muted);letter-spacing:0.5px;margin-bottom:10px;padding:0 2px">멘토 (${mentors.length}명)</div>`;
       mentors.forEach(p => { html += _renderMatchProfileCard(p, sentReqs); });
     }
     if (mentees.length) {
-      html += `<div style="font-size:12px;font-weight:700;color:var(--muted);letter-spacing:0.5px;margin:${mentors.length?'16px':'0'} 0 10px;padding:0 2px">🌱 멘티 (${mentees.length}명)</div>`;
+      html += `<div style="font-size:12px;font-weight:700;color:var(--muted);letter-spacing:0.5px;margin:${mentors.length?'16px':'0'} 0 10px;padding:0 2px">멘티 (${mentees.length}명)</div>`;
       mentees.forEach(p => { html += _renderMatchProfileCard(p, sentReqs); });
     }
   }
@@ -518,8 +518,8 @@ function renderRomanceMatch() {
   const sentReqs = getMatchReqsSent('romance');
   let html = `
     <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
-      <span style="font-size:13px;font-weight:700;color:var(--muted)">💑 이성 교제 <span style="font-size:10px;background:rgba(231,76,60,0.12);color:#E74C3C;border-radius:5px;padding:1px 6px;font-weight:700">🔞 성인</span></span>
-      <button onclick="openRomanceProfileModal()" style="height:34px;padding:0 14px;border-radius:20px;border:none;background:var(--black);color:white;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit">${myProfile ? '✏️ 내 프로필 수정' : '+ 프로필 등록'}</button>
+      <span style="font-size:13px;font-weight:700;color:var(--muted)">이성 교제 <span style="font-size:10px;background:rgba(231,76,60,0.12);color:#E74C3C;border-radius:5px;padding:1px 6px;font-weight:700">성인</span></span>
+      <button onclick="openRomanceProfileModal()" style="height:34px;padding:0 14px;border-radius:20px;border:none;background:var(--black);color:white;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit">${myProfile ? '내 프로필 수정' : '+ 프로필 등록'}</button>
     </div>
     <div style="padding:14px 16px 24px">`;
   if (myProfile) html += _renderMyMatchBanner(myProfile, 'romance');
@@ -557,7 +557,7 @@ function saveRomanceProfile() {
   const lookingFor = document.getElementById('romance-looking').value.trim();
   saveMatchProfile({ type:'romance', gender, bio, lookingFor, age: userAge(), status:'open' });
   closeRomanceProfileModal();
-  toast('✅ 이성 교제 프로필이 등록됐어요!');
+  toast('이성 교제 프로필이 등록됐어요!');
   setTimeout(() => openSubscreen('romance-match'), 150);
 }
 
@@ -586,20 +586,20 @@ function renderMatchInbox() {
           ${r.msg ? `<div style="font-size:13px;color:#444;background:var(--cream2);border-radius:8px;padding:8px 12px;margin-bottom:12px;line-height:1.6">"${escHtml(r.msg)}"</div>` : '<div style="margin-bottom:12px"></div>'}
           <div style="display:flex;gap:8px">
             <button onclick="respondMatchReq('${r.id}',false)" style="flex:1;height:38px;border-radius:10px;border:1.5px solid rgba(220,0,0,0.25);background:#FBE5E5;color:#C0392B;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">거절</button>
-            <button onclick="respondMatchReq('${r.id}',true)"  style="flex:2;height:38px;border-radius:10px;border:none;background:var(--black);color:white;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">✅ 수락</button>
+            <button onclick="respondMatchReq('${r.id}',true)"  style="flex:2;height:38px;border-radius:10px;border:none;background:var(--black);color:white;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">수락</button>
           </div>
         </div>`;
     });
   }
   if (history.length) {
-    html += `<div style="font-size:12px;font-weight:700;color:var(--muted);letter-spacing:0.5px;margin:${pending.length?'16px':'0'} 0 10px">📋 처리 완료 (${history.length})</div>`;
+    html += `<div style="font-size:12px;font-weight:700;color:var(--muted);letter-spacing:0.5px;margin:${pending.length?'16px':'0'} 0 10px">처리 완료 (${history.length})</div>`;
     history.forEach(r => {
       const isAccepted = r.status === 'accepted';
       html += `
         <div style="background:white;border-radius:14px;border:1.5px solid var(--border);padding:14px;margin-bottom:10px;opacity:0.75">
           <div style="display:flex;justify-content:space-between;align-items:center">
             <div style="font-size:13.5px;font-weight:700">${escHtml(r.fromName)}</div>
-            <span style="font-size:11.5px;background:${isAccepted?'rgba(39,174,96,0.12)':'var(--cream2)'};color:${isAccepted?'#27AE60':'var(--muted)'};border-radius:6px;padding:2px 8px;font-weight:700">${isAccepted?'✅ 수락됨':'거절됨'}</span>
+            <span style="font-size:11.5px;background:${isAccepted?'rgba(39,174,96,0.12)':'var(--cream2)'};color:${isAccepted?'#27AE60':'var(--muted)'};border-radius:6px;padding:2px 8px;font-weight:700">${isAccepted?'수락됨':'거절됨'}</span>
           </div>
           <div style="font-size:12px;color:var(--muted);margin-top:3px">${matchTypeLabel(r.type)}</div>
         </div>`;
@@ -624,7 +624,7 @@ function renderMyMatches() {
   let html = '<div style="padding:14px 16px 24px">';
 
   if (sentReqs.length) {
-    html += `<div style="font-size:12px;font-weight:700;color:var(--muted);letter-spacing:0.5px;margin-bottom:10px">✅ 참여 중인 매칭 (${sentReqs.length})</div>`;
+    html += `<div style="font-size:12px;font-weight:700;color:var(--muted);letter-spacing:0.5px;margin-bottom:10px">참여 중인 매칭 (${sentReqs.length})</div>`;
     sentReqs.forEach(r => {
       const profile = DB.get(matchProfilesKey(), []).find(p => p.id === r.profileId);
       html += `
@@ -641,14 +641,14 @@ function renderMyMatches() {
   }
 
   if (myProfiles.length) {
-    html += `<div style="font-size:12px;font-weight:700;color:var(--muted);letter-spacing:0.5px;margin:${sentReqs.length?'16px':'0'} 0 10px">📋 내가 만든 매칭 프로필 (${myProfiles.length})</div>`;
+    html += `<div style="font-size:12px;font-weight:700;color:var(--muted);letter-spacing:0.5px;margin:${sentReqs.length?'16px':'0'} 0 10px">내가 만든 매칭 프로필 (${myProfiles.length})</div>`;
     myProfiles.forEach(p => {
       const acceptedMembers = DB.get(matchReqsKey(), []).filter(r => r.profileId === p.id && r.status === 'accepted');
       html += `
         <div style="background:white;border-radius:14px;border:1.5px solid var(--border);padding:14px;margin-bottom:10px">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
             <div style="font-size:13.5px;font-weight:700">${matchTypeLabel(p.type)}</div>
-            <span style="font-size:11.5px;background:${p.status==='matched'?'rgba(39,174,96,0.12)':'rgba(41,128,185,0.1)'};color:${p.status==='matched'?'#27AE60':'#2980B9'};border-radius:6px;padding:2px 8px;font-weight:700">${p.status==='matched'?'✅ 완료':'🟢 모집 중'}</span>
+            <span style="font-size:11.5px;background:${p.status==='matched'?'rgba(39,174,96,0.12)':'rgba(41,128,185,0.1)'};color:${p.status==='matched'?'#27AE60':'#2980B9'};border-radius:6px;padding:2px 8px;font-weight:700">${p.status==='matched'?'완료':'모집 중'}</span>
           </div>
           ${acceptedMembers.length ? `<div style="font-size:12px;color:var(--muted);margin-bottom:10px">참여 멤버 ${acceptedMembers.length}명</div>` : ''}
           <div style="display:flex;gap:8px">
@@ -664,7 +664,7 @@ function renderMyMatches() {
 function openMatchActionModal(type, reqId, targetName, matchType) {
   _matchAction = { type, reqId, matchType };
   const isLeave = type === 'leave';
-  document.getElementById('match-action-title').textContent = isLeave ? '매칭 나가기 ✋' : '멤버 내보내기';
+  document.getElementById('match-action-title').textContent = isLeave ? '매칭 나가기 ' : '멤버 내보내기';
   document.getElementById('match-action-desc').textContent  = isLeave
     ? '정말 이 매칭에서 나가시겠어요?\n다시 참여하려면 새로 신청해야 해요.'
     : `"${targetName}"님을 정말 내보내시겠어요?`;
@@ -729,7 +729,7 @@ function submitMatchReq() {
   const msg = document.getElementById('match-req-msg').value.trim();
   if (doSendMatchReq(_matchReqTargetUserId, _matchReqTargetProfileId, _matchReqTargetType, msg)) {
     closeMatchReqModal();
-    toast('✅ 매칭 신청을 보냈어요!');
+    toast('매칭 신청을 보냈어요!');
     const screenMap = {hobby:'hobby-match', prayer:'prayer-match', mentor:'mentor-match', romance:'romance-match'};
     setTimeout(() => openSubscreen(screenMap[_matchReqTargetType]||'matching-browse'), 150);
   }
@@ -772,7 +772,7 @@ function saveHobbyProfile() {
   if (maxCount < 2 || maxCount > 100) { toast('인원은 2~100명 사이로 입력해 주세요'); return; }
   saveMatchProfile({ type:'hobby', hobbies: Array.from(_hobbySelected), bio, maxCount, status:'open' });
   closeHobbyProfileModal();
-  toast('✅ 취미 매칭 프로필이 등록됐어요!');
+  toast('취미 매칭 프로필이 등록됐어요!');
   setTimeout(() => openSubscreen('hobby-match'), 150);
 }
 
@@ -818,7 +818,7 @@ function savePrayerProfile() {
   if (!topic) { toast('기도 제목을 입력해 주세요'); return; }
   saveMatchProfile({ type:'prayer', prayerTopic: topic, bio, status:'open' });
   closePrayerProfileModal();
-  toast('✅ 기도 파트너 프로필이 등록됐어요!');
+  toast('기도 파트너 프로필이 등록됐어요!');
   setTimeout(() => openSubscreen('prayer-match'), 150);
 }
 
@@ -867,7 +867,7 @@ function saveMentorProfile() {
   if (!area) { toast('분야를 선택하거나 입력해 주세요'); return; }
   saveMatchProfile({ type:'mentor', mentorRole: role, mentorArea: area, bio, status:'open' });
   closeMentorProfileModal();
-  toast('✅ 멘토링 프로필이 등록됐어요!');
+  toast('멘토링 프로필이 등록됐어요!');
   setTimeout(() => openSubscreen('mentor-match'), 150);
 }
 

@@ -18,4 +18,4 @@ Object.assign(window._fb, {
 onAuthStateChanged(fbAuth, (user) => { window.currentUser = user; });
 
 window._fbReady = true;
-console.log('✅ Firebase 초기화 완료');
+console.log('Firebase 초기화 완료');

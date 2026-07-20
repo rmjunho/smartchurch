@@ -19,7 +19,7 @@ function syncTodoLinkedChallenge(todo) {
   saveMyChallenges(list);
   renderChallenge();
   _refreshSubscreenIfCurrent(['my-challenges']);
-  if (todo.done) toast(`🚩 "${c.label}" 챌린지 자동 체크!`);
+  if (todo.done) toast(`"${c.label}" 챌린지 자동 체크!`);
 }
 
 function openChallengePicker(todoId) {
@@ -32,7 +32,7 @@ function openChallengePicker(todoId) {
   if (!list) return;
 
   if (!myChals.length) {
-    list.innerHTML = `<div class="todo-empty" style="padding:24px">진행 중인 챌린지가 없어요.<br>챌린지 탭에서 먼저 시작해보세요! 🌱</div>`;
+    list.innerHTML = `<div class="todo-empty" style="padding:24px">진행 중인 챌린지가 없어요.<br>챌린지 탭에서 먼저 시작해보세요! </div>`;
   } else {
     const freqLabels = { daily:'매일', weekly:'주간', monthly:'월간', yearly:'연간' };
     list.innerHTML = [
@@ -54,7 +54,7 @@ function openChallengePicker(todoId) {
         const freq     = c.freqTarget || c.target;
         const progressTxt = freq
           ? `${freqLabels[freqType]||''} ${count}/${freq}회`
-          : `🔥 연속 ${calculateStreak(c.checkedDates||[])}일`;
+          : `연속 ${calculateStreak(c.checkedDates||[])}일`;
         return `
           <div class="ch-picker-item${isLinked?' ':''}"
                style="${isLinked?'background:rgba(201,169,110,0.12)':''}"
@@ -90,7 +90,7 @@ function linkTodoToChallenge(todoId, challengeUid) {
   renderTodos();
   if (challengeUid) {
     const c = myChallenges().find(x => x.uid === challengeUid);
-    toast(`🚩 "${c?.label||'챌린지'}"와 연동됐어요!`);
+    toast(`"${c?.label||'챌린지'}"와 연동됐어요!`);
   } else {
     toast('챌린지 연동을 해제했어요');
   }
@@ -111,7 +111,7 @@ function goToLinkedChallenge(challengeUid) {
       setTimeout(() => { if(cards[idx]) cards[idx].style.outline = ''; }, 1800);
     }
   }, 350);
-  toast('🚩 연동된 챌린지로 이동했어요');
+  toast('연동된 챌린지로 이동했어요');
 }
 
 function checkChallengeReminder() {
@@ -168,7 +168,7 @@ function renderMyChallenges() {
     let prog, rightLbl;
     if (isDaily) {
       prog     = Math.min(streak / 30, 1);
-      rightLbl = `🔥 연속 ${streak}일`;
+      rightLbl = `연속 ${streak}일`;
     } else {
       prog     = freq ? Math.min(count / freq, 1) : 0;
       const pm = { weekly:'이번 주', monthly:'이번 달', yearly:'올해' };
@@ -188,9 +188,9 @@ function renderMyChallenges() {
 
     // 체크 버튼
     let btnLabel, btnClass, disabled;
-    if (isExpired)          { btnLabel = '📅 기간 종료';  btnClass = 'done'; disabled = true; }
-    else if (goalDone)      { btnLabel = '🎉 목표 달성!'; btnClass = 'done'; disabled = true; }
-    else if (checkedToday)  { btnLabel = '✅ 오늘 완료!'; btnClass = 'done'; disabled = true; }
+    if (isExpired)          { btnLabel = '기간 종료';  btnClass = 'done'; disabled = true; }
+    else if (goalDone)      { btnLabel = '목표 달성!'; btnClass = 'done'; disabled = true; }
+    else if (checkedToday)  { btnLabel = '오늘 완료!'; btnClass = 'done'; disabled = true; }
     else                    { btnLabel = '오늘 체크하기'; btnClass = '';     disabled = false; }
 
     return `
@@ -221,7 +221,7 @@ function renderMyChallenges() {
   // 진행 중
   if (active.length) {
     html += `<div style="font-size:12px;font-weight:700;color:var(--muted);
-                         letter-spacing:0.5px;margin-bottom:10px">🔥 진행 중 (${active.length}개)</div>`;
+                         letter-spacing:0.5px;margin-bottom:10px">진행 중 (${active.length}개)</div>`;
     active.forEach(c => { html += buildCard(c, true); });
   }
 
@@ -229,7 +229,7 @@ function renderMyChallenges() {
   if (expired.length) {
     html += `<div style="font-size:12px;font-weight:700;color:var(--muted);
                          letter-spacing:0.5px;margin:${active.length?'20px':'0'} 0 10px">
-               📅 기간 종료 (${expired.length}개)
+               기간 종료 (${expired.length}개)
              </div>`;
     expired.forEach(c => { html += buildCard(c, true); });
   }
@@ -338,7 +338,7 @@ function deleteChallenge(e, id) {
   renderChallenge();
   if (document.getElementById('subscreen')?.dataset?.current === 'challenge-manage')
     setTimeout(() => openSubscreen('challenge-manage'), 150);
-  toast('챌린지를 삭제했어요 🗑');
+  toast('챌린지를 삭제했어요 ');
 }
 
 function toggleChallengePublic(id) {
@@ -351,7 +351,7 @@ function toggleChallengePublic(id) {
   saveAllCustomChallenges(list);
   if (window._fbReady && window._fb)
     window._fb.setChallenge(id, ch).catch(() => {});
-  toast(ch.isPublic ? '🌐 전체 공개로 변경됐어요!' : '🔒 우리 교회 비공개로 변경됐어요');
+  toast(ch.isPublic ? '전체 공개로 변경됐어요!' : '우리 교회 비공개로 변경됐어요');
   setTimeout(() => openSubscreen('challenge-manage'), 150);
 }
 
@@ -362,7 +362,7 @@ function openEditChallengeModal(id) {
   const isMine = ch.createdByUid === me.id;
   const isChurchOwner = ch.createdByChurch === (me.church || '') && (isLeader() || hasLeaderPerm('challenge'));
   if (!me.isAppAdmin && !isMine && !isChurchOwner) {
-    toast('수정 권한이 없어요 🔒'); return;
+    toast('수정 권한이 없어요 '); return;
   }
 
   _editChallengeId = id;
@@ -380,7 +380,7 @@ function openEditChallengeModal(id) {
   ccSetScope(scope);
 
   const titleEl = document.querySelector('#modal-create-challenge .modal-title');
-  if (titleEl) titleEl.textContent = '챌린지 수정 ✏️';
+  if (titleEl) titleEl.textContent = '챌린지 수정 ';
   const submitBtn = document.getElementById('cc-submit-btn');
   if (submitBtn) submitBtn.textContent = '수정 완료';
 
@@ -397,7 +397,7 @@ function submitEditChallenge() {
   const isMine = ch.createdByUid === me.id;
   const isChurchOwner = ch.createdByChurch === (me.church || '') && (isLeader() || hasLeaderPerm('challenge'));
   if (!me.isAppAdmin && !isMine && !isChurchOwner) {
-    toast('수정 권한이 없어요 🔒'); return;
+    toast('수정 권한이 없어요 '); return;
   }
 
   const label = document.getElementById('cc-label').value.trim();
@@ -428,15 +428,15 @@ function submitEditChallenge() {
 
   closeCreateChallengeModal();
   renderChallenge();
-  toast(`✅ "${label}" 챌린지가 수정됐어요!`);
+  toast(`"${label}" 챌린지가 수정됐어요!`);
 }
 
 function _cmChCard(ch, showActions) {
   const freqLabel = ch.freqType === 'daily' ? '매일' :
     ch.freqType === 'weekly' ? `주 ${ch.freqTarget}회` :
     ch.freqType === 'monthly' ? `월 ${ch.freqTarget}회` : '';
-  const scopeLabel = ch.scope === 'personal' ? '🔐 개인'
-    : ch.isPublic ? '🌐 전체 공개' : '🔒 교회';
+  const scopeLabel = ch.scope === 'personal' ? '개인'
+    : ch.isPublic ? '전체 공개' : '교회';
   const scopeColor = ch.scope === 'personal' ? 'rgba(142,68,173,0.12)'
     : ch.isPublic ? 'rgba(41,128,185,0.12)' : 'rgba(0,0,0,0.06)';
   const scopeText = ch.scope === 'personal' ? '#8E44AD'
@@ -459,7 +459,7 @@ function _cmChCard(ch, showActions) {
     html += `<div style="display:flex;gap:7px">
       <button onclick="openEditChallengeModal('${ch.id}')"
         style="flex:1;height:34px;border-radius:9px;border:1.5px solid var(--border);background:white;
-               color:var(--dark);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">✏️ 수정</button>
+               color:var(--dark);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">수정</button>
       <button onclick="deleteChallenge(null,'${ch.id}')"
         style="height:34px;padding:0 12px;border-radius:9px;border:1.5px solid rgba(192,57,43,0.25);
                background:#FBE5E5;color:#C0392B;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">🗑</button>
@@ -558,7 +558,7 @@ function renderChallenge() {
         <span class="c-label">${escHtml(c.label)}</span>
         <span class="c-action">+ 시작</span>
       </div>`).join('')
-    : `<div class="todo-empty">추천할 새 챌린지가 없어요. 모든 챌린지를 시작하셨네요! 🎉</div>`;
+    : `<div class="todo-empty">추천할 새 챌린지가 없어요. 모든 챌린지를 시작하셨네요! </div>`;
 
   // 진행 중인 챌린지
   document.getElementById('ch-active').innerHTML = myList.length
@@ -574,7 +574,7 @@ function renderChallenge() {
         let prog, rightLbl;
         if (isDaily) {
           prog     = Math.min(streak / 30, 1);
-          rightLbl = `🔥 연속 ${streak}일`;
+          rightLbl = `연속 ${streak}일`;
         } else {
           prog     = freq ? Math.min(count / freq, 1) : 0;
           const periodMap = { weekly:'이번 주', monthly:'이번 달', yearly:'올해' };
@@ -598,9 +598,9 @@ function renderChallenge() {
         const expired      = c.endDate && c.endDate < today;
         const goalDone     = !isDaily && freq && count >= freq;
         let btnLabel, btnClass, disabled;
-        if (expired)         { btnLabel='📅 기간 종료';   btnClass='done'; disabled=true; }
-        else if (goalDone)   { btnLabel='🎉 목표 달성!';  btnClass='done'; disabled=true; }
-        else if (checkedToday){ btnLabel='✅ 오늘 완료!'; btnClass='done'; disabled=true; }
+        if (expired)         { btnLabel='기간 종료';   btnClass='done'; disabled=true; }
+        else if (goalDone)   { btnLabel='목표 달성!';  btnClass='done'; disabled=true; }
+        else if (checkedToday){ btnLabel='오늘 완료!'; btnClass='done'; disabled=true; }
         else                 { btnLabel='오늘 체크하기';  btnClass='';     disabled=false; }
 
         const tpl = catalog.find(t => t.id === c.templateId);
@@ -618,7 +618,7 @@ function renderChallenge() {
           <button class="ac-check-btn ${btnClass}" ${disabled?'disabled':''} onclick="checkChallengeToday('${c.uid}')">${btnLabel}</button>
         </div>`;
       }).join('')
-    : `<div class="todo-empty">아직 시작한 챌린지가 없어요.<br>추천 챌린지를 시작해보세요! 🌱</div>`;
+    : `<div class="todo-empty">아직 시작한 챌린지가 없어요.<br>추천 챌린지를 시작해보세요! </div>`;
 
   // 모든 챌린지 (카테고리 필터 적용)
   const filtered = chFilter === '전체' ? catalog : catalog.filter(c => c.tag === chFilter);
@@ -667,14 +667,14 @@ function renderCompletedChallenges(myList) {
 
   container.innerHTML = completed.length
     ? completed.map(c => `<div class="challenge-done-row">${escHtml(c.label)}</div>`).join('')
-    : `<div class="todo-empty" style="padding:24px 4px">아직 완료한 챌린지가 없어요.<br>챌린지 탭에서 시작해보세요! 🌱</div>`;
+    : `<div class="todo-empty" style="padding:24px 4px">아직 완료한 챌린지가 없어요.<br>챌린지 탭에서 시작해보세요! </div>`;
 }
 
 function openChallengeStartModal(templateId) {
   const tpl = fullCatalog().find(c => c.id === templateId);
   if (!tpl) return;
   if (myChallenges().some(c => c.templateId === templateId)) {
-    toast('이미 진행 중인 챌린지예요 😊');
+    toast('이미 진행 중인 챌린지예요 ');
     return;
   }
   _pendingChallengeId = templateId;
@@ -709,7 +709,7 @@ function confirmStartChallenge() {
   saveMyChallenges(list);
   closeChallengeModal();
   renderChallenge();
-  toast(`🌱 "${tpl.label}" 챌린지를 시작했어요!`);
+  toast(`"${tpl.label}" 챌린지를 시작했어요!`);
 }
 
 function calculateStreak(checkedDates) {
@@ -769,13 +769,13 @@ function confirmStartChallenge() {
   saveMyChallenges(list);
   closeChallengeModal();
   renderChallenge();
-  toast(`🌱 "${tpl.label}" 챌린지를 시작했어요!`);
+  toast(`"${tpl.label}" 챌린지를 시작했어요!`);
 }
 
 function openCreateChallengeModal() {
   _editChallengeId = null;
   const titleEl = document.querySelector('#modal-create-challenge .modal-title');
-  if (titleEl) titleEl.textContent = '새 챌린지 만들기 ✨';
+  if (titleEl) titleEl.textContent = '새 챌린지 만들기 ';
   const submitBtn = document.getElementById('cc-submit-btn');
   if (submitBtn) submitBtn.textContent = '챌린지 만들기';
   const sel = document.getElementById('cc-tag');
@@ -848,8 +848,8 @@ function submitCreateChallenge() {
 
   closeCreateChallengeModal();
   renderChallenge();
-  const scopeMsg = { personal:'🔐 개인', church:'🔒 교회', public:'🌐 전체 공개' }[_ccScope];
-  toast(`✨ "${label}" 챌린지를 만들었어요! (${scopeMsg})`);
+  const scopeMsg = { personal:'개인', church:'교회', public:'전체 공개' }[_ccScope];
+  toast(`"${label}" 챌린지를 만들었어요! (${scopeMsg})`);
 }
 
 function checkChallengeToday(instanceUid) {
@@ -861,18 +861,18 @@ function checkChallengeToday(instanceUid) {
   const freq     = c.freqTarget || c.target;
 
   // 기간 종료 체크
-  if (c.endDate && c.endDate < today) { toast('챌린지 기간이 종료됐어요 📅'); return; }
+  if (c.endDate && c.endDate < today) { toast('챌린지 기간이 종료됐어요 '); return; }
 
   if (!c.checkedDates) c.checkedDates = [];
 
   // 오늘 이미 체크
-  if (c.checkedDates.includes(today)) { toast('오늘은 이미 체크했어요 😊'); return; }
+  if (c.checkedDates.includes(today)) { toast('오늘은 이미 체크했어요 '); return; }
 
   // 이번 기간 목표 달성 여부
   if (freqType !== 'daily' && freq) {
     const cnt = getCurrentPeriodCount(c.checkedDates, freqType);
     if (cnt >= freq) {
-      toast(`이번 ${freqPeriodLabel(freqType)} 목표를 이미 달성했어요 🎉`); return;
+      toast(`이번 ${freqPeriodLabel(freqType)} 목표를 이미 달성했어요 `); return;
     }
   }
 
@@ -888,9 +888,9 @@ function checkChallengeToday(instanceUid) {
 
   const newCnt = c.current;
   if (freqType !== 'daily' && freq && newCnt >= freq) {
-    toast(`🎉 이번 ${freqPeriodLabel(freqType)} 목표 달성! "${c.label}"`);
+    toast(`이번 ${freqPeriodLabel(freqType)} 목표 달성! "${c.label}"`);
   } else {
-    toast('오늘도 완료! 🔥');
+    toast('오늘도 완료! ');
   }
 }
 

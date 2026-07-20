@@ -66,14 +66,14 @@ function renderBoard() {
                  background:${type==='app'?'var(--black)':'var(--cream2)'};
                  color:${type==='app'?'white':'var(--muted)'};
                  font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit">
-          📢 앱 소식
+          앱 소식
         </button>
         <button onclick="openBoardScreen('user')"
           style="height:32px;padding:0 14px;border-radius:20px;border:none;
                  background:${type==='user'?'var(--black)':'var(--cream2)'};
                  color:${type==='user'?'white':'var(--muted)'};
                  font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit">
-          💡 건의함
+          건의함
         </button>
       </div>
       ${canWrite ? `
@@ -91,7 +91,7 @@ function renderBoard() {
     html += `<div style="background:rgba(201,169,110,0.08);border:1.5px solid rgba(201,169,110,0.3);
                border-radius:12px;padding:12px 14px;margin-bottom:14px;font-size:12.5px;
                color:var(--muted);line-height:1.7">
-      💡 앱 개선을 위한 제안이나 새 챌린지 카테고리를 자유롭게 건의해 주세요!<br>
+      앱 개선을 위한 제안이나 새 챌린지 카테고리를 자유롭게 건의해 주세요!<br>
       앱 관리자가 검토 후 상태를 업데이트해 드려요.
     </div>`;
   }
@@ -115,7 +115,7 @@ function renderBoard() {
                  padding:14px;margin-bottom:10px;cursor:pointer">
           <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
             <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-              ${p.pinned?'<span style="font-size:11px;font-weight:700;color:var(--gold)">📌 고정</span>':''}
+              ${p.pinned?'<span style="font-size:11px;font-weight:700;color:var(--gold)">고정</span>':''}
               <span style="font-size:11.5px;background:var(--cream2);border-radius:6px;padding:2px 8px;font-weight:600">${escHtml(p.category||'기타')}</span>
               ${st?`<span style="font-size:11.5px;background:${st.bg};color:${st.color};border-radius:6px;padding:2px 8px;font-weight:700">${st.label}</span>`:''}
             </div>
@@ -126,8 +126,8 @@ function renderBoard() {
                       overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(p.content||'')}</div>
           <div style="display:flex;align-items:center;gap:10px;font-size:12px;color:var(--muted)">
             <span>${escHtml(p.authorName||'익명')}</span>
-            <span>❤️ ${likeCount}</span>
-            <span>💬 ${commentCount}</span>
+            <span>${likeCount}</span>
+            <span>${commentCount}</span>
           </div>
         </div>`;
     });
@@ -161,8 +161,8 @@ function renderBoardPost() {
     <!-- 카테고리/상태 배지 -->
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
       <span style="font-size:12px;background:var(--cream2);border-radius:6px;padding:3px 10px;font-weight:600">${escHtml(p.category||'기타')}</span>
-      ${p.pinned?'<span style="font-size:12px;color:var(--gold);font-weight:700">📌 고정</span>':''}
-      ${p.isPrivate?'<span style="font-size:12px;background:rgba(201,169,110,0.15);color:var(--gold-deep,#c9a227);border-radius:6px;padding:3px 10px;font-weight:700">🔒 비공개</span>':''}
+      ${p.pinned?'<span style="font-size:12px;color:var(--gold);font-weight:700">고정</span>':''}
+      ${p.isPrivate?'<span style="font-size:12px;background:rgba(201,169,110,0.15);color:var(--gold-deep,#c9a227);border-radius:6px;padding:3px 10px;font-weight:700">비공개</span>':''}
       ${st?`<span style="font-size:12px;background:${st.bg};color:${st.color};border-radius:6px;padding:3px 10px;font-weight:700">${st.label}</span>`:''}
     </div>
     <!-- 제목 -->
@@ -189,7 +189,7 @@ function renderBoardPost() {
     if (!isApp) {
       html += `<div style="background:rgba(231,76,60,0.05);border:1.5px solid rgba(231,76,60,0.15);
                 border-radius:12px;padding:12px 14px;margin-bottom:16px">
-        <div style="font-size:12px;font-weight:700;color:#C0392B;margin-bottom:8px">🔑 관리자 — 상태 변경</div>
+        <div style="font-size:12px;font-weight:700;color:#C0392B;margin-bottom:8px">관리자 — 상태 변경</div>
         <div style="display:flex;gap:6px;flex-wrap:wrap">
           ${[['reviewing','검토 중'],['adopted','반영됨'],['declined','보류']].map(([s,l])=>`
             <button onclick="changeBoardPostStatus('${p.id}','${s}')"
@@ -202,12 +202,12 @@ function renderBoardPost() {
     } else {
       html += `<div style="background:rgba(231,76,60,0.05);border:1.5px solid rgba(231,76,60,0.15);
                 border-radius:12px;padding:12px 14px;margin-bottom:16px">
-        <div style="font-size:12px;font-weight:700;color:#C0392B;margin-bottom:8px">🔑 관리자</div>
+        <div style="font-size:12px;font-weight:700;color:#C0392B;margin-bottom:8px">관리자</div>
         <div style="display:flex;gap:6px">
           <button onclick="toggleBoardPostPin('${p.id}')"
             style="flex:1;height:32px;border-radius:8px;border:1.5px solid var(--border);background:white;
                    font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">
-            ${p.pinned?'📌 고정 해제':'📌 상단 고정'}
+            ${p.pinned?'고정 해제':'상단 고정'}
           </button>
         </div>
       </div>`;
@@ -215,13 +215,13 @@ function renderBoardPost() {
     html += `<button onclick="deleteBoardPost('${p.id}')"
       style="width:100%;height:36px;border-radius:10px;border:1.5px solid rgba(192,57,43,0.25);
              background:#FBE5E5;color:#C0392B;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:16px">
-      🗑 게시글 삭제
+      게시글 삭제
     </button>`;
   }
 
   // 댓글 섹션 (Firestore 서브컬렉션 + 실시간 onSnapshot)
   html += `<div style="border-top:1px solid var(--border);padding-top:16px">
-    <div id="board-comment-count" style="font-size:13px;font-weight:800;margin-bottom:12px">💬 댓글</div>
+    <div id="board-comment-count" style="font-size:13px;font-weight:800;margin-bottom:12px">댓글</div>
     <!-- 댓글 작성 (모든 로그인 사용자) -->
     <div style="display:flex;gap:8px;margin-bottom:14px">
       <textarea id="bc-inline" rows="1" placeholder="댓글을 입력하세요"
@@ -243,7 +243,7 @@ function renderBoardPost() {
 function openBoardPostModal(type) {
   _boardPostModalType = type;
   const isApp = type === 'app';
-  document.getElementById('board-post-modal-title').textContent = isApp ? '📢 공지 작성' : '💡 건의하기';
+  document.getElementById('board-post-modal-title').textContent = isApp ? '공지 작성' : '건의하기';
   document.getElementById('bp-submit-btn').textContent = isApp ? '공지 등록' : '건의 등록';
   const cats = isApp ? BOARD_APP_CATEGORIES : BOARD_USER_CATEGORIES;
   document.getElementById('bp-category').innerHTML = cats.map(c=>`<option value="${c}">${c}</option>`).join('');
@@ -291,7 +291,7 @@ function submitBoardPost() {
     window._fb.setBoardPost(post.id, post).catch(() => {});
 
   closeBoardPostModal();
-  toast(_boardPostModalType === 'app' ? '📢 공지가 등록됐어요!' : '💡 건의가 등록됐어요! 검토 후 상태가 업데이트돼요 😊');
+  toast(_boardPostModalType === 'app' ? '공지가 등록됐어요!' : '건의가 등록됐어요! 검토 후 상태가 업데이트돼요 ');
   openBoardScreen(_boardPostModalType);
 }
 
@@ -391,10 +391,10 @@ function stopBoardComments() {
 function renderBoardCommentsList(postId, comments) {
   const cntEl  = document.getElementById('board-comment-count');
   const listEl = document.getElementById('board-comments-list');
-  if (cntEl)  cntEl.textContent = `💬 댓글 ${comments.length}개`;
+  if (cntEl)  cntEl.textContent = `댓글 ${comments.length}개`;
   if (!listEl) return;
   if (!comments.length) {
-    listEl.innerHTML = `<div style="text-align:center;padding:20px;color:var(--muted);font-size:13px">첫 번째 댓글을 남겨보세요 😊</div>`;
+    listEl.innerHTML = `<div style="text-align:center;padding:20px;color:var(--muted);font-size:13px">첫 번째 댓글을 남겨보세요 </div>`;
     return;
   }
   const canAdmin = !!me.isAppAdmin;
@@ -455,7 +455,7 @@ function submitBoardComment(postId) {
   // Firestore 서브컬렉션 저장 (onSnapshot이 canonical 목록으로 다시 렌더)
   if (window._fbReady && window._fb)
     window._fb.setBoardComment(postId, cid, comment).catch(() => {});
-  toast('댓글이 등록됐어요 💬');
+  toast('댓글이 등록됐어요 ');
 }
 
 function startEditBoardComment(postId, commentId) {
@@ -485,7 +485,7 @@ function saveEditBoardComment(postId, commentId) {
   renderBoardCommentsList(postId, _boardCommentsCache);
   if (window._fbReady && window._fb)
     window._fb.updateBoardComment(postId, commentId, { content, editedAt: c.editedAt }).catch(() => {});
-  toast('댓글을 수정했어요 ✏️');
+  toast('댓글을 수정했어요 ');
 }
 
 function deleteBoardComment(postId, commentId) {
@@ -519,7 +519,7 @@ function startOnboarding() {
   document.getElementById('ob-cnt').classList.remove('active');
   document.getElementById('ob1').classList.add('ob-in');
   // Set name
-  document.getElementById('ob-welcome-name').textContent = `환영합니다,\n${me.name}님 🙏`;
+  document.getElementById('ob-welcome-name').textContent = `환영합니다,\n${me.name}님 `;
   // 흰색 로고 이미지 설정
   const logoSrc = document.querySelector('.splash-logo')?.src || document.querySelector('.auth-hero-logo')?.src || '';
   const logoImg = document.getElementById('ob-welcome-logo-img');

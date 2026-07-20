@@ -53,7 +53,7 @@ function renderAdminUsersHtml(allUsers) {
     <div style="padding:12px 16px;border-bottom:1px solid var(--border)">
       <input type="text" value="${escHtml(_adminUserSearch)}"
         oninput="filterAdminUsers(this.value)"
-        placeholder="🔍 이름, 이메일, 교회 검색..."
+        placeholder="이름, 이메일, 교회 검색..."
         style="width:100%;height:40px;border-radius:10px;border:1.5px solid var(--border);
                padding:0 14px;font-size:13.5px;font-family:inherit;box-sizing:border-box">
     </div>
@@ -87,7 +87,7 @@ function renderAdminUsersHtml(allUsers) {
           </div>
           <!-- 교회/역할 -->
           <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
-            ${u.church?`<span style="font-size:11.5px;background:var(--cream2);border-radius:6px;padding:2px 8px;font-weight:600">⛪ ${escHtml(u.church)}</span>`:''}
+            ${u.church?`<span style="font-size:11.5px;background:var(--cream2);border-radius:6px;padding:2px 8px;font-weight:600">${escHtml(u.church)}</span>`:''}
             ${u.role?`<span style="font-size:11.5px;background:var(--cream2);border-radius:6px;padding:2px 8px;font-weight:600">${escHtml(u.role)}</span>`:''}
             ${cs==='pending'?`<span style="font-size:11.5px;background:rgba(243,156,18,0.1);color:#E67E22;border-radius:6px;padding:2px 8px;font-weight:700">교회 가입 대기</span>`:''}
           </div>
@@ -96,7 +96,7 @@ function renderAdminUsersHtml(allUsers) {
             ${u.status==='pending'?`
               <button onclick="approveMinor('${u.id}')"
                 style="flex:1;height:32px;border-radius:8px;border:none;background:var(--black);
-                       color:white;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">✅ 승인</button>
+                       color:white;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">승인</button>
               <button onclick="rejectMinor('${u.id}')"
                 style="flex:1;height:32px;border-radius:8px;border:1.5px solid rgba(192,57,43,0.25);
                        background:#FBE5E5;color:#C0392B;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">거절</button>
@@ -104,12 +104,12 @@ function renderAdminUsersHtml(allUsers) {
             ${cs==='pending'?`
               <button onclick="approveChurchJoin('${u.id}')"
                 style="flex:1;height:32px;border-radius:8px;border:none;background:var(--black);
-                       color:white;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">⛪ 교회 승인</button>
+                       color:white;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">교회 승인</button>
             `:''}
             <button onclick="adminToggleDisable('${u.id}')"
               style="height:32px;padding:0 12px;border-radius:8px;border:1.5px solid var(--border);
                      background:white;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">
-              ${isDisabled?'🔓 활성화':'🚫 비활성화'}
+              ${isDisabled?'활성화':'비활성화'}
             </button>
             <button onclick="adminDeleteUser('${u.id}','${u.name?.replace(/'/g,"\\'")}')"
               style="height:32px;padding:0 12px;border-radius:8px;border:1.5px solid rgba(192,57,43,0.25);
@@ -130,7 +130,7 @@ function adminToggleDisable(userId) {
   if (window._fbReady && window._fb) {
     window._fb.updateUser(userId, { status: u.status }).catch(() => {});
   }
-  toast(u.status === 'disabled' ? `🚫 ${u.name}님을 비활성화했어요` : `✅ ${u.name}님을 활성화했어요`);
+  toast(u.status === 'disabled' ? `${u.name}님을 비활성화했어요` : `${u.name}님을 활성화했어요`);
   setTimeout(() => openSubscreen('admin-users'), 150);
 }
 
@@ -155,11 +155,11 @@ function adminDeleteUser(userId, name) {
 
 async function adminSyncAllToFirestore() {
   if (!window._fbReady || !window._fb) {
-    toast('Firestore에 연결되지 않았어요 🔴'); return;
+    toast('Firestore에 연결되지 않았어요 '); return;
   }
   const users = DB.get('users', []);
   if (!users.length) { toast('동기화할 사용자가 없어요'); return; }
-  toast('☁️ 서버 동기화 중...');
+  toast('서버 동기화 중...');
   let count = 0;
   for (const u of users) {
     try {
@@ -175,19 +175,19 @@ async function adminSyncAllToFirestore() {
       if (typeof data === 'object') await window._fb.setChurchInfo(code, data);
     } catch(e) {}
   }
-  toast(`✅ ${count}명 서버 동기화 완료!`);
+  toast(`${count}명 서버 동기화 완료!`);
   setTimeout(() => openSubscreen('admin-panel'), 300);
 }
 
 function activateAdminCode() {
   const code = document.getElementById('admin-code-input')?.value.trim();
-  if (code !== ADMIN_SECRET) { toast('올바르지 않은 코드예요 🔒'); return; }
+  if (code !== ADMIN_SECRET) { toast('올바르지 않은 코드예요 '); return; }
   const users = DB.get('users', []);
   const u = users.find(x => x.id === me.id);
   if (u) { u.isAppAdmin = true; DB.set('users', users); me.isAppAdmin = true; }
   initSideMenu();
   closeSubscreen();
-  toast('🔑 앱 관리자 권한이 활성화됐어요! 사이드 메뉴를 확인해 주세요');
+  toast('앱 관리자 권한이 활성화됐어요! 사이드 메뉴를 확인해 주세요');
 }
 
 function approveChurchRegistration(code) {
@@ -221,7 +221,7 @@ function approveChurchRegistration(code) {
       pendingChurchCode: null, pendingChurchName: null
     }).catch(() => {});
   }
-  toast(`✅ "${entry.name}" [${code}] 교회 등록을 승인했어요!`);
+  toast(`"${entry.name}" [${code}] 교회 등록을 승인했어요!`);
   setTimeout(() => openSubscreen('admin-panel'), 150);
 }
 
@@ -338,7 +338,7 @@ function renderAdminPanelHtml(allUsers) {
 
     <!-- 퀵 액션 -->
     <div style="padding:12px 16px 0">
-      <div style="font-size:12px;font-weight:700;color:var(--muted);letter-spacing:0.5px;margin-bottom:8px">⚡ 퀵 액션</div>
+      <div style="font-size:12px;font-weight:700;color:var(--muted);letter-spacing:0.5px;margin-bottom:8px">퀵 액션</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
         <button onclick="openSubscreen('admin-users')"
           style="height:52px;border-radius:12px;border:1.5px solid var(--border);background:white;
@@ -367,7 +367,7 @@ function renderAdminPanelHtml(allUsers) {
       </div>
     </div>
 
-    <div class="ss-section-title" style="margin-top:14px">📊 현황 요약</div>
+    <div class="ss-section-title" style="margin-top:14px">현황 요약</div>
     <div class="ss-card">
       <div class="ss-card-row" onclick="openSubscreen('admin-users')" style="cursor:pointer">
         <div class="ss-card-icon">👥</div>
@@ -415,7 +415,7 @@ function renderAdminPanelHtml(allUsers) {
   html += `
     <div style="background:rgba(201,169,110,0.08);border:1.5px solid rgba(201,169,110,0.35);border-radius:14px;margin:0 16px 6px;padding:14px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-        <span style="font-size:11.5px;font-weight:700;color:var(--gold)">🔑 관리자 현재 소속</span>
+        <span style="font-size:11.5px;font-weight:700;color:var(--gold)">관리자 현재 소속</span>
         <span style="font-size:11px;color:var(--muted);background:var(--cream2);border-radius:6px;padding:2px 8px;font-family:monospace">${escHtml(currentCode)}</span>
       </div>
       <div style="font-size:15px;font-weight:800;margin-bottom:12px">${escHtml(currentChurchName)}</div>
@@ -458,20 +458,20 @@ function renderAdminPanelHtml(allUsers) {
 
   // 교회 가입 대기
   if (churchJoinPen.length) {
-    html += `<div class="ss-section-title">🕐 교회 가입 승인 대기 (${churchJoinPen.length}명)</div><div class="ss-card">`;
+    html += `<div class="ss-section-title">교회 가입 승인 대기 (${churchJoinPen.length}명)</div><div class="ss-card">`;
     churchJoinPen.forEach(u => {
       const isNF = u.registrationType === 'newfamily';
       const badge = isNF
-        ? `<span style="font-size:11px;background:rgba(39,174,96,0.12);color:#27AE60;border-radius:6px;padding:1px 7px;font-weight:700">👋 새가족</span>`
-        : `<span style="font-size:11px;background:rgba(52,152,219,0.12);color:#2980B9;border-radius:6px;padding:1px 7px;font-weight:700">📋 가입 신청</span>`;
+        ? `<span style="font-size:11px;background:rgba(39,174,96,0.12);color:#27AE60;border-radius:6px;padding:1px 7px;font-weight:700">새가족</span>`
+        : `<span style="font-size:11px;background:rgba(52,152,219,0.12);color:#2980B9;border-radius:6px;padding:1px 7px;font-weight:700">가입 신청</span>`;
       html += `<div style="padding:14px 16px;border-bottom:1px solid var(--border)">
         <div style="font-size:14px;font-weight:700;margin-bottom:2px">${escHtml(u.name)} ${badge}</div>
         <div style="font-size:12px;color:var(--muted);margin-bottom:10px">${escHtml(u.church||'—')} · ${escHtml(u.email||'')}</div>
         <div style="display:flex;gap:8px">
           <button onclick="approveChurchJoin('${u.id}')"
-            style="flex:1;height:40px;border:none;border-radius:10px;background:var(--black);color:white;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">✅ ${isNF?'새가족 승인':'승인'}</button>
+            style="flex:1;height:40px;border:none;border-radius:10px;background:var(--black);color:white;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">${isNF?'새가족 승인':'승인'}</button>
           <button onclick="rejectChurchJoin('${u.id}')"
-            style="flex:1;height:40px;border:none;border-radius:10px;background:#FBE5E5;color:#C0392B;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">✕ 거절</button>
+            style="flex:1;height:40px;border:none;border-radius:10px;background:#FBE5E5;color:#C0392B;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">거절</button>
         </div>
       </div>`;
     });
@@ -480,7 +480,7 @@ function renderAdminPanelHtml(allUsers) {
 
   // 교회 등록 대기
   if (pendingChurch.length) {
-    html += `<div class="ss-section-title">⛪ 교회 등록 승인 대기</div><div class="ss-card">`;
+    html += `<div class="ss-section-title">교회 등록 승인 대기</div><div class="ss-card">`;
     pendingChurch.forEach(c => {
       html += `<div style="padding:14px 16px;border-bottom:1px solid var(--border)">
         <div style="font-size:15px;font-weight:800;letter-spacing:1px;margin-bottom:4px">${escHtml(c.name)}</div>
@@ -489,9 +489,9 @@ function renderAdminPanelHtml(allUsers) {
         </div>
         <div style="display:flex;gap:8px">
           <button onclick="approveChurchRegistration('${c.code}')"
-            style="flex:1;height:42px;border:none;border-radius:10px;background:var(--black);color:white;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">✅ 등록 승인</button>
+            style="flex:1;height:42px;border:none;border-radius:10px;background:var(--black);color:white;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">등록 승인</button>
           <button onclick="rejectChurchRegistration('${c.code}')"
-            style="flex:1;height:42px;border:none;border-radius:10px;background:#FBE5E5;color:#C0392B;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">✕ 거절</button>
+            style="flex:1;height:42px;border:none;border-radius:10px;background:#FBE5E5;color:#C0392B;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">거절</button>
         </div>
       </div>`;
     });
@@ -500,20 +500,20 @@ function renderAdminPanelHtml(allUsers) {
 
   // 미성년자 승인 대기
   if (minorPending.length) {
-    html += `<div class="ss-section-title">🧒 미성년자 승인 대기</div><div class="ss-card">`;
+    html += `<div class="ss-section-title">미성년자 승인 대기</div><div class="ss-card">`;
     minorPending.forEach(u => {
       html += `<div style="padding:14px 16px;border-bottom:1px solid var(--border)">
         <div style="font-size:14px;font-weight:700;margin-bottom:4px">
           ${escHtml(u.name)}<span style="font-size:12px;color:var(--muted);font-weight:400"> · ${escHtml(u.church||'교회 미지정')}</span>
         </div>
         <div style="font-size:12.5px;color:var(--muted);margin-bottom:10px">
-          보호자: ${escHtml(u.guardianName||'—')} / 📞 ${escHtml(u.guardianContact||'—')}
+          보호자: ${escHtml(u.guardianName||'—')} / ${escHtml(u.guardianContact||'—')}
         </div>
         <div style="display:flex;gap:8px">
           <button onclick="approveMinor('${u.id}')"
-            style="flex:1;height:40px;border:none;border-radius:10px;background:var(--black);color:white;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">✅ 승인</button>
+            style="flex:1;height:40px;border:none;border-radius:10px;background:var(--black);color:white;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">승인</button>
           <button onclick="rejectMinor('${u.id}')"
-            style="flex:1;height:40px;border:none;border-radius:10px;background:#FBE5E5;color:#C0392B;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">✕ 거절</button>
+            style="flex:1;height:40px;border:none;border-radius:10px;background:#FBE5E5;color:#C0392B;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">거절</button>
         </div>
       </div>`;
     });
@@ -525,7 +525,7 @@ function renderAdminPanelHtml(allUsers) {
   const churchCodes = Object.keys(customChurches);
 
   html += `<div id="admin-church-section" style="display:flex;justify-content:space-between;align-items:center;padding:0 16px;margin:16px 0 10px">
-    <span style="font-size:12px;font-weight:700;color:var(--muted);letter-spacing:0.5px">⛪ 교회·기관 관리 (${churchCodes.length}개)</span>
+    <span style="font-size:12px;font-weight:700;color:var(--muted);letter-spacing:0.5px">교회·기관 관리 (${churchCodes.length}개)</span>
     <button onclick="openCreateChurchModal()" style="height:30px;padding:0 14px;border-radius:20px;border:none;background:var(--black);color:white;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">+ 새로 만들기</button>
   </div>`;
 
@@ -555,10 +555,10 @@ function renderAdminPanelHtml(allUsers) {
             <span style="background:rgba(0,0,0,0.06);border-radius:7px;padding:3px 9px;font-size:11.5px;font-weight:700;font-family:monospace">${escHtml(code)}</span>
           </div>
           <div style="display:flex;gap:10px;font-size:12px;color:var(--muted);margin-bottom:12px;padding-left:4px">
-            <span>👥 활성 ${mCnt}명</span>
+            <span>활성 ${mCnt}명</span>
             ${pCnt>0?`<span style="color:#E67E22">⏳ 대기 ${pCnt}명</span>`:''}
-            ${data.leaderName?`<span>👤 ${escHtml(data.leaderName)}</span>`:''}
-            ${data.address?`<span>📍 ${escHtml(data.address.slice(0,15)+(data.address.length>15?'…':''))}</span>`:''}
+            ${data.leaderName?`<span>${escHtml(data.leaderName)}</span>`:''}
+            ${data.address?`<span>${escHtml(data.address.slice(0,15)+(data.address.length>15?'…':''))}</span>`:''}
           </div>
           <div style="display:flex;gap:8px">
             <button onclick="openChurchManage('${code}')" style="flex:2;height:36px;border-radius:9px;border:none;background:var(--black);color:white;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit">상세 보기</button>
@@ -604,7 +604,7 @@ function adminSwitchChurch(code) {
   updateProfileDisplay();
   initSideMenu();
 
-  const msg = code ? `✅ "${name}"(으)로 이동했어요!` : '👤 소속 없음으로 변경됐어요';
+  const msg = code ? `"${name}"(으)로 이동했어요!` : '소속 없음으로 변경됐어요';
   toast(msg);
 
   // 관리자 패널 새로고침
