@@ -6976,6 +6976,7 @@ function openChatRoom(roomId) {
   if (!room) return;
 
   _currentRoomId = roomId;
+  _photoRefreshedThisView = new Set();  // 이 채팅 진입 시 발신자 사진 최신 갱신
   _markRoomAsRead(roomId); // 읽음 처리
 
   // 패널 표시
@@ -7768,6 +7769,7 @@ function openOpenChannel(channelId, name, sub) {
   if (list) list.style.display = 'none';
   if (room) room.style.display = 'flex';
   _currentOpenChannelId = channelId;
+  _photoRefreshedThisView = new Set();  // 이 채널 진입 시 발신자 사진 최신 갱신
   document.getElementById('openchat-room-name').textContent = name;
   document.getElementById('openchat-room-sub').textContent  = sub || '실시간 채팅';
   document.getElementById('openchat-msgs').innerHTML =
@@ -7972,18 +7974,21 @@ async function warmPhotoCache(force) {
   } catch(e) { console.warn('사진 캐시 로드 실패:', e); }
 }
 // 단일 사용자 사진을 캐시에 확보 (없을 때만 1회 조회)
-async function ensurePhotoCached(uid) {
-  if (!uid || _photoCache[uid] || !window._fbReady || !window._fb) return;
+async function ensurePhotoCached(uid, force) {
+  if (!uid || (!force && _photoCache[uid]) || !window._fbReady || !window._fb) return;
   try {
     const d = await window._fb.getUserPhotoDoc(uid);
     if (d.exists() && d.data().photoURL) _photoCache[uid] = d.data().photoURL;
   } catch(e) {}
 }
-// 메시지 발신자들의 최신 사진 확보 → 옛 메시지에 박제된 사진 대신 현재 프로필 표시
+// 채팅 뷰를 열 때마다 발신자 사진을 1회 강제 갱신 → 상대가 프로필을 바꾸면 옛 메시지에도 반영
+var _photoRefreshedThisView = new Set();
 async function _ensureSenderPhotos(msgs) {
   const ids = [...new Set((msgs || []).map(m => m.senderId)
-    .filter(id => id && id !== 'system' && !_photoCache[id]))];
-  if (ids.length) await Promise.all(ids.map(id => ensurePhotoCached(id)));
+    .filter(id => id && id !== 'system' && !_photoRefreshedThisView.has(id)))];
+  if (!ids.length) return;
+  ids.forEach(id => _photoRefreshedThisView.add(id));
+  await Promise.all(ids.map(id => ensurePhotoCached(id, true)));   // 강제 = 캐시가 있어도 최신으로 갱신
 }
 
 // ── 이미지 base64 유틸 (Firebase Storage 미사용 → Firestore 문서에 압축본 저장) ──
