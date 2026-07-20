@@ -222,24 +222,25 @@ function approveMinor(userId) {
   u.status     = 'active';
   u.approvedBy = me.id;
   u.approvedAt = new Date().toISOString();
-  // 승인자의 교회에 자동 배정
+  // 교회 미배정이면 승인자의 교회로 배정
   if (me.churchCode && (!u.churchCode || !u.church)) {
-    u.church        = me.church;
-    u.churchCode    = me.churchCode;
-    u.churchStatus  = 'active';
-    u.orgType       = me.orgType || 'church';
+    u.church     = me.church;
+    u.churchCode = me.churchCode;
+    u.orgType    = me.orgType || 'church';
   }
+  // 교회가 있으면 가입도 함께 활성화 → 오픈채팅 가능 (이전: 기존 교회가 있으면 pending 유지돼 채팅 차단됨)
+  if (u.churchCode) u.churchStatus = 'active';
   DB.set('users', users);
   const cached = _membersCache.find(x => x.id === userId);
-  if (cached) { cached.status = 'active'; if (me.churchCode) cached.churchStatus = 'active'; }
+  if (cached) { cached.status = 'active'; if (u.churchCode) cached.churchStatus = 'active'; }
   // Firestore 동기화
   if (window._fbReady && window._fb) {
     const update = { status: 'active', approvedBy: me.id, approvedAt: u.approvedAt };
-    if (me.churchCode && u.churchCode === me.churchCode) {
-      update.church       = u.church;
-      update.churchCode   = u.churchCode;
-      update.churchStatus = 'active';
-      update.orgType      = u.orgType;
+    if (u.churchCode) update.churchStatus = 'active';                 // 교회 가입도 활성화
+    if (me.churchCode && u.churchCode === me.churchCode) {            // 승인자 교회로 새로 배정한 경우
+      update.church     = u.church;
+      update.churchCode = u.churchCode;
+      update.orgType    = u.orgType;
     }
     window._fb.updateUser(userId, update).catch(() => toast('⚠ 서버 동기화 실패 — 잠시 후 다시 승인해 주세요'));
   }
