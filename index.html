@@ -3585,6 +3585,20 @@ function todayDateKey() {
 
 function binderKey() { return `binder_${me.id}_${dateKey()}`; }
 
+// 바인더에 실제 작성 내용이 있는지 (달력 점 표시·빈 항목 저장 방지용).
+// updatedAt·기본 시간표 슬롯 등 '자동 생성' 필드는 내용으로 치지 않음.
+function binderHasContent(d) {
+  if (!d || typeof d !== 'object') return false;
+  if (['verse','meditation','application','prayer','diary','photoCaption','qt']
+        .some(k => (d[k] || '').trim())) return true;
+  if (Array.isArray(d.schRows) && d.schRows.some(r => r && (r.plan || '').trim())) return true;
+  if (Array.isArray(d.todos)   && d.todos.some(t => t && (t.text || '').trim())) return true;
+  if (d.photo) return true;
+  const drw = d.drawings || {};
+  if (Object.keys(drw).some(k => drw[k])) return true;
+  return false;
+}
+
 function loadBinder() {
   // 미완료 할 일 이월 (텍스트형 + 드로잉형)
   carryOverTodosIfNeeded();
@@ -3719,6 +3733,11 @@ function saveBinderNow() {
   if (!me) return;
   const existing = DB.get(binderKey(), {});
   const merged   = Object.assign({}, existing, readBinder());
+  // 실제 작성 내용이 없으면 저장하지 않음 (날짜 이동만으로 빈 항목이 생겨 달력에 점 찍히던 문제)
+  if (!binderHasContent(merged)) {
+    if (DB.get(binderKey(), null) !== null) DB.del(binderKey());   // 이전에 저장된 빈 항목 정리
+    return;
+  }
   DB.set(binderKey(), merged);
 
   // 공유 허용한 경우 Firestore에도 동기화 (선택한 항목만)
@@ -5087,7 +5106,7 @@ function renderCalDays() {
     const ds = ymdKey(yy, mm, c.day);
     const isToday = ds === todayStr;
     const isSelected = ds === selStr;
-    const hasData = !c.muted && DB.get(`binder_${me.id}_${ds}`, null) !== null;
+    const hasData = !c.muted && binderHasContent(DB.get(`binder_${me.id}_${ds}`, null));
     const cls = ['cal-day-cell'];
     if (c.muted) cls.push('muted');
     if (isToday) cls.push('today');
