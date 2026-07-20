@@ -5021,7 +5021,9 @@ function removePhoto() {
   const data = DB.get(binderKey(), {});
   delete data.photo;
   data.updatedAt = new Date().toISOString();
-  DB.set(binderKey(), data);
+  // 사진 삭제 후 그날 내용이 없으면 항목 자체를 정리 (달력 점 방지)
+  if (binderHasContent(data)) DB.set(binderKey(), data);
+  else if (DB.get(binderKey(), null) !== null) DB.del(binderKey());
   hidePhotoPreview();
   document.getElementById('photo-input').value = '';
   toast('사진을 삭제했어요');
