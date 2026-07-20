@@ -3718,10 +3718,9 @@ function migrateClearSchDefaults() {
   DB.set('schDefaultsCleared_v1', true);
 }
 
-// 수정 전 저장된 '빈 손글씨'(그렸다 지운 투명 캔버스) 1회 정리 — 달력 점 오탐 제거
-async function migrateCleanBlankDrawings() {
-  if (DB.get('blankDrawCleaned_v1', false)) return;
-  const isBlankSrc = (src) => new Promise(res => {
+// 손글씨 데이터 URL을 렌더해 빈(투명) 캔버스인지 판별 (공용)
+function _drawSrcIsBlank(src) {
+  return new Promise(res => {
     const img = new Image();
     img.onload = () => {
       try {
@@ -3734,26 +3733,60 @@ async function migrateCleanBlankDrawings() {
     img.onerror = () => res(false);
     img.src = src;
   });
+}
+
+// 한 바인더 항목(DB 키)의 빈 손글씨 제거. 변경되면 저장/삭제하고 true 반환.
+async function _cleanBlankDrawingsIn(dbKey) {
+  const obj = DB.get(dbKey, null);
+  if (!obj || !obj.drawings || typeof obj.drawings !== 'object') return false;
+  let changed = false;
+  for (const dk of Object.keys(obj.drawings)) {
+    const v   = obj.drawings[dk];
+    const src = typeof v === 'string' ? v : (v && v.dataUrl);
+    if (!src) { delete obj.drawings[dk]; changed = true; continue; }
+    if (await _drawSrcIsBlank(src)) { delete obj.drawings[dk]; changed = true; }
+  }
+  if (changed) {
+    if (binderHasContent(obj)) DB.set(dbKey, obj);
+    else DB.del(dbKey);
+  }
+  return changed;
+}
+
+// 수정 전 저장된 '빈 손글씨'(그렸다 지운 투명 캔버스) 1회 정리 — 달력 점 오탐 제거
+async function migrateCleanBlankDrawings() {
+  if (DB.get('blankDrawCleaned_v1', false)) return;
   try {
-    const keys = [];
+    const dbKeys = [];
     for (let i = 0; i < localStorage.length; i++) {
       const k = localStorage.key(i);
-      if (k && k.indexOf('sc2_binder_') === 0) keys.push(k);
+      if (k && k.indexOf('sc2_binder_') === 0) dbKeys.push(k.replace(/^sc2_/, ''));
     }
-    for (const fullKey of keys) {
-      let obj; try { obj = JSON.parse(localStorage.getItem(fullKey)); } catch (e) { continue; }
-      if (!obj || !obj.drawings || typeof obj.drawings !== 'object') continue;
-      let changed = false;
-      for (const dk of Object.keys(obj.drawings)) {
-        const v   = obj.drawings[dk];
-        const src = typeof v === 'string' ? v : (v && v.dataUrl);
-        if (!src) { delete obj.drawings[dk]; changed = true; continue; }
-        if (await isBlankSrc(src)) { delete obj.drawings[dk]; changed = true; }
-      }
-      if (changed) localStorage.setItem(fullKey, JSON.stringify(obj));
-    }
+    for (const dbKey of dbKeys) await _cleanBlankDrawingsIn(dbKey);
   } catch (e) {}
   DB.set('blankDrawCleaned_v1', true);
+}
+
+// 달력 팝업이 보여주는 달의 빈 손글씨를 실시간 검증·정리 후 점 갱신 (열 때마다, 날짜당 1회)
+var _drawBlankChecked = {};
+async function _verifyMonthDrawings(cells) {
+  if (!me) return;
+  let changed = false;
+  for (const c of cells) {
+    if (c.muted) continue;
+    let yy = c.y, mm = c.m;
+    if (mm < 0)  { mm = 11; yy -= 1; }
+    if (mm > 11) { mm = 0;  yy += 1; }
+    const ds = ymdKey(yy, mm, c.day);
+    if (_drawBlankChecked[ds]) continue;
+    _drawBlankChecked[ds] = true;
+    const data = DB.get(`binder_${me.id}_${ds}`, null);
+    if (!data || !data.drawings || !Object.keys(data.drawings).some(k => data.drawings[k])) continue;
+    if (await _cleanBlankDrawingsIn(`binder_${me.id}_${ds}`)) changed = true;
+  }
+  if (changed && calView === 'days' && document.getElementById('modal-calendar')?.classList.contains('open')) {
+    renderCalDays();
+  }
 }
 
 function buildDiaryRings() {
@@ -5174,6 +5207,9 @@ function renderCalDays() {
     if (hasData) cls.push('has-data');
     return `<div class="${cls.join(' ')}" onclick="calPickDate(${yy},${mm},${c.day})">${c.day}</div>`;
   }).join('');
+
+  // 실시간: 보이는 달의 빈 손글씨를 검증·정리하고 점 갱신 (달 열/이동할 때마다)
+  _verifyMonthDrawings(cells);
 }
 
 function calPickDate(y, m, d) {
