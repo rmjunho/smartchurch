@@ -3404,6 +3404,8 @@ function bootApp() {
 
   // 프로필 사진 캐시 예열 (userPhotos 컬렉션 → 교회 단위 1회 벌크 로드)
   warmPhotoCache();
+  // 구버전에 로컬로만 저장된 내 사진을 서버에 1회 등록 (남의 화면에서 👤 로 보이던 문제)
+  backfillMyPhoto();
   // 발신자 이름/직분 캐시 예열 (채팅에 현재 값 표시)
   warmUserInfoCache();
   // 교인 프로필(이름·직분) 실시간 감시 → 모든 화면 자동 갱신
@@ -8355,6 +8357,25 @@ async function warmPhotoCache(force) {
     if (typeof updateProfileAvatarDisplay === 'function') updateProfileAvatarDisplay();
   } catch(e) { console.warn('사진 캐시 로드 실패:', e); }
 }
+// 구버전 호환 — 사진을 로컬(또는 users.photoURL)에만 갖고 있는 계정은 userPhotos 문서가 없어서
+// 남의 화면에서는 👤 로 보인다. 접속할 때 내 사진을 1회 서버로 올려 스스로 복구한다.
+async function backfillMyPhoto() {
+  if (!window._fbReady || !window._fb || !me) return;
+  const local = DB.get('profilePhoto_' + me.id, null) || me.photoURL || null;
+  if (!local) return;
+  try {
+    const d = await window._fb.getUserPhotoDoc(me.id);
+    if (d.exists() && d.data().photoURL) {
+      // 문서는 있는데 교회 코드가 옛 값이면 갱신 (교회 단위 벌크 조회에서 누락됨)
+      if ((d.data().churchCode || '') !== (me.churchCode || ''))
+        await window._fb.setUserPhoto(me.id, { churchCode: me.churchCode || '' });
+      return;
+    }
+    const small = await _fitImageForFirestore(local);
+    await window._fb.setUserPhoto(me.id, { photoURL: small, churchCode: me.churchCode || '' });
+    _photoCache[me.id] = small;
+  } catch (e) { if (window._fbErr) window._fbErr('내 프로필 사진 서버 등록', e); }
+}
 // 단일 사용자 사진을 캐시에 확보 (없을 때만 1회 조회)
 async function ensurePhotoCached(uid, force) {
   if (!uid || (!force && _photoCache[uid]) || !window._fbReady || !window._fb) return;
@@ -8437,6 +8458,7 @@ window.addEventListener('fb-ready', () => {
   startChurchMembersWatch();
   warmUserInfoCache(true);
   warmPhotoCache(true);
+  backfillMyPhoto();
   if (typeof _syncChurchStatus === 'function') _syncChurchStatus();
 });
 
