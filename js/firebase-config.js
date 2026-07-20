@@ -122,15 +122,17 @@ window._fb = {
       setMeeting:          (id, data)       => setDoc(doc(fbDb, 'meetings', id), data, { merge: true }),
       deleteMeeting:       (id)             => deleteDoc(doc(fbDb, 'meetings', id)),
       listenMeetings:      (churchCode, cb) => {
-        try {
-          return onSnapshot(query(collection(fbDb, 'meetings'),
-            where('churchCode', '==', churchCode),
-            orderBy('date', 'asc')), cb);
-        } catch(e) {
-          // orderBy 인덱스 없을 때 fallback (정렬 없이)
-          return onSnapshot(query(collection(fbDb, 'meetings'),
-            where('churchCode', '==', churchCode)), cb);
-        }
+        // 복합 색인(churchCode+date) 부재는 예외가 아니라 리스너 에러로 온다 → try/catch 로는 못 잡음.
+        // 에러 콜백에서 정렬 없는 쿼리로 재구독한다 (정렬은 renderMeetingList 가 클라이언트에서 수행).
+        let unsub = onSnapshot(query(collection(fbDb, 'meetings'),
+          where('churchCode', '==', churchCode),
+          orderBy('date', 'asc')), cb,
+          e => {
+            if (window._fbErr) window._fbErr('모임 목록 실시간 조회', e);
+            unsub = onSnapshot(query(collection(fbDb, 'meetings'),
+              where('churchCode', '==', churchCode)), cb);
+          });
+        return () => unsub && unsub();
       },
       getMeetingByCode:    (code)           =>
         getDocs(query(collection(fbDb, 'meetings'), where('code', '==', code))),
