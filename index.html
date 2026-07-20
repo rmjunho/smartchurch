@@ -3418,17 +3418,30 @@ function bootApp() {
         return;
       }
       _selfSeen = true;
-      // 승인(status/churchStatus) 변경을 로컬 me 에 실시간 반영 → 리더 승인이 재로그인 없이 적용됨
+      // 승인·직분·리더 권한 변경을 로컬 me 에 실시간 반영 → 재로그인/새로고침 없이 적용됨
       const data = snap.data();
       const wasActive = me.churchStatus === 'active';
+      const wasLeader = (typeof isLeader === 'function') ? isLeader() : false;
       let changed = false;
-      ['status', 'churchStatus'].forEach(f => {
+      ['status', 'churchStatus', 'role', 'orgType', 'isAppointedLeader', 'isAppAdmin'].forEach(f => {
         if (data[f] !== undefined && me[f] !== data[f]) { me[f] = data[f]; changed = true; }
       });
+      // leaderPerms (배열) 비교
+      if (Array.isArray(data.leaderPerms) &&
+          JSON.stringify(data.leaderPerms) !== JSON.stringify(me.leaderPerms || [])) {
+        me.leaderPerms = data.leaderPerms; changed = true;
+      }
       if (changed) {
         DB.saveUser(me);
         if (!wasActive && me.churchStatus === 'active') toast('교회 가입이 승인됐어요!');
-        if (typeof updateProfileDisplay === 'function') updateProfileDisplay();
+        const nowLeader = (typeof isLeader === 'function') ? isLeader() : false;
+        if (!wasLeader && nowLeader) toast('리더 권한이 부여됐어요');
+        if (typeof updateProfileDisplay === 'function') updateProfileDisplay();  // 직분 배지·탭 라벨
+        if (typeof initSideMenu === 'function') initSideMenu();                   // 리더 전용 메뉴
+        // 교회/기관 탭이 열려 있으면 다시 렌더 (리더 버튼 등 반영)
+        if (document.getElementById('nav-church')?.classList.contains('active') && typeof initChurchTab === 'function') {
+          try { initChurchTab(); } catch (e) {}
+        }
       }
     });
   }
