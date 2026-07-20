@@ -967,7 +967,8 @@ function renderMembersScreenHtml(allUsers) {
           : '';
         return `
         <div class="member-row" style="flex-wrap:wrap;gap:0">
-          <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0;padding:2px 0">
+          <!-- width:100% — 아래 버튼 줄도 width:100% 라 flex:1(기본크기 0)이면 같은 줄에 배치돼 이름 칸이 0px 로 찌그러짐 -->
+          <div style="display:flex;align-items:center;gap:10px;width:100%;min-width:0;padding:2px 0">
             ${memberAvatarHtml(u, '🙏')}
             <div class="member-info">
               <div class="member-name">
