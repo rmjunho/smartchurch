@@ -956,10 +956,11 @@
       <div id="chat-room-panel" style="display:none;flex-direction:column;height:100%;position:absolute;inset:0;background:var(--cream);z-index:10">
         <div class="openchat-header" style="display:flex;align-items:center;gap:10px">
           <button onclick="closeChatRoomPanel()" style="background:none;border:none;font-size:20px;cursor:pointer;padding:0;color:var(--black)">←</button>
-          <div style="flex:1">
+          <div style="flex:1;min-width:0">
             <div class="openchat-header-title" id="room-panel-name"></div>
             <div class="openchat-header-sub" id="room-panel-sub"></div>
           </div>
+          <button onclick="openRoomMenu()" style="background:none;border:none;font-size:22px;cursor:pointer;padding:0 4px;color:var(--black)">⋮</button>
         </div>
         <div class="openchat-msgs" id="room-panel-msgs">
           <div style="text-align:center;padding:20px;color:var(--muted);font-size:13px">🔄 불러오는 중...</div>
@@ -980,11 +981,16 @@
       <div id="chat-panel-friends" style="display:none">
         <div style="padding:14px 20px 0;display:flex;justify-content:space-between;align-items:center">
           <span style="font-size:13px;font-weight:700;color:var(--muted)">친구 목록</span>
-          <button onclick="openAddFriendModal()"
-            style="height:32px;padding:0 14px;border-radius:20px;border:1.5px solid var(--border);
-                   background:white;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit">
-            + 친구 추가
-          </button>
+          <div style="display:flex;gap:6px">
+            <button onclick="openBlockedList()"
+              style="height:32px;padding:0 12px;border-radius:20px;border:1.5px solid var(--border);
+                     background:white;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit">🚫 차단</button>
+            <button onclick="openAddFriendModal()"
+              style="height:32px;padding:0 14px;border-radius:20px;border:1.5px solid var(--border);
+                     background:white;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit">
+              + 친구 추가
+            </button>
+          </div>
         </div>
         <div id="friend-requests-wrap" style="margin-top:8px"></div>
         <div id="chat-friends-list" style="margin-top:8px"></div>
@@ -3367,6 +3373,9 @@ function bootApp() {
 
   // 프로필 사진 캐시 예열 (userPhotos 컬렉션 → 교회 단위 1회 벌크 로드)
   warmPhotoCache();
+
+  // 차단 목록 기기 간 동기화 (Firestore me.blocked → 로컬)
+  syncBlockedFromMe();
 
   // 계정 삭제 감지 — 서버(Firebase)에서 내 사용자 문서가 삭제되면 자동 로그아웃
   if (window._fbReady && window._fb && me) {
@@ -7026,6 +7035,7 @@ async function _renderRoomMsgs(msgs) {
   const el = document.getElementById('room-panel-msgs');
   if (!el) return;
   await _ensureSenderPhotos(msgs);
+  msgs = (msgs || []).filter(m => !isBlocked(m.senderId));   // 차단한 사용자 메시지 숨김
 
   if (!msgs.length) {
     el.innerHTML = `<div style="text-align:center;padding:40px 16px;color:var(--muted)">
@@ -7190,9 +7200,126 @@ function closeChatRoomPanel() {
   if (fab) fab.style.display = '';
 }
 
+// ================= 차단 / 채팅방 나가기 (카톡식) =================
+function blockedList()  { return DB.get('blocked_' + me.id, []); }
+function isBlocked(uid)  { return !!uid && blockedList().some(b => b.userId === uid); }
+function _saveBlocked(list) {
+  DB.set('blocked_' + me.id, list);
+  if (window._fbReady && window._fb) window._fb.updateUser(me.id, { blocked: list.map(b => b.userId) }).catch(() => {});
+}
+function blockUser(uid, name) {
+  if (!uid || uid === me.id) return;
+  const list = blockedList();
+  if (!list.some(b => b.userId === uid)) {
+    list.push({ userId: uid, name: name || '', blockedAt: new Date().toISOString() });
+    _saveBlocked(list);
+  }
+  saveFriends(getFriends().filter(f => f.userId !== uid));   // 친구에서 제거
+}
+function unblockUser(uid) {
+  _saveBlocked(blockedList().filter(b => b.userId !== uid));
+  toast('차단을 해제했어요');
+  renderBlockedList();
+}
+// 로그인/부팅 시 Firestore 의 blocked 를 로컬로 반영 (기기 간 동기화)
+function syncBlockedFromMe() {
+  if (!me || !Array.isArray(me.blocked)) return;
+  const local = blockedList();
+  let changed = false;
+  me.blocked.forEach(uid => {
+    if (uid && !local.some(b => b.userId === uid)) {
+      local.push({ userId: uid, name: '', blockedAt: new Date().toISOString() });
+      changed = true;
+    }
+  });
+  if (changed) DB.set('blocked_' + me.id, local);
+}
+
+// ── 채팅방 액션 메뉴 (⋮) ──
+function openRoomMenu() {
+  const room = (_allRooms || []).find(r => r.id === _currentRoomId) || getChatRooms().find(r => r.id === _currentRoomId);
+  if (!room) return;
+  const isDm = room.type === 'dm';
+  const partnerId   = isDm ? (room.members || []).find(id => id !== me.id) : null;
+  const partnerName = isDm ? dmDisplayName(room) : (room.name || '그룹');
+  let menu = document.getElementById('room-action-menu');
+  if (!menu) {
+    menu = document.createElement('div');
+    menu.id = 'room-action-menu';
+    menu.onclick = e => { if (e.target.id === 'room-action-menu') closeRoomMenu(); };
+    document.body.appendChild(menu);
+  }
+  menu.innerHTML = `<div class="ram-sheet">
+    <div class="ram-title">${escHtml(partnerName)}</div>
+    ${isDm && partnerId ? `<button class="ram-item danger" onclick="blockFromRoom('${partnerId}','${escHtml(partnerName)}')">🚫 차단하기</button>` : ''}
+    <button class="ram-item danger" onclick="leaveChatRoom('${room.id}')">🚪 채팅방 나가기</button>
+    <button class="ram-item" onclick="closeRoomMenu()">취소</button>
+  </div>`;
+  menu.style.display = 'flex';
+}
+function closeRoomMenu() { const m = document.getElementById('room-action-menu'); if (m) m.style.display = 'none'; }
+
+function _leaveRoomCore(roomId) {
+  const room = getChatRooms().find(r => r.id === roomId) || (_allRooms || []).find(r => r.id === roomId);
+  saveChatRooms(getChatRooms().filter(r => r.id !== roomId));
+  _allRooms = (_allRooms || []).filter(r => r.id !== roomId);
+  // Firestore members 에서 나 제외 → listenMyRooms 가 더 이상 이 방을 주지 않음 (상대는 유지)
+  if (window._fbReady && window._fb && room) {
+    const newMembers = (room.members || []).filter(id => id !== me.id);
+    window._fb.updateChatRoom(roomId, { members: newMembers }).catch(() => {});
+  }
+}
+function leaveChatRoom(roomId) {
+  closeRoomMenu();
+  if (!confirm('이 채팅방을 나갈까요?\n목록에서 사라져요.')) return;
+  _leaveRoomCore(roomId);
+  closeChatRoomPanel();
+  renderChatRooms();
+  toast('채팅방을 나갔어요');
+}
+function blockFromRoom(partnerId, partnerName) {
+  closeRoomMenu();
+  if (!confirm(`${partnerName}님을 차단할까요?\n\n· 서로 메시지를 받지 않아요\n· 친구 목록에서 제거돼요`)) return;
+  blockUser(partnerId, partnerName);
+  _leaveRoomCore(_currentRoomId);
+  closeChatRoomPanel();
+  renderChatRooms();
+  toast(`${partnerName}님을 차단했어요`);
+}
+
+// ── 차단 목록 관리 모달 ──
+function openBlockedList() {
+  let modal = document.getElementById('blocked-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'blocked-modal';
+    modal.onclick = e => { if (e.target.id === 'blocked-modal') closeBlockedList(); };
+    document.body.appendChild(modal);
+  }
+  modal.style.display = 'flex';
+  renderBlockedList();
+}
+function closeBlockedList() { const m = document.getElementById('blocked-modal'); if (m) m.style.display = 'none'; }
+function renderBlockedList() {
+  const modal = document.getElementById('blocked-modal');
+  if (!modal) return;
+  const list = blockedList();
+  modal.innerHTML = `<div class="ram-sheet">
+    <div class="ram-title">🚫 차단 목록 (${list.length})</div>
+    ${list.length ? list.map(b => `
+      <div class="ram-blocked-row">
+        <div class="friend-avatar">${getUserPhoto(b.userId) ? `<img src="${getUserPhoto(b.userId)}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">` : '👤'}</div>
+        <div class="name">${escHtml(b.name || '이름 없음')}</div>
+        <button class="ram-unblock-btn" onclick="unblockUser('${b.userId}')">차단 해제</button>
+      </div>`).join('')
+      : '<div class="ram-empty">차단한 사용자가 없어요</div>'}
+    <button class="ram-item" onclick="closeBlockedList()">닫기</button>
+  </div>`;
+}
+
 // ── 친구 렌더링 ──
 function renderFriendsList() {
-  const friends = getFriends();
+  const friends = getFriends().filter(f => !isBlocked(f.userId));   // 차단한 사용자 제외
   const el = document.getElementById('chat-friends-list');
   if (!el) return;
   if (!friends.length) {
@@ -7464,7 +7591,7 @@ function renderFriendSearch() {
     const friends  = getFriends().map(f => f.userId);
     const seen     = new Set();
     const combined = [...churchMembers, ...publicUsers].filter(u => {
-      if (u.id === me.id || friends.includes(u.id)) return false;
+      if (u.id === me.id || friends.includes(u.id) || isBlocked(u.id)) return false;
       if (q && !(u.name||'').toLowerCase().includes(q)) return false;
       if (seen.has(u.id)) return false;
       seen.add(u.id); return true;
@@ -7525,7 +7652,7 @@ async function renderFriendRequests() {
   let reqs = [];
   try {
     const snap = await window._fb.getFriendRequestsTo(me.id);
-    snap.forEach(d => { const r = d.data(); if (r.status === 'pending') reqs.push(r); });
+    snap.forEach(d => { const r = d.data(); if (r.status === 'pending' && !isBlocked(r.fromId)) reqs.push(r); });
   } catch(e) { wrap.innerHTML = ''; return; }
   if (!reqs.length) { wrap.innerHTML = ''; return; }
   wrap.innerHTML = `
@@ -7853,6 +7980,7 @@ async function _renderOpenChatMsgs(msgs) {
   const el = document.getElementById('openchat-msgs');
   if (!el) return;
   await _ensureSenderPhotos(msgs);
+  msgs = (msgs || []).filter(m => !isBlocked(m.senderId));   // 차단한 사용자 메시지 숨김
 
   if (!msgs.length) {
     el.innerHTML = `<div class="openchat-empty" style="flex:1;margin:auto">

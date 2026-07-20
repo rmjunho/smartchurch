@@ -789,6 +789,33 @@
       background:rgba(0,0,0,0.88); padding:24px; cursor:zoom-out;
     }
     #img-lightbox img { max-width:96%; max-height:96%; border-radius:10px; }
+    /* 채팅 액션 시트 / 차단 목록 모달 */
+    #room-action-menu, #blocked-modal {
+      position:fixed; inset:0; z-index:9998; display:none;
+      align-items:flex-end; justify-content:center; background:rgba(0,0,0,0.4);
+    }
+    .ram-sheet {
+      width:100%; max-width:480px; background:var(--cream);
+      border-radius:18px 18px 0 0; padding:12px 12px calc(16px + env(safe-area-inset-bottom,0px));
+      display:flex; flex-direction:column; gap:7px;
+    }
+    .ram-title { font-size:13px; font-weight:700; color:var(--muted); text-align:center; padding:6px 0 4px; }
+    .ram-item {
+      width:100%; min-height:50px; border:none; border-radius:12px;
+      background:white; font-size:15px; font-weight:600; cursor:pointer;
+      font-family:inherit; color:var(--black); padding:0 14px;
+    }
+    .ram-item.danger { color:var(--danger); }
+    .ram-empty { text-align:center; color:var(--muted); font-size:13px; padding:24px 0; }
+    .ram-blocked-row {
+      display:flex; align-items:center; gap:10px; background:white;
+      border-radius:12px; padding:10px 14px;
+    }
+    .ram-blocked-row .name { flex:1; font-size:14px; font-weight:600; }
+    .ram-unblock-btn {
+      height:32px; padding:0 14px; border-radius:16px; border:1.5px solid var(--border);
+      background:white; font-size:12.5px; font-weight:700; cursor:pointer; font-family:inherit;
+    }
     .openchat-empty {
       flex:1; display:flex; flex-direction:column; align-items:center;
       justify-content:center; color:var(--muted); gap:8px;
