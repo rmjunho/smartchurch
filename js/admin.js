@@ -319,6 +319,13 @@ function renderAdminPanelHtml(allUsers) {
   const onlineCutoff  = new Date(Date.now() - 3 * 60 * 1000).toISOString();
   const onlineNow     = allUsers.filter(u => u.lastActiveAt && u.lastActiveAt > onlineCutoff)
                                 .sort((a, b) => (b.lastActiveAt || '').localeCompare(a.lastActiveAt || ''));
+  // 기간별 접속자 수 — lastActiveAt(마지막 사용 시각)이 각 기간 안에 드는 사용자 (기간 내 활성 사용자)
+  const _todayStart = new Date(); _todayStart.setHours(0, 0, 0, 0);
+  const activeSince  = ms => allUsers.filter(u => u.lastActiveAt && u.lastActiveAt >= ms).length;
+  const cntToday = allUsers.filter(u => u.lastActiveAt && u.lastActiveAt >= _todayStart.toISOString()).length;
+  const cntWeek  = activeSince(new Date(Date.now() -   7 * 864e5).toISOString());
+  const cntMonth = activeSince(new Date(Date.now() -  30 * 864e5).toISOString());
+  const cntYear  = activeSince(new Date(Date.now() - 365 * 864e5).toISOString());
   const churches      = [...new Set(allUsers.map(u => u.church).filter(Boolean))];
 
   let html = `<div id="admin-panel-body">
@@ -396,6 +403,10 @@ function renderAdminPanelHtml(allUsers) {
         <div class="ss-card-info"><div class="ss-card-title">교회 가입 대기</div></div>
         <span class="ss-card-badge ${churchJoinPen.length > 0 ? 'ss-badge-gold' : 'ss-badge-gray'}">${churchJoinPen.length}</span>
       </div>
+    </div>
+
+    <div class="ss-section-title" style="margin-top:14px">접속자</div>
+    <div class="ss-card">
       <div class="ss-card-row" ${onlineNow.length ? `onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='block'?'none':'block'" style="cursor:pointer"` : ''}>
         <div class="ss-card-icon">🟢</div>
         <div class="ss-card-info"><div class="ss-card-title">현재 접속자</div><div class="ss-card-sub">최근 3분 내 접속${onlineNow.length ? ' · 눌러서 명단 보기' : ''}</div></div>
@@ -407,6 +418,26 @@ function renderAdminPanelHtml(allUsers) {
           <span style="font-weight:600">${escHtml(u.name || '이름 없음')}</span>
           <span style="color:var(--muted);font-size:12px">${escHtml(u.role || '')}${u.church ? ' · ' + escHtml(u.church) : ''}</span>
         </div>`).join('')}
+      </div>
+      <div class="ss-card-row">
+        <div class="ss-card-icon">📅</div>
+        <div class="ss-card-info"><div class="ss-card-title">오늘 접속</div><div class="ss-card-sub">오늘 0시 이후 접속</div></div>
+        <span class="ss-card-badge ss-badge-gray">${cntToday}</span>
+      </div>
+      <div class="ss-card-row">
+        <div class="ss-card-icon">🗓️</div>
+        <div class="ss-card-info"><div class="ss-card-title">최근 7일</div><div class="ss-card-sub">일주일 내 접속</div></div>
+        <span class="ss-card-badge ss-badge-gray">${cntWeek}</span>
+      </div>
+      <div class="ss-card-row">
+        <div class="ss-card-icon">📆</div>
+        <div class="ss-card-info"><div class="ss-card-title">최근 30일</div><div class="ss-card-sub">한 달 내 접속</div></div>
+        <span class="ss-card-badge ss-badge-gray">${cntMonth}</span>
+      </div>
+      <div class="ss-card-row">
+        <div class="ss-card-icon">📈</div>
+        <div class="ss-card-info"><div class="ss-card-title">최근 1년</div><div class="ss-card-sub">1년 내 접속</div></div>
+        <span class="ss-card-badge ss-badge-gray">${cntYear}</span>
       </div>
     </div>`;
 
