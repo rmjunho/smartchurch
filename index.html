@@ -2729,6 +2729,19 @@ function go(screen) {
       nav.style.display = 'none';
     }
   }
+  if (screen === 'main') _maybeRouteToAdmin();
+}
+
+// 전용 주소(smartchurch.kro.kr/#admin 또는 /admin/)로 접속하면 메인 대신 관리자 콘솔로 바로 진입.
+// 해시는 1회 소비 → 콘솔을 닫고 뒤로 가도 다시 안 열림. 관리자가 아니면 일반 앱 그대로.
+function _maybeRouteToAdmin() {
+  if ((location.hash || '').toLowerCase() !== '#admin') return;
+  try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
+  if (me && me.isAppAdmin) {
+    setTimeout(() => { try { openSubscreen('admin-panel'); } catch (e) {} }, 420);
+  } else {
+    setTimeout(() => toast('관리자 전용 페이지예요'), 500);
+  }
 }
 
 // 로그인 ↔ 회원가입 탭 전환 (화면 이동 없음)
