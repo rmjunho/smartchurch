@@ -6080,6 +6080,7 @@ function saveAppointLeader() {
 // ═══════════════════════════════════════════════════
 var _adminUserSearch = '';
 var _adminUsersData  = null;   // Firestore에서 불러온 전체 사용자 캐시
+var _adminUsersPeriod = null;  // 접속 기간 필터(online/today/week/month/year/all) — null 이면 전체 사용자
 
 // 전체 사용자 목록 — Firestore 조회 (item ①). 이전엔 로컬 users 만 표시됐음.
 // 검색은 재조회 없이 캐시에서 필터링

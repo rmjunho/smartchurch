@@ -33,14 +33,44 @@ function filterAdminUsers(val) {
   if (body && _adminUsersData) body.outerHTML = renderAdminUsersHtml(_adminUsersData);
 }
 
+// 접속자 항목 → 그 기간 사용자만 보이는 명단 화면으로 진입 (전체 사용자 화면 재사용)
+function openAdminUsersByPeriod(period) {
+  _adminUsersPeriod = period || null;
+  _adminUserSearch  = '';
+  openSubscreen('admin-users');
+}
+// 기간별 lastActiveAt 하한 (ISO) — null 이면 필터 없음(전체 사용자)
+function _adminPeriodCutoff(period) {
+  const D = 864e5, now = Date.now();
+  if (period === 'online') return new Date(now - 3 * 60 * 1000).toISOString();
+  if (period === 'today')  { const t = new Date(); t.setHours(0,0,0,0); return t.toISOString(); }
+  if (period === 'week')   return new Date(now -   7 * D).toISOString();
+  if (period === 'month')  return new Date(now -  30 * D).toISOString();
+  if (period === 'year')   return new Date(now - 365 * D).toISOString();
+  return null;   // all / null → 필터 없음. (전체 기간은 아래에서 lastActiveAt 존재로 거름)
+}
+var _ADMIN_PERIOD_LABEL = { online:'현재 접속자', today:'오늘 접속', week:'최근 7일', month:'최근 30일', year:'최근 1년', all:'전체 기간 접속' };
+
 function renderAdminUsersHtml(allUsers) {
+  // 접속 기간 필터 (접속자 항목에서 진입한 경우) — 먼저 기간으로 거르고, 그 안에서 검색
+  const period = _adminUsersPeriod;
+  let base = allUsers;
+  if (period === 'all') {
+    base = allUsers.filter(u => u.lastActiveAt);   // 접속 기록이 한 번이라도 있는 사용자
+  } else if (period) {
+    const cut = _adminPeriodCutoff(period);
+    base = allUsers.filter(u => u.lastActiveAt && u.lastActiveAt >= cut);
+  }
+  // 최근 접속 순 정렬 (기간 필터 시 유용)
+  if (period) base = [...base].sort((a, b) => (b.lastActiveAt || '').localeCompare(a.lastActiveAt || ''));
+
   const q = _adminUserSearch.toLowerCase();
   const filtered = q
-    ? allUsers.filter(u =>
+    ? base.filter(u =>
         (u.name||'').toLowerCase().includes(q) ||
         (u.email||'').toLowerCase().includes(q) ||
         (u.church||'').toLowerCase().includes(q))
-    : allUsers;
+    : base;
 
   const STATUS_BADGE = {
     active:   ['#27AE60','rgba(39,174,96,0.1)','활성'],
@@ -50,6 +80,13 @@ function renderAdminUsersHtml(allUsers) {
   };
 
   let html = `<div id="admin-users-body">
+    ${period ? `<div style="margin:12px 16px 0;background:rgba(201,169,110,0.12);border:1.5px solid rgba(201,169,110,0.35);
+                border-radius:10px;padding:8px 12px;display:flex;align-items:center;justify-content:space-between;gap:8px">
+      <span style="font-size:12.5px;font-weight:700;color:var(--dark)">🟢 ${_ADMIN_PERIOD_LABEL[period] || '접속'} · ${base.length}명</span>
+      <button onclick="openAdminUsersByPeriod(null)"
+        style="height:28px;padding:0 12px;border-radius:7px;border:1.5px solid var(--border);background:white;
+               font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">전체 보기</button>
+    </div>` : ''}
     <div style="padding:12px 16px;border-bottom:1px solid var(--border)">
       <input type="text" value="${escHtml(_adminUserSearch)}"
         oninput="filterAdminUsers(this.value)"
@@ -379,7 +416,7 @@ function renderAdminPanelHtml(allUsers) {
 
     <div class="ss-section-title" style="margin-top:14px">현황 요약</div>
     <div class="ss-card">
-      <div class="ss-card-row" onclick="openSubscreen('admin-users')" style="cursor:pointer">
+      <div class="ss-card-row" onclick="openAdminUsersByPeriod(null)" style="cursor:pointer">
         <div class="ss-card-icon">👥</div>
         <div class="ss-card-info"><div class="ss-card-title">전체 사용자</div><div class="ss-card-sub">${allUsers.length}명 등록됨</div></div>
         <span class="sm-arrow">›</span>
@@ -408,42 +445,35 @@ function renderAdminPanelHtml(allUsers) {
 
     <div class="ss-section-title" style="margin-top:14px">접속자</div>
     <div class="ss-card">
-      <div class="ss-card-row" ${onlineNow.length ? `onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='block'?'none':'block'" style="cursor:pointer"` : ''}>
+      <div class="ss-card-row" onclick="openAdminUsersByPeriod('online')" style="cursor:pointer">
         <div class="ss-card-icon">🟢</div>
-        <div class="ss-card-info"><div class="ss-card-title">현재 접속자</div><div class="ss-card-sub">최근 3분 내 접속${onlineNow.length ? ' · 눌러서 명단 보기' : ''}</div></div>
-        <span class="ss-card-badge ss-badge-green">${onlineNow.length}</span>
+        <div class="ss-card-info"><div class="ss-card-title">현재 접속자</div><div class="ss-card-sub">최근 3분 내 접속 · 눌러서 명단</div></div>
+        <span class="ss-card-badge ss-badge-green">${onlineNow.length}</span><span class="sm-arrow">›</span>
       </div>
-      <div style="display:none;padding:4px 16px 12px">
-        ${onlineNow.map(u => `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;font-size:13px">
-          <span style="width:7px;height:7px;border-radius:50%;background:var(--success);flex-shrink:0"></span>
-          <span style="font-weight:600">${escHtml(u.name || '이름 없음')}</span>
-          <span style="color:var(--muted);font-size:12px">${escHtml(u.role || '')}${u.church ? ' · ' + escHtml(u.church) : ''}</span>
-        </div>`).join('')}
-      </div>
-      <div class="ss-card-row">
+      <div class="ss-card-row" onclick="openAdminUsersByPeriod('today')" style="cursor:pointer">
         <div class="ss-card-icon">📅</div>
         <div class="ss-card-info"><div class="ss-card-title">오늘 접속</div><div class="ss-card-sub">오늘 0시 이후 접속</div></div>
-        <span class="ss-card-badge ss-badge-gray">${cntToday}</span>
+        <span class="ss-card-badge ss-badge-gray">${cntToday}</span><span class="sm-arrow">›</span>
       </div>
-      <div class="ss-card-row">
+      <div class="ss-card-row" onclick="openAdminUsersByPeriod('week')" style="cursor:pointer">
         <div class="ss-card-icon">🗓️</div>
         <div class="ss-card-info"><div class="ss-card-title">최근 7일</div><div class="ss-card-sub">일주일 내 접속</div></div>
-        <span class="ss-card-badge ss-badge-gray">${cntWeek}</span>
+        <span class="ss-card-badge ss-badge-gray">${cntWeek}</span><span class="sm-arrow">›</span>
       </div>
-      <div class="ss-card-row">
+      <div class="ss-card-row" onclick="openAdminUsersByPeriod('month')" style="cursor:pointer">
         <div class="ss-card-icon">📆</div>
         <div class="ss-card-info"><div class="ss-card-title">최근 30일</div><div class="ss-card-sub">한 달 내 접속</div></div>
-        <span class="ss-card-badge ss-badge-gray">${cntMonth}</span>
+        <span class="ss-card-badge ss-badge-gray">${cntMonth}</span><span class="sm-arrow">›</span>
       </div>
-      <div class="ss-card-row">
+      <div class="ss-card-row" onclick="openAdminUsersByPeriod('year')" style="cursor:pointer">
         <div class="ss-card-icon">📈</div>
         <div class="ss-card-info"><div class="ss-card-title">최근 1년</div><div class="ss-card-sub">1년 내 접속</div></div>
-        <span class="ss-card-badge ss-badge-gray">${cntYear}</span>
+        <span class="ss-card-badge ss-badge-gray">${cntYear}</span><span class="sm-arrow">›</span>
       </div>
-      <div class="ss-card-row">
+      <div class="ss-card-row" onclick="openAdminUsersByPeriod('all')" style="cursor:pointer">
         <div class="ss-card-icon">🗄️</div>
         <div class="ss-card-info"><div class="ss-card-title">전체 기간</div><div class="ss-card-sub">접속 기록이 있는 누적 사용자</div></div>
-        <span class="ss-card-badge ss-badge-gold">${cntAll}</span>
+        <span class="ss-card-badge ss-badge-gold">${cntAll}</span><span class="sm-arrow">›</span>
       </div>
     </div>`;
 
