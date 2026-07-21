@@ -7249,6 +7249,7 @@ async function _renderRoomMsgs(msgs) {
       html += `<div class="openchat-date-divider"><span>${dateStr}</span></div>`;
       lastDate = dateStr;
     }
+    harvestSenderPhoto(msg);   // 박제 사진을 캐시에 → 교인 목록 등 다른 화면에도 표시
     const photo = (msg.senderId !== 'system' && getUserPhoto(msg.senderId)) || msg.senderPhoto;
     const avatarHtml = photo
       ? `<img src="${photo}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`
@@ -8245,6 +8246,7 @@ async function _renderOpenChatMsgs(msgs) {
       lastDate = dateStr;
     }
 
+    harvestSenderPhoto(msg);   // 박제 사진을 캐시에 → 교인 목록 등 다른 화면에도 표시
     const photo = (msg.senderId !== 'system' && getUserPhoto(msg.senderId)) || msg.senderPhoto;
     const avatarHtml = photo
       ? `<img src="${photo}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`
@@ -8380,6 +8382,13 @@ async function backfillMyPhoto() {
     await window._fb.setUserPhoto(me.id, { photoURL: small, churchCode: me.churchCode || '' });
     _photoCache[me.id] = small;
   } catch (e) { if (window._fbErr) window._fbErr('내 프로필 사진 서버 등록', e); }
+}
+// 채팅 메시지에 박제된 senderPhoto 를 사진 캐시에 주워담음 → userPhotos 문서가 없는
+// 구버전 계정도 (그 사람이 채팅한 적 있으면) 교인 목록·나의 교회 등에 사진이 뜬다.
+// 캐시가 빈 경우에만 채움 → warmPhotoCache 의 최신값(userPhotos)을 덮어쓰지 않음.
+function harvestSenderPhoto(msg) {
+  if (msg && msg.senderId && msg.senderId !== 'system' && msg.senderPhoto && !_photoCache[msg.senderId])
+    _photoCache[msg.senderId] = msg.senderPhoto;
 }
 // 단일 사용자 사진을 캐시에 확보 (없을 때만 1회 조회)
 async function ensurePhotoCached(uid, force) {
