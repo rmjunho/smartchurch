@@ -355,7 +355,7 @@ function _renderMatchProfileCard(p, sentReqs) {
   return `
     <div style="background:white;border-radius:14px;border:1.5px solid ${isFull&&(!sentReq||sentReq.status!=='accepted')?'rgba(231,76,60,0.2)':'var(--border)'};padding:14px;margin-bottom:12px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-        <div style="font-size:14.5px;font-weight:800">${escHtml(p.userName)}</div>
+        <div style="font-size:14.5px;font-weight:800">${escHtml(getUserName(p.userId, p.userName))}</div>
         <span style="font-size:11px;color:var(--muted)">${p.createdAt ? new Date(p.createdAt).toLocaleDateString('ko-KR',{month:'numeric',day:'numeric'}) : ''}</span>
       </div>
       ${chips ? `<div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px">${chips}</div>` : ''}

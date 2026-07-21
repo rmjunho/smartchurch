@@ -7527,24 +7527,29 @@ function renderFriendsList() {
     return;
   }
   el.innerHTML = friends.map(f => {
-    const photo = f.photoURL || getUserPhoto(f.userId);
-    const avatarHtml = photo
-      ? `<img src="${photo}" alt="${escHtml(f.name)}">`
-      : '👤';
+    // 저장 당시 박제값 대신 현재 값 우선 (상대가 이름/직분/사진 바꾸면 반영)
+    const name  = getUserName(f.userId, f.name);
+    const role  = getUserRole(f.userId, f.role || '성도');
+    const photo = getUserPhoto(f.userId) || f.photoURL;
     return `
       <div class="friend-item">
         <div class="friend-avatar">${photo ? `<img src="${photo}">` : '👤'}</div>
         <div style="flex:1;min-width:0">
-          <div class="friend-name">${escHtml(f.name)}</div>
-          <div class="friend-sub">${escHtml(f.role||'성도')} · ${escHtml(f.church||'')}</div>
+          <div class="friend-name">${escHtml(name)}</div>
+          <div class="friend-sub">${escHtml(role)} · ${escHtml(f.church||'')}</div>
         </div>
-        <button onclick="startDmWith('${f.userId}','${escHtml(f.name)}')"
+        <button onclick="startDmWith('${f.userId}','${escHtml(name)}')"
           style="height:32px;padding:0 12px;border-radius:20px;border:1.5px solid var(--border);
                  background:white;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">
           채팅
         </button>
       </div>`;
   }).join('');
+
+  // 다른 교회 친구는 사진 캐시에 없을 수 있음 → 빠진 것만 개별 조회 후 1회 다시 그림
+  const missing = friends.filter(f => !getUserPhoto(f.userId) && !f.photoURL).map(f => f.userId);
+  if (missing.length) Promise.all(missing.map(id => ensurePhotoCached(id)))
+    .then(() => { if (missing.some(id => _photoCache[id])) renderFriendsList(); });
 }
 
 function startDmWith(userId, name) {
