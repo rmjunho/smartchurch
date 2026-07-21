@@ -326,6 +326,7 @@ function renderAdminPanelHtml(allUsers) {
   const cntWeek  = activeSince(new Date(Date.now() -   7 * 864e5).toISOString());
   const cntMonth = activeSince(new Date(Date.now() -  30 * 864e5).toISOString());
   const cntYear  = activeSince(new Date(Date.now() - 365 * 864e5).toISOString());
+  const cntAll   = allUsers.filter(u => u.lastActiveAt).length;   // 전체 기간 — 접속 기록이 한 번이라도 있는 사용자(옛 기록 포함)
   const churches      = [...new Set(allUsers.map(u => u.church).filter(Boolean))];
 
   let html = `<div id="admin-panel-body">
@@ -438,6 +439,11 @@ function renderAdminPanelHtml(allUsers) {
         <div class="ss-card-icon">📈</div>
         <div class="ss-card-info"><div class="ss-card-title">최근 1년</div><div class="ss-card-sub">1년 내 접속</div></div>
         <span class="ss-card-badge ss-badge-gray">${cntYear}</span>
+      </div>
+      <div class="ss-card-row">
+        <div class="ss-card-icon">🗄️</div>
+        <div class="ss-card-info"><div class="ss-card-title">전체 기간</div><div class="ss-card-sub">접속 기록이 있는 누적 사용자</div></div>
+        <span class="ss-card-badge ss-badge-gold">${cntAll}</span>
       </div>
     </div>`;
 
