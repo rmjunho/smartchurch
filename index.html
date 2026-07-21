@@ -3394,10 +3394,8 @@ function bootApp() {
     if (r.lastMessageAt) _prevRoomTimestamps[r.id] = r.lastMessageAt;
   });
 
-  // 접속 시각 기록 (관리자 패널 "현재 접속자" 산정 기준)
-  if (window._fbReady && window._fb) {
-    window._fb.updateUser(me.id, { lastActiveAt: new Date().toISOString() }).catch(() => {});
-  }
+  // 접속 시각 주기적 기록 (관리자 패널 "현재 접속자" 산정 기준)
+  startPresenceHeartbeat();
 
   // 교회 가입 상태 Firestore에서 재확인 (승인/거부 반영)
   _syncChurchStatus();
@@ -3421,6 +3419,24 @@ function bootApp() {
   updateDateSegments();
   _bootAppTail();
 }
+
+// ── 접속 상태 하트비트 — 앱을 켜둔 동안 60초마다 lastActiveAt 갱신 ──
+// (1회성 기록이면 오래 켜둔 사람이 오프라인으로 잡힘 → 관리자 '현재 접속자' 기준을 짧게 잡으려면 필요)
+var _presenceTimer = null;
+function _stampActive() {
+  if (window._fbReady && window._fb && me)
+    window._fb.updateUser(me.id, { lastActiveAt: new Date().toISOString() }).catch(() => {});
+}
+function startPresenceHeartbeat() {
+  _stampActive();
+  if (_presenceTimer) clearInterval(_presenceTimer);
+  _presenceTimer = setInterval(() => { if (document.visibilityState === 'visible') _stampActive(); }, 60000);
+}
+function stopPresenceHeartbeat() {
+  if (_presenceTimer) { clearInterval(_presenceTimer); _presenceTimer = null; }
+}
+// 탭을 다시 보면 즉시 한 번 찍어 접속 상태를 최신화 (백그라운드 60초 갱신 건너뛴 것 보정)
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') _stampActive(); });
 
 // 내 사용자 문서 실시간 감시 — 계정 삭제 감지 + 직분·리더 권한 변경 즉시 반영
 function startSelfDocWatch() {
@@ -6166,6 +6182,7 @@ function closeLogoutModal(e) {
 }
 function doLogout() {
   if (typeof stopChurchMembersWatch === 'function') stopChurchMembersWatch();
+  if (typeof stopPresenceHeartbeat === 'function') stopPresenceHeartbeat();
   if (_selfDocUnsub) { _selfDocUnsub(); _selfDocUnsub = null; }
   DB.clearSession();
   me = null;
@@ -8485,6 +8502,7 @@ window.addEventListener('fb-ready', () => {
   if (!me) return;
   startSelfDocWatch();
   startChurchMembersWatch();
+  startPresenceHeartbeat();
   warmUserInfoCache(true);
   warmPhotoCache(true);
   backfillMyPhoto();

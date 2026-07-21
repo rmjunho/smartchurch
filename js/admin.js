@@ -315,8 +315,10 @@ function renderAdminPanelHtml(allUsers) {
   const minorPending  = allUsers.filter(u => u.status === 'pending');
   const churchJoinPen = allUsers.filter(u => u.status !== 'pending' && u.churchStatus === 'pending');
   const active        = allUsers.filter(u => u.status === 'active' || !u.status);
-  const thirtyMinAgo  = new Date(Date.now() - 30 * 60 * 1000).toISOString();
-  const onlineNow     = allUsers.filter(u => u.lastActiveAt && u.lastActiveAt > thirtyMinAgo);
+  // 접속 기준 3분 — 앱이 60초마다 lastActiveAt 을 갱신하므로 한 번 놓쳐도 접속 중으로 유지
+  const onlineCutoff  = new Date(Date.now() - 3 * 60 * 1000).toISOString();
+  const onlineNow     = allUsers.filter(u => u.lastActiveAt && u.lastActiveAt > onlineCutoff)
+                                .sort((a, b) => (b.lastActiveAt || '').localeCompare(a.lastActiveAt || ''));
   const churches      = [...new Set(allUsers.map(u => u.church).filter(Boolean))];
 
   let html = `<div id="admin-panel-body">
@@ -394,10 +396,17 @@ function renderAdminPanelHtml(allUsers) {
         <div class="ss-card-info"><div class="ss-card-title">교회 가입 대기</div></div>
         <span class="ss-card-badge ${churchJoinPen.length > 0 ? 'ss-badge-gold' : 'ss-badge-gray'}">${churchJoinPen.length}</span>
       </div>
-      <div class="ss-card-row">
+      <div class="ss-card-row" ${onlineNow.length ? `onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='block'?'none':'block'" style="cursor:pointer"` : ''}>
         <div class="ss-card-icon">🟢</div>
-        <div class="ss-card-info"><div class="ss-card-title">현재 접속자</div><div class="ss-card-sub">최근 30분 내 접속</div></div>
+        <div class="ss-card-info"><div class="ss-card-title">현재 접속자</div><div class="ss-card-sub">최근 3분 내 접속${onlineNow.length ? ' · 눌러서 명단 보기' : ''}</div></div>
         <span class="ss-card-badge ss-badge-green">${onlineNow.length}</span>
+      </div>
+      <div style="display:none;padding:4px 16px 12px">
+        ${onlineNow.map(u => `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;font-size:13px">
+          <span style="width:7px;height:7px;border-radius:50%;background:var(--success);flex-shrink:0"></span>
+          <span style="font-weight:600">${escHtml(u.name || '이름 없음')}</span>
+          <span style="color:var(--muted);font-size:12px">${escHtml(u.role || '')}${u.church ? ' · ' + escHtml(u.church) : ''}</span>
+        </div>`).join('')}
       </div>
     </div>`;
 
