@@ -8445,14 +8445,16 @@ window._fbErr = function (where, e) {
     toast(where + ': 서버 권한 거부 — 보안 규칙 확인 필요');
 };
 
-// ── 교회 교인 실시간 감시 → 이름·직분 변경을 모든 화면에 실시간 반영 ──
-var _membersUnsub = null;
-var _membersSig   = '';
+// ── 교회 교인 실시간 감시 → 이름·직분·사진 변경을 모든 화면에 실시간 반영 ──
+var _membersUnsub   = null;
+var _membersSig     = '';
+var _memberPhotoStamps = {};   // id -> photoUpdatedAt (사진 변경 감지용)
 function startChurchMembersWatch() {
   if (!window._fbReady || !window._fb || !me || !me.churchCode) return;
   if (_membersUnsub) { _membersUnsub(); _membersUnsub = null; }
   _membersSig = '';
-  _membersUnsub = window._fb.watchChurch(me.churchCode, snap => {
+  _memberPhotoStamps = {};
+  _membersUnsub = window._fb.watchChurch(me.churchCode, async snap => {
     const members = [];
     snap.forEach(d => members.push({ id: d.id, ...d.data() }));
     // 공용 캐시 갱신 (교인목록 · 채팅 이름/직분 · 사진 · 승인 핸들러)
@@ -8460,14 +8462,22 @@ function startChurchMembersWatch() {
     if (typeof _cacheUserPhotos === 'function') _cacheUserPhotos(members);
     members.forEach(u => { _userInfoCache[u.id] = { name: u.name || '', role: u.role || '' }; });
     _userInfoWarmed = true;
-    // 이름/직분/사진이 실제로 바뀐 경우에만 화면 갱신 (lastActiveAt 등 잡음 무시)
-    const sig = members.map(u => `${u.id}:${u.name}:${u.role}:${u.photoURL || ''}`).sort().join('|');
+    // 사진 변경 감지 — 사진은 userPhotos 컬렉션에 있어 이 스냅샷엔 안 담긴다. users 문서의
+    // photoUpdatedAt 표식이 바뀐 교인만 userPhotos 를 다시 불러온다 (첫 스냅샷은 warmPhotoCache 가 담당).
+    const firstRun = _membersSig === '';
+    const changed  = members.filter(u => (u.photoUpdatedAt || '') !== (_memberPhotoStamps[u.id] || ''));
+    members.forEach(u => { _memberPhotoStamps[u.id] = u.photoUpdatedAt || ''; });
+    if (!firstRun && changed.length)
+      await Promise.all(changed.map(u => ensurePhotoCached(u.id, true)));   // 강제 = 옛 캐시 무시하고 최신
+    // 이름/직분/사진표식이 실제로 바뀐 경우에만 화면 갱신 (lastActiveAt 등 잡음 무시)
+    const sig = members.map(u => `${u.id}:${u.name}:${u.role}:${u.photoUpdatedAt || ''}`).sort().join('|');
     if (sig !== _membersSig) { _membersSig = sig; _refreshVisibleMemberViews(); }
   });
 }
 function stopChurchMembersWatch() {
   if (_membersUnsub) { _membersUnsub(); _membersUnsub = null; }
   _membersSig = '';
+  _memberPhotoStamps = {};
 }
 // Firebase 모듈이 부팅(1.8초)보다 늦게 준비되는 느린 회선에서는 위 실시간 감시들이
 // 조용히 건너뛰어진다 → 준비 완료 신호를 받으면 다시 건다.
@@ -8740,7 +8750,11 @@ function saveProfileEdit() {
       _photoCache[me.id] = small;
       // users 문서가 아닌 별도 컬렉션에 저장 → 교인목록/검색/로그인 조회가 사진을 안 끌고 옴
       if (window._fbReady && window._fb) {
-        window._fb.setUserPhoto(me.id, { photoURL: small, churchCode: me.churchCode || '' }).catch(() => {});
+        // 사진이 userPhotos 에 올라간 '뒤에' users 문서에 표식을 남긴다 → 남의 watchChurch 가
+        // 깨어나 사진을 다시 불러올 때 옛 사진이 아닌 방금 올린 사진을 집도록 (경합 방지)
+        window._fb.setUserPhoto(me.id, { photoURL: small, churchCode: me.churchCode || '' })
+          .then(() => window._fb.updateUser(me.id, { photoUpdatedAt: new Date().toISOString() }))
+          .catch(() => {});
       }
     }).catch(() => {});
   }
