@@ -1,0 +1,180 @@
+rules_version = '2';
+
+// SmartChurch Firestore 보안 규칙
+// - 전체 허용(catch-all `match /{document=**}`)을 제거하고 컬렉션마다 명시적으로 정의.
+// - 소유자는 문서 ID가 아니라 필드로 판별되는 경우가 많음(userId/authorId/fromId·toId/createdById).
+// - 리더/관리자 교차 쓰기는 호출자의 users 문서를 get() 해서 판별.
+// ⚠️ 콘솔에 적용 후 반드시 주요 흐름(로그인·가입승인·직분변경·채팅·바인더 동기화)을 테스트하세요.
+//    문제가 생기면 콘솔 규칙 히스토리에서 이전 버전으로 롤백.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── 헬퍼 ──
+    function signedIn() { return request.auth != null; }
+    function uid()      { return request.auth.uid; }
+    function hasProfile() { return exists(/databases/$(database)/documents/users/$(uid())); }
+    function profile()    { return get(/databases/$(database)/documents/users/$(uid())).data; }
+    function isAdmin()  { return signedIn() && hasProfile() && profile().isAppAdmin == true; }
+    function isLeader() {
+      return signedIn() && hasProfile() && (
+        profile().isAppAdmin == true ||
+        (profile().leaderPerms is list && profile().leaderPerms.size() > 0) ||
+        profile().role in ['담임목사','부목사','전도사','기관장','원장','부원장','관리자']
+      );
+    }
+    function hasPerm(p) {
+      return signedIn() && hasProfile() && (
+        profile().isAppAdmin == true ||
+        profile().role in ['담임목사','부목사','전도사','기관장','원장','부원장','관리자'] ||
+        (profile().leaderPerms is list && p in profile().leaderPerms)
+      );
+    }
+
+    // ── 사용자 프로필 ──
+    // 읽기: 로그인한 교인 누구나(교인 목록). 생성: 본인 가입 또는 관리자 벌크 동기화.
+    // 수정: 본인 / 관리자 / 같은 교회 리더(가입승인·직분·리더임명). 삭제: 관리자.
+    match /users/{userId} {
+      allow read:   if signedIn();
+      allow create: if signedIn() && (uid() == userId || isAdmin());
+      allow update: if signedIn() && (
+                      uid() == userId ||
+                      isAdmin() ||
+                      (isLeader() && resource.data.churchCode == profile().churchCode)
+                    );
+      allow delete: if isAdmin();
+    }
+
+    // ── 프로필 사진 (문서 ID = uid) ──
+    // 본인 또는 리더/관리자(구버전 계정 사진 대신 등록 backfillOtherPhoto).
+    match /userPhotos/{photoId} {
+      allow read:  if signedIn();
+      allow write: if signedIn() && (uid() == photoId || isLeader());
+    }
+
+    // ── 공유 바인더 (key = uid_date, 교회 내 공개 열람) ──
+    match /binderEntries/{key} {
+      allow read:  if signedIn();
+      allow write: if signedIn() && key.split('_')[0] == uid();
+    }
+
+    // ── 개인 바인더 기기 동기화 (key = uid_date, 본인만 — 비공개) ──
+    match /myBinders/{key} {
+      allow read, write: if signedIn() && key.split('_')[0] == uid();
+    }
+
+    // ── 공유 바인더 코멘트 (소유자 필드 authorId) ──
+    // 생성: 작성자 본인. 수정/삭제: 작성자 또는 바인더 권한 리더(모더레이션).
+    match /binderComments/{id} {
+      allow read:   if signedIn();
+      allow create: if signedIn() && request.resource.data.authorId == uid();
+      allow update, delete: if signedIn() && (
+                      resource.data.authorId == uid() || hasPerm('binder')
+                    );
+    }
+
+    // ── 챌린지 (소유자 필드 createdByUid) ──
+    match /challenges/{id} {
+      allow read:   if signedIn();
+      allow create: if signedIn();
+      allow update, delete: if signedIn() && (
+                      resource.data.createdByUid == uid() || isLeader()
+                    );
+    }
+
+    // ── 게시판 글 (소유자 필드 authorId) ──
+    // 수정은 로그인 누구나 허용(좋아요 likes[] 를 모든 교인이 갱신). 삭제는 작성자/관리자.
+    match /boardPosts/{postId} {
+      allow read:   if signedIn();
+      allow create: if signedIn() && request.resource.data.authorId == uid();
+      allow update: if signedIn();
+      allow delete: if signedIn() && (resource.data.authorId == uid() || isAdmin());
+
+      match /comments/{commentId} {
+        allow read:   if signedIn();
+        allow create: if signedIn() && request.resource.data.authorId == uid();
+        allow update: if signedIn() && resource.data.authorId == uid();
+        allow delete: if signedIn() && (resource.data.authorId == uid() || isAdmin());
+      }
+    }
+
+    // ── 친구 요청 (id = fr_{fromId}_{toId}, 당사자만) ──
+    match /friendRequests/{id} {
+      allow read:   if signedIn() && (resource.data.fromId == uid() || resource.data.toId == uid());
+      allow create: if signedIn() && request.resource.data.fromId == uid();
+      allow update, delete: if signedIn() && (resource.data.fromId == uid() || resource.data.toId == uid());
+    }
+
+    // ── 매칭 프로필 (소유자 필드 userId) ──
+    match /matchProfiles/{id} {
+      allow read:   if signedIn();
+      allow create: if signedIn() && request.resource.data.userId == uid();
+      allow update, delete: if signedIn() && resource.data.userId == uid();
+    }
+
+    // ── 매칭 요청 (당사자 fromId/toId) ──
+    match /matchRequests/{id} {
+      allow read:   if signedIn();
+      allow create: if signedIn() && request.resource.data.fromId == uid();
+      allow update, delete: if signedIn() && (resource.data.fromId == uid() || resource.data.toId == uid());
+    }
+
+    // ── 오픈채팅 채널 (소유자 필드 createdBy, 리더 승인/삭제) ──
+    match /openChannels/{id} {
+      allow read:   if signedIn();
+      allow create: if signedIn() && request.resource.data.createdBy == uid();
+      allow update, delete: if signedIn() && (resource.data.createdBy == uid() || isLeader());
+    }
+
+    // ── 모임/회의 (소유자 필드 createdById, 리더 생성) ──
+    match /meetings/{id} {
+      allow read:   if signedIn();
+      allow create: if signedIn() && request.resource.data.createdById == uid();
+      allow update, delete: if signedIn() && resource.data.createdById == uid();
+    }
+
+    // ── 교회 상세정보 (문서 ID = 교회코드, 리더/관리자만 수정) ──
+    match /churchInfo/{code} {
+      allow read:  if signedIn();
+      allow write: if isLeader();
+    }
+
+    // ── 행사 (소유자 필드 createdById). 티켓 신청/취소는 모든 교인이 ticketCount 갱신 → update 개방 ──
+    match /events/{id} {
+      allow read:   if signedIn();
+      allow create: if signedIn() && request.resource.data.createdById == uid() && (isLeader() || hasPerm('ticketing'));
+      allow update: if signedIn();
+      allow delete: if signedIn() && resource.data.createdById == uid();
+    }
+
+    // ── 채팅방 + 메시지 (공유 문서 — 교인 누구나 참여) ──
+    match /chatRooms/{roomId} {
+      allow read, create, update: if signedIn();
+      match /messages/{msgId} {
+        allow read:   if signedIn();
+        allow create: if signedIn() && (request.resource.data.senderId == uid() || request.resource.data.senderId == 'system');
+        allow update: if signedIn();
+      }
+    }
+
+    // ── 초대 코드 (코드 = 문서 ID) ──
+    // 읽기 공개(온보딩 코드 확인). 생성: invite 권한 리더. 사용(usedBy arrayUnion): 로그인 누구나. 삭제: 리더.
+    match /inviteCodes/{code} {
+      allow read:   if true;
+      allow create: if hasPerm('invite');
+      allow update: if signedIn();
+      allow delete: if isLeader();
+    }
+
+    // ── 행사 예약 (churchData/{code}/events/{id}/reservations/{uid}) ──
+    // 예약 목록 읽기(참석자 수)는 교인 공개. 쓰기는 본인 예약만.
+    match /churchData/{churchCode}/events/{eventId}/reservations/{resUid} {
+      allow read:  if signedIn();
+      allow write: if signedIn() && resUid == uid();
+    }
+    // 내 예약 전체조회(collectionGroup 'reservations') 대응
+    match /{path=**}/reservations/{resId} {
+      allow read:  if signedIn();
+    }
+  }
+}
