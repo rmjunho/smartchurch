@@ -810,10 +810,39 @@
           <button class="btn-cancel" onclick="event.stopPropagation();removePhoto()">삭제</button>
           <button class="btn-confirm" onclick="event.stopPropagation();openPhotoSourceModal()">다른 사진 선택</button>
         </div>
-        <textarea id="photo-caption" class="qt-ta" rows="2"
-                  placeholder="사진에 대한 짧은 기록을 남겨보세요 (선택)"
-                  oninput="autoSave('photo');autoGrow(this)" style="margin-top:14px"></textarea>
-        <span class="binder-saved" id="photo-saved">저장됨 </span>
+      </div>
+
+      <!-- 공용: 메모 + 받은 코멘트 (텍스트/드로잉/업로드형 모두에 표시) -->
+      <div class="worship-common" id="worship-common-wrap">
+        <div class="binder-sec">
+          <div class="binder-sec-hd" onclick="toggleSec('memo')">
+            <div class="binder-sec-title"><span class="binder-sec-icon">📝</span>메모</div>
+            <div class="binder-sec-right">
+              <span class="binder-saved" id="memo-saved">저장됨 </span>
+              <span class="binder-chevron" id="memo-chev">∨</span>
+            </div>
+          </div>
+          <div class="binder-sec-body" id="memo-body">
+            <div class="binder-sec-inner">
+              <textarea id="binder-memo" class="qt-ta" rows="3"
+                        placeholder="오늘의 예배에 대한 메모를 자유롭게 남겨보세요..."
+                        oninput="autoSave('memo');autoGrow(this)"></textarea>
+            </div>
+          </div>
+        </div>
+        <div class="binder-sec" style="border-bottom:none">
+          <div class="binder-sec-hd" onclick="toggleSec('mycmt')">
+            <div class="binder-sec-title"><span class="binder-sec-icon">💬</span>받은 코멘트 <span class="binder-cmts-count" id="mycmt-count"></span></div>
+            <div class="binder-sec-right"><span class="binder-chevron" id="mycmt-chev">∨</span></div>
+          </div>
+          <div class="binder-sec-body" id="mycmt-body">
+            <div class="binder-sec-inner">
+              <div class="binder-cmts-list" id="my-binder-cmts-list">
+                <div style="font-size:12.5px;color:var(--muted);padding:8px 0">아직 받은 코멘트가 없어요</div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- Community binder (교인 묵상 나눔 — 리더 전용) -->
@@ -3618,6 +3647,8 @@ function setMode(m) {
   document.getElementById('worship-draw-wrap').classList.toggle('on',  m === 'draw');
   document.getElementById('worship-upload-wrap').classList.toggle('on', m === 'upload');
   document.getElementById('worship-share-wrap')?.classList.toggle('on', m === 'share');
+  // 메모 + 받은 코멘트는 개인 모드(텍스트/드로잉/업로드)에서만 표시, 나눔 모드에선 숨김
+  document.getElementById('worship-common-wrap')?.classList.toggle('off', m === 'share');
   const shareBtn = document.getElementById('binder-share-status-btn');
   if (shareBtn) shareBtn.style.display = m === 'share' ? 'none' : '';
   updateFloatToolbarVisibility();
@@ -3677,7 +3708,7 @@ function binderKey() { return `binder_${me.id}_${dateKey()}`; }
 // updatedAt·기본 시간표 슬롯 등 '자동 생성' 필드는 내용으로 치지 않음.
 function binderHasContent(d) {
   if (!d || typeof d !== 'object') return false;
-  if (['verse','meditation','application','prayer','diary','photoCaption','qt']
+  if (['verse','meditation','application','prayer','diary','memo','qt']
         .some(k => (d[k] || '').trim())) return true;
   if (Array.isArray(d.schRows) && d.schRows.some(r => r && (r.plan || '').trim())) return true;
   if (Array.isArray(d.todos)   && d.todos.some(t => t && (t.text || '').trim())) return true;
@@ -3699,12 +3730,17 @@ function loadBinder() {
   document.getElementById('qt-prayer').value      = data.prayer      || '';
   // Diary
   document.getElementById('diary-text').value = data.diary || '';
+  // Memo (모든 모드 공용)
+  const memoEl = document.getElementById('binder-memo');
+  if (memoEl) memoEl.value = data.memo || '';
   // Schedule - build rows if not yet built
   buildScheduleRows(data);
   // Auto-grow all textareas
-  ['qt-meditation','qt-application','qt-prayer','diary-text'].forEach(id => {
+  ['qt-meditation','qt-application','qt-prayer','diary-text','binder-memo'].forEach(id => {
     autoGrow(document.getElementById(id));
   });
+  // 받은 코멘트(리더 등이 내 바인더에 남긴 코멘트) 실시간 감시 — 날짜 바뀌면 재구독
+  startMyBinderCommentsWatch();
   // Diary rings
   buildDiaryRings();
   // Photo upload mode
@@ -3883,7 +3919,7 @@ function readBinder() {
     prayer:       document.getElementById('qt-prayer').value,
     schRows:      readSchRowsFromDOM(),   // 시간표 행 편집 데이터
     diary:        document.getElementById('diary-text').value,
-    photoCaption: document.getElementById('photo-caption').value,
+    memo:         document.getElementById('binder-memo').value,
     updatedAt:    new Date().toISOString()
   };
 }
@@ -5188,8 +5224,6 @@ function removePhoto() {
 function loadPhotoForDate(data) {
   if (data.photo) showPhotoPreview(data.photo);
   else hidePhotoPreview();
-  document.getElementById('photo-caption').value = data.photoCaption || '';
-  autoGrow(document.getElementById('photo-caption'));
   document.getElementById('photo-input').value = '';
 }
 
@@ -6197,6 +6231,7 @@ function closeLogoutModal(e) {
 function doLogout() {
   if (typeof stopChurchMembersWatch === 'function') stopChurchMembersWatch();
   if (typeof stopPresenceHeartbeat === 'function') stopPresenceHeartbeat();
+  if (typeof stopMyBinderCommentsWatch === 'function') stopMyBinderCommentsWatch();
   if (_selfDocUnsub) { _selfDocUnsub(); _selfDocUnsub = null; }
   DB.clearSession();
   me = null;
@@ -9067,6 +9102,44 @@ function showShareModeIfLeader() {
 }
 
 var _communityCache = {};
+
+// ── 내 바인더에 달린 코멘트(받은 코멘트) 실시간 감시 — 개인 모드 공용 섹션에 표시 ──
+var _myCmtUnsub = null;
+function startMyBinderCommentsWatch() {
+  if (!me) return;
+  if (_myCmtUnsub) { _myCmtUnsub(); _myCmtUnsub = null; }
+  const myKey = `${me.id}_${dateKey()}`;
+  if (!window._fbReady || !window._fb) return;
+  if (window._fb.listenBinderComments) {
+    _myCmtUnsub = window._fb.listenBinderComments(myKey, snap => {
+      const comments = [];
+      snap.forEach(d => comments.push({ id: d.id, ...d.data() }));
+      renderMyBinderComments(myKey, comments);
+    });
+  } else {
+    // 실시간 미지원 시 1회 로드
+    window._fb.getBinderComments(myKey).then(snap => {
+      const comments = []; snap.forEach(d => comments.push({ id: d.id, ...d.data() }));
+      renderMyBinderComments(myKey, comments);
+    }).catch(() => {});
+  }
+}
+function stopMyBinderCommentsWatch() {
+  if (_myCmtUnsub) { _myCmtUnsub(); _myCmtUnsub = null; }
+}
+function renderMyBinderComments(myKey, comments) {
+  const list = document.getElementById('my-binder-cmts-list');
+  const countEl = document.getElementById('mycmt-count');
+  if (!list) return;
+  comments.sort((a, b) => _cmtTime(a) - _cmtTime(b));
+  comments.forEach(c => { _binderCmtCache[c.id] = c; });
+  if (countEl) countEl.textContent = comments.length ? `(${comments.length})` : '';
+  if (!comments.length) {
+    list.innerHTML = `<div style="font-size:12.5px;color:var(--muted);padding:8px 0">아직 받은 코멘트가 없어요</div>`;
+    return;
+  }
+  list.innerHTML = comments.map(c => renderBinderComment(c, myKey)).join('');
+}
 
 async function loadCommunityBinders() {
   const body = document.getElementById('community-binder-body');

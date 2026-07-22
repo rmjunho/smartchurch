@@ -2859,6 +2859,9 @@
     .worship-upload.on { display: block; }
     .worship-text { display: block; padding-top: 16px; }
     .worship-text.off { display: none; }
+    /* 공용: 메모 + 받은 코멘트 (개인 모드 공통, 나눔 모드에선 .off 로 숨김) */
+    .worship-common { display: block; padding: 0 0 24px; }
+    .worship-common.off { display: none; }
 
     /* =============================================
        ONBOARDING
