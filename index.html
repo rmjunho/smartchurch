@@ -9138,17 +9138,117 @@ function renderCommunityEntry(e) {
     `<img src="${drw.diary}" style="width:100%;border-radius:8px">`);
 
   const role = e.userRole || '';
+  const entryKey = `${e.userId}_${e.date || dateKey()}`;
+  const photo = (typeof getUserPhoto === 'function' && getUserPhoto(e.userId)) || e.userPhoto || '';
+  const avatar = photo
+    ? `<img src="${photo}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`
+    : '👤';
   return `<div class="comm-user-card">
-    <div class="comm-user-hd" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none';this.querySelector('.acc-chev').classList.toggle('open')">
-      <div class="comm-user-avatar">👤</div>
+    <div class="comm-user-hd" onclick="toggleCommEntry(this,'${entryKey}')">
+      <div class="comm-user-avatar" style="overflow:hidden">${avatar}</div>
       <div class="comm-user-info">
-        <div class="comm-user-name">${escHtml(e.userName||'')}</div>
+        <div class="comm-user-name">${escHtml(e.userName||'')}${role?` <span style="font-size:11px;color:var(--muted);font-weight:600">${escHtml(role)}</span>`:''}</div>
         <div class="comm-user-sub">${hasText?'텍스트':''}${hasText&&hasDraw?' · ':''}${hasDraw?'드로잉':''}</div>
       </div>
       <span class="acc-chev">▼</span>
     </div>
-    <div class="comm-user-body" style="display:none">${sections}</div>
+    <div class="comm-user-body" style="display:none">
+      ${sections}
+      <div class="binder-cmts" data-key="${entryKey}">
+        <div class="binder-cmts-title">💬 코멘트 <span class="binder-cmts-count" id="bcc-${entryKey}"></span></div>
+        <div class="binder-cmts-list" id="bcl-${entryKey}">
+          <div style="font-size:12.5px;color:var(--muted);padding:8px 0">불러오는 중...</div>
+        </div>
+        <div class="binder-cmts-input">
+          <input type="text" id="bci-${entryKey}" maxlength="300"
+            placeholder="${escHtml(e.userName||'')}님의 묵상에 코멘트..."
+            onkeydown="if(event.key==='Enter')submitBinderComment('${entryKey}')">
+          <button onclick="submitBinderComment('${entryKey}')">등록</button>
+        </div>
+      </div>
+    </div>
   </div>`;
+}
+
+// 카드 펼침/접힘 + 첫 펼침 때 코멘트 로드
+function toggleCommEntry(hd, entryKey) {
+  const body = hd.nextElementSibling;
+  const opening = body.style.display === 'none';
+  body.style.display = opening ? 'block' : 'none';
+  hd.querySelector('.acc-chev').classList.toggle('open');
+  if (opening && !body.dataset.cmtsLoaded) { body.dataset.cmtsLoaded = '1'; loadBinderComments(entryKey); }
+}
+
+async function loadBinderComments(entryKey) {
+  const list = document.getElementById('bcl-' + entryKey);
+  if (!list) return;
+  let comments = [];
+  try {
+    if (window._fbReady && window._fb) {
+      const snap = await window._fb.getBinderComments(entryKey);
+      snap.forEach(d => comments.push({ id: d.id, ...d.data() }));
+    }
+  } catch (e) { if (window._fbErr) window._fbErr('코멘트 불러오기', e); }
+  // 최신순 정렬 (쿼리에 orderBy 없이 클라이언트에서)
+  comments.sort((a, b) => _cmtTime(a) - _cmtTime(b));
+  const countEl = document.getElementById('bcc-' + entryKey);
+  if (countEl) countEl.textContent = comments.length ? `(${comments.length})` : '';
+  if (!comments.length) {
+    list.innerHTML = `<div style="font-size:12.5px;color:var(--muted);padding:8px 0">첫 코멘트를 남겨보세요</div>`;
+    return;
+  }
+  list.innerHTML = comments.map(c => renderBinderComment(c, entryKey)).join('');
+}
+function _cmtTime(c) { return c.createdAt?.toDate ? c.createdAt.toDate().getTime() : 0; }
+
+function renderBinderComment(c, entryKey) {
+  const ts = c.createdAt?.toDate ? c.createdAt.toDate() : null;
+  const timeStr = ts ? ts.toLocaleDateString('ko-KR', { month:'numeric', day:'numeric' }) + ' ' +
+                       ts.toLocaleTimeString('ko-KR', { hour:'2-digit', minute:'2-digit', hour12:true }) : '';
+  const canDelete = c.authorId === me.id || (typeof isLeader === 'function' && isLeader());
+  const photo = (typeof getUserPhoto === 'function' && getUserPhoto(c.authorId)) || '';
+  const avatar = photo ? `<img src="${photo}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">` : '👤';
+  return `<div class="binder-cmt">
+    <div class="binder-cmt-av" style="overflow:hidden">${avatar}</div>
+    <div class="binder-cmt-main">
+      <div class="binder-cmt-hd">
+        <span class="binder-cmt-name">${escHtml(getUserName ? getUserName(c.authorId, c.authorName) : (c.authorName||''))}</span>
+        ${c.authorRole ? `<span class="binder-cmt-role">${escHtml(getUserRole ? getUserRole(c.authorId, c.authorRole) : c.authorRole)}</span>` : ''}
+        <span class="binder-cmt-time">${timeStr}</span>
+        ${canDelete ? `<button class="binder-cmt-del" onclick="deleteBinderComment('${c.id}','${entryKey}')">삭제</button>` : ''}
+      </div>
+      <div class="binder-cmt-text">${escHtml(c.text||'')}</div>
+    </div>
+  </div>`;
+}
+
+async function submitBinderComment(entryKey) {
+  const input = document.getElementById('bci-' + entryKey);
+  if (!input) return;
+  const text = input.value.trim();
+  if (!text) { toast('코멘트를 입력해 주세요'); return; }
+  if (!window._fbReady || !window._fb) { toast('서버 연결이 필요해요'); return; }
+  input.value = '';
+  try {
+    await window._fb.addBinderComment({
+      entryKey, text,
+      authorId: me.id, authorName: me.name || '', authorRole: me.role || '',
+      church: me.church || '', churchCode: me.churchCode || ''
+    });
+    await loadBinderComments(entryKey);
+  } catch (e) {
+    input.value = text;   // 실패 시 입력 복원
+    if (window._fbErr) window._fbErr('코멘트 등록', e);
+    toast('코멘트 등록 실패 — 다시 시도해 주세요');
+  }
+}
+
+async function deleteBinderComment(id, entryKey) {
+  if (!window._fbReady || !window._fb) return;
+  try {
+    await window._fb.deleteBinderComment(id);
+    await loadBinderComments(entryKey);
+  } catch (e) { if (window._fbErr) window._fbErr('코멘트 삭제', e); toast('삭제 실패'); }
 }
 
 function accSection(icon, title, inner) {

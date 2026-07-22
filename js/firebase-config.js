@@ -62,6 +62,15 @@ window._fb = {
       getBinderEntry:  (key)       => getDoc(doc(fbDb, 'binderEntries', key)),
       getBinderEntriesByDate: (date) =>
         getDocs(query(collection(fbDb, 'binderEntries'), where('date', '==', date))),
+      // 공유 바인더 코멘트 — entryKey = `${바인더주인id}_${date}` 로 묶음
+      addBinderComment:  (data)     => addDoc(collection(fbDb, 'binderComments'),
+                                        { ...data, createdAt: serverTimestamp() }),
+      getBinderComments: (entryKey) =>
+        getDocs(query(collection(fbDb, 'binderComments'), where('entryKey', '==', entryKey))),
+      deleteBinderComment: (id)     => deleteDoc(doc(fbDb, 'binderComments', id)),
+      listenBinderComments: (entryKey, cb) =>
+        onSnapshot(query(collection(fbDb, 'binderComments'), where('entryKey', '==', entryKey)), cb,
+          e => window._fbErr && window._fbErr('바인더 코멘트 감시', e)),
       // 교회 상세 정보 (위치, 소개, 목사 프로필)
       setChurchInfo:   (code, data) => setDoc(doc(fbDb, 'churchInfo', code), data, { merge: true }),
       getChurchInfo:   (code)       => getDoc(doc(fbDb, 'churchInfo', code)),
