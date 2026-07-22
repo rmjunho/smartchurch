@@ -22,10 +22,14 @@ function syncTodoLinkedChallenge(todo) {
   if (todo.done) toast(`"${c.label}" 챌린지 자동 체크!`);
 }
 
-function openChallengePicker(todoId) {
+var _flagTargetIsDraw = false;   // true면 드로잉 할 일 카드, false면 텍스트 할 일
+function openChallengePicker(todoId, isDraw) {
   _flagTargetTodoId = todoId;
+  _flagTargetIsDraw = !!isDraw;
   const myChals = myChallenges();
-  const t = getDayTodos().find(x => x.id === todoId);
+  const t = _flagTargetIsDraw
+    ? getDrawTodoCards().find(x => x.id === todoId)
+    : getDayTodos().find(x => x.id === todoId);
   const currentLinked = t?.linkedChallengeUid || null;
 
   const list = document.getElementById('challenge-picker-list');
@@ -38,7 +42,7 @@ function openChallengePicker(todoId) {
     list.innerHTML = [
       // 연동 해제 옵션 (이미 연동된 경우)
       currentLinked ? `
-        <div class="ch-picker-item" onclick="linkTodoToChallenge('${todoId}', null)"
+        <div class="ch-picker-item" onclick="linkFlagTarget(null)"
              style="background:#FFF0F0">
           <span style="font-size:18px">🔗</span>
           <div>
@@ -58,7 +62,7 @@ function openChallengePicker(todoId) {
         return `
           <div class="ch-picker-item${isLinked?' ':''}"
                style="${isLinked?'background:rgba(201,169,110,0.12)':''}"
-               onclick="linkTodoToChallenge('${todoId}','${c.uid}')">
+               onclick="linkFlagTarget('${c.uid}')">
             <span style="font-size:20px">🚩</span>
             <div style="flex:1;min-width:0">
               <div class="ch-picker-label">${escHtml(c.label)}</div>
@@ -77,6 +81,30 @@ function closeChallengePicker(e) {
   if (!e || e.target.id === 'modal-challenge-picker') {
     document.getElementById('modal-challenge-picker').classList.remove('open');
     _flagTargetTodoId = null;
+    _flagTargetIsDraw = false;
+  }
+}
+
+// 피커에서 선택 시 텍스트/드로잉에 맞게 연동 처리
+function linkFlagTarget(challengeUid) {
+  if (_flagTargetIsDraw) linkDrawCardToChallenge(_flagTargetTodoId, challengeUid);
+  else                   linkTodoToChallenge(_flagTargetTodoId, challengeUid);
+}
+
+// 드로잉 할 일 카드에 챌린지 연동
+function linkDrawCardToChallenge(cardId, challengeUid) {
+  const cards = getDrawTodoCards();
+  const c = cards.find(x => x.id === cardId);
+  if (!c) return;
+  c.linkedChallengeUid = challengeUid || null;
+  saveDrawTodoCards(cards);
+  closeChallengePicker();
+  renderDrawTodoSection();
+  if (challengeUid) {
+    const ch = myChallenges().find(x => x.uid === challengeUid);
+    toast(`"${ch?.label||'챌린지'}"와 연동됐어요!`);
+  } else {
+    toast('챌린지 연동을 해제했어요');
   }
 }
 

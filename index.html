@@ -4728,6 +4728,17 @@ function saveDrawTodoCards(cards) {
   DB.set(binderKey(), data);
 }
 
+// 드로잉 카드용 챌린지 연동 🚩 버튼 (텍스트 할 일과 동일 UX)
+function _drawCardFlagBtn(c) {
+  const linked = c.linkedChallengeUid;
+  const linkedChal = linked ? myChallenges().find(x => x.uid === linked) : null;
+  return `<button class="draw-todo-card-flag${linkedChal ? ' linked' : ''}"
+    onclick="event.stopPropagation();${linkedChal
+      ? `goToLinkedChallenge('${linked}')`
+      : `openChallengePicker('${c.id}', true)`}"
+    title="${linkedChal ? '연동: ' + escHtml(linkedChal.label) : '챌린지 연동'}">🚩</button>`;
+}
+
 function renderDrawTodoSection() {
   const wrap = document.getElementById('draw-todo-items-wrap');
   if (!wrap || !me) return;
@@ -4760,6 +4771,7 @@ function renderDrawTodoSection() {
           <div class="draw-todo-card-hd">
             <div class="draw-card-cb${inv?' inv':''}" onclick="toggleDrawCardInvert('${c.id}')">${inv?ckSvg:''}</div>
             <span style="flex:1"></span>
+            ${_drawCardFlagBtn(c)}
             <button class="draw-todo-card-edit" onclick="openDrawTodoEditModal(event,'${c.id}')" title="카테고리 수정">✎</button>
             <button class="draw-todo-card-del" onclick="deleteDrawTodoCard(event,'${c.id}')">×</button>
           </div>
@@ -4782,6 +4794,7 @@ function renderDrawTodoSection() {
           <div class="draw-card-cb${inv?' inv':''}" onclick="toggleDrawCardInvert('${c.id}')">${inv?ckSvg:''}</div>
           <span class="todo-cat-tag">${escHtml(c.cat || '')}</span>
           <span style="flex:1"></span>
+          ${_drawCardFlagBtn(c)}
           <button class="draw-todo-card-edit" onclick="openDrawTodoEditModal(event,'${c.id}')" title="카테고리 수정">✎</button>
           <button class="draw-todo-card-del" onclick="deleteDrawTodoCard(event,'${c.id}')">×</button>
         </div>
@@ -4836,6 +4849,11 @@ function toggleDrawCardInvert(id) {
   const inv = DB.get('drawInv_' + me.id, {});
   inv[id] = !inv[id];
   DB.set('drawInv_' + me.id, inv);
+  // 연동된 챌린지 자동 체크/해제 (반전=완료 상태를 텍스트 할 일과 동일하게 처리)
+  const cardData = getDrawTodoCards().find(x => x.id === id);
+  if (cardData && cardData.linkedChallengeUid && typeof syncTodoLinkedChallenge === 'function') {
+    syncTodoLinkedChallenge({ linkedChallengeUid: cardData.linkedChallengeUid, done: !!inv[id] });
+  }
   const card = document.getElementById('dtcard-' + id);
   if (!card) return;
   const newInv = !!inv[id];
@@ -5087,7 +5105,7 @@ function carryOverDrawTodosIfNeeded() {
     const oldH  = heights[c.id];
     if (oldH) heights[newId] = oldH;
     if (keepDone && invStates[c.id]) newInv[newId] = true;
-    return { id: newId, cat: c.cat, createdAt: new Date().toISOString() };
+    return { id: newId, cat: c.cat, linkedChallengeUid: c.linkedChallengeUid || undefined, createdAt: new Date().toISOString() };
   });
 
   DB.set('drawCatH_' + me.id, heights);

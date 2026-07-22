@@ -1425,6 +1425,18 @@
       border-color: rgba(255,255,255,0.3); background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.6);
     }
     .draw-todo-card-edit:active { background: var(--cream2); }
+    /* 드로잉 카드 챌린지 연동 버튼 */
+    .draw-todo-card-flag {
+      width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid rgba(0,0,0,0.18);
+      background: rgba(0,0,0,0.05); font-size: 11px; cursor: pointer; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center; transition: all 0.15s;
+      filter: grayscale(1) opacity(0.55);
+    }
+    .draw-todo-card-flag.linked { filter: none; border-color: var(--gold); background: rgba(201,169,110,0.18); }
+    .draw-todo-card.card-inv .draw-todo-card-flag {
+      border-color: rgba(255,255,255,0.3); background: rgba(255,255,255,0.1);
+    }
+    .draw-todo-card.card-inv .draw-todo-card-flag.linked { border-color: var(--gold); }
     .draw-todo-canvas-wrap {
       position: relative; background: #FAFAF8; border-top: 1px solid var(--border);
     }
