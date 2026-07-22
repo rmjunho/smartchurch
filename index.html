@@ -640,7 +640,7 @@
         </div>
 
         <!-- ④ 일기 -->
-        <div class="binder-sec" style="border-bottom:none">
+        <div class="binder-sec">
           <div class="binder-sec-hd" onclick="toggleSec('diary')">
             <div class="binder-sec-title">
               <span class="binder-sec-icon">📓</span>일기
@@ -658,6 +658,24 @@
                           placeholder="오늘 하루를 자유롭게 기록해보세요..."
                           oninput="autoSave('diary');autoGrow(this)"></textarea>
               </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ⑤ 메모 (텍스트형 전용) -->
+        <div class="binder-sec" style="border-bottom:none">
+          <div class="binder-sec-hd" onclick="toggleSec('memoText')">
+            <div class="binder-sec-title"><span class="binder-sec-icon">📝</span>메모</div>
+            <div class="binder-sec-right">
+              <span class="binder-saved" id="memoText-saved">저장됨 </span>
+              <span class="binder-chevron" id="memoText-chev">∨</span>
+            </div>
+          </div>
+          <div class="binder-sec-body" id="memoText-body">
+            <div class="binder-sec-inner">
+              <textarea id="binder-memo-text" class="qt-ta" rows="3"
+                        placeholder="자유롭게 메모를 남겨보세요..."
+                        oninput="autoSave('memoText');autoGrow(this)"></textarea>
             </div>
           </div>
         </div>
@@ -720,7 +738,6 @@
         </div>
 
         <!-- ④ 일기 -->
-        <!-- ④ 일기 -->
         <div class="draw-sec" style="margin-bottom:4px">
           <div class="draw-sec-label"><span class="binder-sec-icon">📓</span>일기</div>
           <div class="draw-cell-wrap" id="dcell-diary-wrap">
@@ -732,6 +749,20 @@
           <!-- 크기 기본값 저장 버튼 -->
           <div class="draw-cell-footer">
             <button class="btn-sch-set-default" onclick="setDiaryDefault()">기본값으로 저장</button>
+          </div>
+        </div>
+
+        <!-- ⑤ 메모 (드로잉형 전용) -->
+        <div class="draw-sec" style="margin-bottom:4px">
+          <div class="draw-sec-label"><span class="binder-sec-icon">📝</span>메모</div>
+          <div class="draw-cell-wrap" id="dcell-memo-wrap">
+            <canvas id="draw-canvas-memo" class="draw-cell-canvas lined"></canvas>
+            <canvas id="draw-sel-memo" class="draw-sel-canvas"></canvas>
+            <span class="binder-saved canvas-saved" id="draw-memo-saved">저장됨 </span>
+            <div class="draw-resize-grip" onpointerdown="startCellResize(event,'memo')"></div>
+          </div>
+          <div class="draw-cell-footer">
+            <button class="btn-sch-set-default" onclick="setMemoDrawDefault()">기본값으로 저장</button>
           </div>
         </div>
 
@@ -810,26 +841,27 @@
           <button class="btn-cancel" onclick="event.stopPropagation();removePhoto()">삭제</button>
           <button class="btn-confirm" onclick="event.stopPropagation();openPhotoSourceModal()">다른 사진 선택</button>
         </div>
-      </div>
-
-      <!-- 공용: 메모 + 받은 코멘트 (텍스트/드로잉/업로드형 모두에 표시) -->
-      <div class="worship-common" id="worship-common-wrap">
-        <div class="binder-sec">
-          <div class="binder-sec-hd" onclick="toggleSec('memo')">
+        <!-- 메모 (업로드형 전용) -->
+        <div class="binder-sec" style="border-bottom:none;margin-top:14px">
+          <div class="binder-sec-hd" onclick="toggleSec('memoUpload')">
             <div class="binder-sec-title"><span class="binder-sec-icon">📝</span>메모</div>
             <div class="binder-sec-right">
-              <span class="binder-saved" id="memo-saved">저장됨 </span>
-              <span class="binder-chevron" id="memo-chev">∨</span>
+              <span class="binder-saved" id="memoUpload-saved">저장됨 </span>
+              <span class="binder-chevron open" id="memoUpload-chev">∨</span>
             </div>
           </div>
-          <div class="binder-sec-body" id="memo-body">
+          <div class="binder-sec-body open" id="memoUpload-body">
             <div class="binder-sec-inner">
-              <textarea id="binder-memo" class="qt-ta" rows="3"
-                        placeholder="오늘의 예배에 대한 메모를 자유롭게 남겨보세요..."
-                        oninput="autoSave('memo');autoGrow(this)"></textarea>
+              <textarea id="binder-memo-upload" class="qt-ta" rows="3"
+                        placeholder="사진에 대한 기록이나 메모를 남겨보세요..."
+                        oninput="autoSave('memoUpload');autoGrow(this)"></textarea>
             </div>
           </div>
         </div>
+      </div>
+
+      <!-- 공용: 받은 코멘트 (텍스트/드로잉/업로드형 모두에 표시) -->
+      <div class="worship-common" id="worship-common-wrap">
         <div class="binder-sec" style="border-bottom:none">
           <div class="binder-sec-hd" onclick="toggleSec('mycmt')">
             <div class="binder-sec-title"><span class="binder-sec-icon">💬</span>받은 코멘트 <span class="binder-cmts-count" id="mycmt-count"></span></div>
@@ -3708,7 +3740,7 @@ function binderKey() { return `binder_${me.id}_${dateKey()}`; }
 // updatedAt·기본 시간표 슬롯 등 '자동 생성' 필드는 내용으로 치지 않음.
 function binderHasContent(d) {
   if (!d || typeof d !== 'object') return false;
-  if (['verse','meditation','application','prayer','diary','memo','qt']
+  if (['verse','meditation','application','prayer','diary','memoText','memoUpload','qt']
         .some(k => (d[k] || '').trim())) return true;
   if (Array.isArray(d.schRows) && d.schRows.some(r => r && (r.plan || '').trim())) return true;
   if (Array.isArray(d.todos)   && d.todos.some(t => t && (t.text || '').trim())) return true;
@@ -3730,13 +3762,15 @@ function loadBinder() {
   document.getElementById('qt-prayer').value      = data.prayer      || '';
   // Diary
   document.getElementById('diary-text').value = data.diary || '';
-  // Memo (모든 모드 공용)
-  const memoEl = document.getElementById('binder-memo');
-  if (memoEl) memoEl.value = data.memo || '';
+  // Memo — 형식별 분리 (텍스트형 / 업로드형 각각, 드로잉형은 캔버스)
+  const memoTextEl = document.getElementById('binder-memo-text');
+  if (memoTextEl) memoTextEl.value = data.memoText || '';
+  const memoUpEl = document.getElementById('binder-memo-upload');
+  if (memoUpEl) memoUpEl.value = data.memoUpload || '';
   // Schedule - build rows if not yet built
   buildScheduleRows(data);
   // Auto-grow all textareas
-  ['qt-meditation','qt-application','qt-prayer','diary-text','binder-memo'].forEach(id => {
+  ['qt-meditation','qt-application','qt-prayer','diary-text','binder-memo-text','binder-memo-upload'].forEach(id => {
     autoGrow(document.getElementById(id));
   });
   // 받은 코멘트(리더 등이 내 바인더에 남긴 코멘트) 실시간 감시 — 날짜 바뀌면 재구독
@@ -3752,6 +3786,8 @@ function loadBinder() {
     const drawWrap = document.getElementById('worship-draw-wrap');
     if (drawWrap && drawWrap.classList.contains('on')) renderDrawTodoSection();
   }, 30);
+  // 다른 기기에서 저장한 최신본 있으면 가져와 반영
+  pullBinderFromServer();
 }
 
 // 시간표: 행 편집형 (시간/계획 직접 입력, 행 추가/삭제). data.schRows = [{time, plan}]
@@ -3919,7 +3955,8 @@ function readBinder() {
     prayer:       document.getElementById('qt-prayer').value,
     schRows:      readSchRowsFromDOM(),   // 시간표 행 편집 데이터
     diary:        document.getElementById('diary-text').value,
-    memo:         document.getElementById('binder-memo').value,
+    memoText:     document.getElementById('binder-memo-text').value,
+    memoUpload:   document.getElementById('binder-memo-upload').value,
     updatedAt:    new Date().toISOString()
   };
 }
@@ -3962,6 +3999,8 @@ function saveBinderNow() {
     };
     window._fb.setBinderEntry(`${me.id}_${dateKey()}`, firestoreData).catch(() => {});
   }
+  // 개인 바인더 전체를 기기 간 동기화 (비공개)
+  syncBinderToServer();
 }
 
 function autoSave(section) {
@@ -3970,6 +4009,51 @@ function autoSave(section) {
     saveBinderNow();
     flashSaved(section + '-saved');
   }, 900);
+}
+
+// ── 개인 바인더 기기 간 동기화 (비공개, 본인 전용) ──
+// 저장할 때마다 myBinders/${uid}_${date} 에 전체 바인더를 올림(디바운스). 다른 기기에서 로드 시 최신본 반영.
+var _binderSyncTimer = null;
+var _binderSizeWarned = {};
+function syncBinderToServer() {
+  if (!me || !window._fbReady || !window._fb || !window._fb.setMyBinder) return;
+  clearTimeout(_binderSyncTimer);
+  const dk = dateKey();
+  _binderSyncTimer = setTimeout(() => {
+    const data = DB.get(`binder_${me.id}_${dk}`, null);
+    if (!data) return;
+    const payload = { ...data, uid: me.id, date: dk, syncedAt: new Date().toISOString() };
+    // Firestore 문서 1MB 제한 — 드로잉이 많으면 초과 가능. 초과분은 이 날짜만 기기 동기화 건너뜀.
+    // ponytail: 단일 문서. 상시 초과하면 드로잉을 항목별 문서로 쪼개는 게 업그레이드 경로.
+    const size = JSON.stringify(payload).length;
+    if (size > 950000) {
+      if (!_binderSizeWarned[dk]) { _binderSizeWarned[dk] = true; toast('이 날짜는 드로잉이 많아 기기 동기화 용량을 초과했어요'); }
+      return;
+    }
+    _binderSizeWarned[dk] = false;
+    window._fb.setMyBinder(`${me.id}_${dk}`, payload).catch(e => { if (window._fbErr) window._fbErr('바인더 기기 동기화', e); });
+  }, 1200);
+}
+
+// 다른 기기에서 저장한 최신본을 서버에서 가져와 반영 (서버가 더 최신일 때만)
+async function pullBinderFromServer() {
+  if (!me || !window._fbReady || !window._fb || !window._fb.getMyBinder) return;
+  const dk = dateKey();                       // 요청 시점 날짜 캡처 (도중 날짜 바뀌면 무시)
+  try {
+    const snap = await window._fb.getMyBinder(`${me.id}_${dk}`);
+    if (!snap.exists()) return;
+    if (dateKey() !== dk) return;              // 응답 오는 사이 날짜가 바뀜 → 폐기
+    const server = snap.data();
+    const localKey = `binder_${me.id}_${dk}`;
+    const local = DB.get(localKey, {}) || {};
+    // 서버가 로컬보다 최신일 때만 반영 (last-write-wins)
+    if ((server.updatedAt || '') <= (local.updatedAt || '')) return;
+    const merged = { ...server };
+    delete merged.uid; delete merged.date; delete merged.syncedAt;
+    DB.set(localKey, merged);
+    loadBinder();          // 텍스트 필드 재적용 (merged.updatedAt == local 이 되어 재-pull 없음)
+    if (canvasReady) DRAW_KEYS.forEach(loadDrawingForKey);   // 드로잉 캔버스도 서버본으로 갱신
+  } catch (e) { /* 조용히 무시 — 로컬 데이터로 계속 */ }
 }
 
 function flashSaved(id) {
@@ -4014,8 +4098,8 @@ var DRAW_COLORS = [
   '#FF6FA5',  // 분홍
   '#8D6E4B',  // 갈색
 ];
-var DRAW_KEYS = ['qt', 'schedule', 'diary']; // todo는 개별 카드 캔버스로 처리
-var DEFAULT_DRAW_HEIGHTS = { qt: 170, todo: 170, schedule: 150, diary: 210 };
+var DRAW_KEYS = ['qt', 'schedule', 'diary', 'memo']; // todo는 개별 카드 캔버스로 처리
+var DEFAULT_DRAW_HEIGHTS = { qt: 170, todo: 170, schedule: 150, diary: 210, memo: 170 };
 var CANVAS_DENSITY = 2; // CSS 픽셀당 내부 픽셀 비율
 
 // ── 그리기 상태 ──
@@ -4412,6 +4496,7 @@ function saveDrawingFor(key) {
   // 바인더 전체에 실제 내용이 없으면 항목을 만들지 않음(정리)
   if (binderHasContent(data)) DB.set(binderKey(), data);
   else if (DB.get(binderKey(), null) !== null) DB.del(binderKey());
+  syncBinderToServer();   // 드로잉 변경도 기기 간 동기화
   // 주요 4칸의 저장됨 배지
   const savedId = 'draw-' + key + '-saved';
   const el = document.getElementById(savedId);
@@ -4450,7 +4535,7 @@ function clearActiveCanvas() {
   saveDrawingFor(key);
 
   // 어떤 칸이 지워졌는지 레이블로 알려주기
-  const KEY_LABELS = { qt: '말씀 묵상', schedule: '시간표', diary: '일기' };
+  const KEY_LABELS = { qt: '말씀 묵상', schedule: '시간표', diary: '일기', memo: '메모' };
   let label = KEY_LABELS[key];
   if (!label && key.startsWith('tdraw_cat_')) {
     label = 'Todo — ' + key.replace('tdraw_cat_', '');
@@ -4927,6 +5012,14 @@ function setDiaryDefault() {
   if (!wrap) return;
   saveDrawSizeDefault('diary', wrap.offsetHeight);
   toast('일기 칸 크기를 기본값으로 저장했어요 — 다음 날부터 자동 적용돼요');
+}
+
+function setMemoDrawDefault() {
+  if (!me) return;
+  const wrap = document.getElementById('dcell-memo-wrap');
+  if (!wrap) return;
+  saveDrawSizeDefault('memo', wrap.offsetHeight);
+  toast('메모 칸 크기를 기본값으로 저장했어요 — 다음 날부터 자동 적용돼요');
 }
 
 // ── 할 일 날짜별 저장 + 미완료 이월 ──
