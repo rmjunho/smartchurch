@@ -4733,9 +4733,7 @@ function _drawCardFlagBtn(c) {
   const linked = c.linkedChallengeUid;
   const linkedChal = linked ? myChallenges().find(x => x.uid === linked) : null;
   return `<button class="draw-todo-card-flag${linkedChal ? ' linked' : ''}"
-    onclick="event.stopPropagation();${linkedChal
-      ? `goToLinkedChallenge('${linked}')`
-      : `openChallengePicker('${c.id}', true)`}"
+    onclick="event.stopPropagation();openChallengePicker('${c.id}', true)"
     title="${linkedChal ? '연동: ' + escHtml(linkedChal.label) : '챌린지 연동'}">🚩</button>`;
 }
 
@@ -5656,9 +5654,7 @@ function renderTodos() {
       const linked = t.linkedChallengeUid;
       const linkedChal = linked ? myChals.find(c => c.uid === linked) : null;
       const flagBtn = `<button class="todo-flag-btn${linkedChal ? ' linked' : ''}"
-        onclick="event.stopPropagation();${linkedChal
-          ? `goToLinkedChallenge('${linked}')`
-          : `openChallengePicker('${t.id}')`}"
+        onclick="event.stopPropagation();openChallengePicker('${t.id}')"
         title="${linkedChal ? '연동: ' + escHtml(linkedChal.label) : '챌린지 연동'}">🚩</button>`;
 
       let rightHtml = '';

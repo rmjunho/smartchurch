@@ -40,8 +40,16 @@ function openChallengePicker(todoId, isDraw) {
   } else {
     const freqLabels = { daily:'매일', weekly:'주간', monthly:'월간', yearly:'연간' };
     list.innerHTML = [
-      // 연동 해제 옵션 (이미 연동된 경우)
+      // 이미 연동된 경우: 챌린지로 이동 + 연동 해제 옵션
       currentLinked ? `
+        <div class="ch-picker-item" onclick="closeChallengePicker();goToLinkedChallenge('${currentLinked}')"
+             style="background:rgba(201,169,110,0.1)">
+          <span style="font-size:18px">➡️</span>
+          <div>
+            <div class="ch-picker-label">연동된 챌린지로 이동</div>
+            <div class="ch-picker-sub">챌린지 탭에서 확인해요</div>
+          </div>
+        </div>
         <div class="ch-picker-item" onclick="linkFlagTarget(null)"
              style="background:#FFF0F0">
           <span style="font-size:18px">🔗</span>
