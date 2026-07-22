@@ -8426,6 +8426,7 @@ function harvestSenderPhoto(msg) {
   if (!msg || !msg.senderId || msg.senderId === 'system' || !msg.senderPhoto) return;
   if (_photoCache[msg.senderId]) return;
   _photoCache[msg.senderId] = msg.senderPhoto;
+  _notePhotoAdded();
   // localStorage 에도 저장 → 새로고침/다른 탭에서도 유지 (세션 캐시만이면 채팅 다시 볼 때까지 👤)
   // ponytail: 인원 많은 교회면 localStorage 용량이 커질 수 있음 — 문제되면 서버 백필로 대체
   if (!DB.get('profilePhoto_' + msg.senderId, null)) DB.set('profilePhoto_' + msg.senderId, msg.senderPhoto);
@@ -8451,7 +8452,7 @@ async function ensurePhotoCached(uid, force) {
   if (!uid || (!force && _photoCache[uid]) || !window._fbReady || !window._fb) return;
   try {
     const d = await window._fb.getUserPhotoDoc(uid);
-    if (d.exists() && d.data().photoURL) _photoCache[uid] = d.data().photoURL;
+    if (d.exists() && d.data().photoURL) { _photoCache[uid] = d.data().photoURL; _notePhotoAdded(); }
   } catch(e) {}
 }
 // 교인 목록용 — 벌크 조회(getUserPhotosByChurch)는 userPhotos 문서의 churchCode 로 거르기 때문에
@@ -8549,6 +8550,16 @@ function _refreshVisibleMemberViews() {
   if (document.getElementById('nav-church')?.classList.contains('active') && typeof renderChurchMembers === 'function') {
     renderChurchMembers();
   }
+}
+// 사진이 뒤늦게 캐시에 들어오면(채팅에서 수확 / userPhotos 개별 조회) 이미 그려진 교인 목록은
+// 스스로 갱신되지 않는다(오버레이 아래 홈 목록 등). 새 사진이 생기면 1회 디바운스 재렌더.
+var _photoRefreshTimer = null;
+function _notePhotoAdded() {
+  if (_photoRefreshTimer) return;
+  _photoRefreshTimer = setTimeout(() => {
+    _photoRefreshTimer = null;
+    try { _refreshVisibleMemberViews(); } catch (e) {}
+  }, 350);
 }
 
 // ── 이미지 base64 유틸 (Firebase Storage 미사용 → Firestore 문서에 압축본 저장) ──
