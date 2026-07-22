@@ -9197,29 +9197,71 @@ async function loadBinderComments(entryKey) {
     list.innerHTML = `<div style="font-size:12.5px;color:var(--muted);padding:8px 0">첫 코멘트를 남겨보세요</div>`;
     return;
   }
+  comments.forEach(c => { _binderCmtCache[c.id] = c; });   // 수정 시 원문 조회용
   list.innerHTML = comments.map(c => renderBinderComment(c, entryKey)).join('');
 }
 function _cmtTime(c) { return c.createdAt?.toDate ? c.createdAt.toDate().getTime() : 0; }
+
+var _binderCmtCache = {};   // id -> 코멘트 (인라인 수정 시 원문 사용)
+// 코멘트 수정/삭제 권한 — 작성자 본인, 또는 바인더 권한을 가진 리더(모더레이션)
+function _canModerateCmt(c) {
+  const isAuthor = c.authorId === me.id;
+  const isBinderLeader = (typeof hasLeaderPerm === 'function' && hasLeaderPerm('binder'));
+  return { edit: isAuthor || isBinderLeader, del: isAuthor || isBinderLeader, isAuthor };
+}
 
 function renderBinderComment(c, entryKey) {
   const ts = c.createdAt?.toDate ? c.createdAt.toDate() : null;
   const timeStr = ts ? ts.toLocaleDateString('ko-KR', { month:'numeric', day:'numeric' }) + ' ' +
                        ts.toLocaleTimeString('ko-KR', { hour:'2-digit', minute:'2-digit', hour12:true }) : '';
-  const canDelete = c.authorId === me.id || (typeof isLeader === 'function' && isLeader());
+  const perm = _canModerateCmt(c);
+  const edited = c.editedAt ? ` <span style="font-size:10px;color:var(--muted)">(수정됨)</span>` : '';
   const photo = (typeof getUserPhoto === 'function' && getUserPhoto(c.authorId)) || '';
   const avatar = photo ? `<img src="${photo}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">` : '👤';
-  return `<div class="binder-cmt">
+  return `<div class="binder-cmt" id="bc-row-${c.id}">
     <div class="binder-cmt-av" style="overflow:hidden">${avatar}</div>
     <div class="binder-cmt-main">
       <div class="binder-cmt-hd">
         <span class="binder-cmt-name">${escHtml(getUserName ? getUserName(c.authorId, c.authorName) : (c.authorName||''))}</span>
         ${c.authorRole ? `<span class="binder-cmt-role">${escHtml(getUserRole ? getUserRole(c.authorId, c.authorRole) : c.authorRole)}</span>` : ''}
         <span class="binder-cmt-time">${timeStr}</span>
-        ${canDelete ? `<button class="binder-cmt-del" onclick="deleteBinderComment('${c.id}','${entryKey}')">삭제</button>` : ''}
+        <span class="binder-cmt-actions">
+          ${perm.edit ? `<button class="binder-cmt-edit" onclick="startEditBinderComment('${c.id}','${entryKey}')">수정</button>` : ''}
+          ${perm.del ? `<button class="binder-cmt-del" onclick="deleteBinderComment('${c.id}','${entryKey}')">삭제</button>` : ''}
+        </span>
       </div>
-      <div class="binder-cmt-text">${escHtml(c.text||'')}</div>
+      <div class="binder-cmt-text" id="bct-${c.id}">${escHtml(c.text||'')}${edited}</div>
     </div>
   </div>`;
+}
+
+// 인라인 수정 시작 — 텍스트를 편집창으로 교체
+function startEditBinderComment(id, entryKey) {
+  const box = document.getElementById('bct-' + id);
+  const c = _binderCmtCache[id];
+  if (!box || !c) return;
+  box.innerHTML = `
+    <textarea class="binder-cmt-edit-ta" id="bce-${id}" maxlength="300" rows="2">${escHtml(c.text || '')}</textarea>
+    <div class="binder-cmt-edit-actions">
+      <button class="binder-cmt-edit-save" onclick="saveEditBinderComment('${id}','${entryKey}')">저장</button>
+      <button class="binder-cmt-edit-cancel" onclick="loadBinderComments('${entryKey}')">취소</button>
+    </div>`;
+  const ta = document.getElementById('bce-' + id);
+  if (ta) { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
+}
+
+async function saveEditBinderComment(id, entryKey) {
+  const ta = document.getElementById('bce-' + id);
+  if (!ta) return;
+  const text = ta.value.trim();
+  if (!text) { toast('내용을 입력해 주세요'); return; }
+  if (!window._fbReady || !window._fb) { toast('서버 연결이 필요해요'); return; }
+  try {
+    await window._fb.updateBinderComment(id, {
+      text, editedAt: new Date().toISOString(), editedBy: me.id
+    });
+    await loadBinderComments(entryKey);
+  } catch (e) { if (window._fbErr) window._fbErr('코멘트 수정', e); toast('수정 실패 — 다시 시도해 주세요'); }
 }
 
 async function submitBinderComment(entryKey) {

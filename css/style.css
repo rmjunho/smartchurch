@@ -1090,9 +1090,27 @@
     .binder-cmt-name { font-size: 12.5px; font-weight: 700; color: var(--black); }
     .binder-cmt-role { font-size: 10.5px; color: var(--muted); font-weight: 600; }
     .binder-cmt-time { font-size: 10.5px; color: var(--muted); }
-    .binder-cmt-del {
-      margin-left: auto; background: none; border: none; color: var(--danger);
+    .binder-cmt-actions { margin-left: auto; display: flex; gap: 8px; flex-shrink: 0; }
+    .binder-cmt-edit {
+      background: none; border: none; color: var(--muted);
       font-size: 11px; font-weight: 600; cursor: pointer; font-family: inherit; padding: 0;
+    }
+    .binder-cmt-del {
+      background: none; border: none; color: var(--danger);
+      font-size: 11px; font-weight: 600; cursor: pointer; font-family: inherit; padding: 0;
+    }
+    .binder-cmt-edit-ta {
+      width: 100%; box-sizing: border-box; border: 1.5px solid var(--border); border-radius: 10px;
+      padding: 8px 10px; font-size: 13px; font-family: inherit; line-height: 1.5; resize: vertical;
+    }
+    .binder-cmt-edit-actions { display: flex; gap: 6px; margin-top: 6px; }
+    .binder-cmt-edit-save {
+      height: 30px; padding: 0 14px; border: none; border-radius: 8px; background: var(--black);
+      color: white; font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit;
+    }
+    .binder-cmt-edit-cancel {
+      height: 30px; padding: 0 12px; border: 1.5px solid var(--border); border-radius: 8px; background: white;
+      color: var(--muted); font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit;
     }
     .binder-cmt-text {
       font-size: 13px; color: var(--black); line-height: 1.5; margin-top: 2px;

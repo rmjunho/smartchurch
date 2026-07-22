@@ -67,6 +67,7 @@ window._fb = {
                                         { ...data, createdAt: serverTimestamp() }),
       getBinderComments: (entryKey) =>
         getDocs(query(collection(fbDb, 'binderComments'), where('entryKey', '==', entryKey))),
+      updateBinderComment: (id, data) => updateDoc(doc(fbDb, 'binderComments', id), data),
       deleteBinderComment: (id)     => deleteDoc(doc(fbDb, 'binderComments', id)),
       listenBinderComments: (entryKey, cb) =>
         onSnapshot(query(collection(fbDb, 'binderComments'), where('entryKey', '==', entryKey)), cb,
