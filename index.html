@@ -8423,8 +8423,28 @@ async function backfillMyPhoto() {
 // 구버전 계정도 (그 사람이 채팅한 적 있으면) 교인 목록·나의 교회 등에 사진이 뜬다.
 // 캐시가 빈 경우에만 채움 → warmPhotoCache 의 최신값(userPhotos)을 덮어쓰지 않음.
 function harvestSenderPhoto(msg) {
-  if (msg && msg.senderId && msg.senderId !== 'system' && msg.senderPhoto && !_photoCache[msg.senderId])
-    _photoCache[msg.senderId] = msg.senderPhoto;
+  if (!msg || !msg.senderId || msg.senderId === 'system' || !msg.senderPhoto) return;
+  if (_photoCache[msg.senderId]) return;
+  _photoCache[msg.senderId] = msg.senderPhoto;
+  // localStorage 에도 저장 → 새로고침/다른 탭에서도 유지 (세션 캐시만이면 채팅 다시 볼 때까지 👤)
+  // ponytail: 인원 많은 교회면 localStorage 용량이 커질 수 있음 — 문제되면 서버 백필로 대체
+  if (!DB.get('profilePhoto_' + msg.senderId, null)) DB.set('profilePhoto_' + msg.senderId, msg.senderPhoto);
+  // 관리자가 채팅을 보면, userPhotos 문서가 없는 교인의 사진을 대신 서버에 올려 모두에게 영구 반영.
+  // 권한(보안 규칙)이 막으면 조용히 무시 — 최소한 이 기기에는 위에서 이미 저장됨.
+  backfillOtherPhoto(msg.senderId, msg.senderPhoto);
+}
+// 관리자/리더 전용 — 남의 userPhotos 문서가 없을 때 채팅에서 주운 사진으로 1회 대신 등록 (best-effort)
+var _backfilledOthers = {};
+async function backfillOtherPhoto(uid, photo) {
+  if (!uid || !photo || _backfilledOthers[uid]) return;
+  if (!window._fbReady || !window._fb || !me || !(me.isAppAdmin || (typeof isLeader === 'function' && isLeader()))) return;
+  _backfilledOthers[uid] = true;   // 세션당 1회 시도
+  try {
+    const d = await window._fb.getUserPhotoDoc(uid);
+    if (d.exists() && d.data().photoURL) return;   // 이미 서버에 있으면 그대로 둠
+    const member = (_membersCache || []).find(m => m.id === uid);
+    await window._fb.setUserPhoto(uid, { photoURL: photo, churchCode: (member && member.churchCode) || me.churchCode || '' });
+  } catch (e) { /* 권한 거부 등 → 무시 (이 기기 localStorage 에는 이미 있음) */ }
 }
 // 단일 사용자 사진을 캐시에 확보 (없을 때만 1회 조회)
 async function ensurePhotoCached(uid, force) {
