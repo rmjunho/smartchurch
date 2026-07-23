@@ -990,15 +990,11 @@ function renderMembersScreenHtml(allUsers) {
           </div>
           ${!isMe && isLeader() ? `
           <div style="display:flex;gap:6px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end;margin-top:6px;width:100%">
-            <button onclick="startDmFromMembers('${u.id}','${escHtml(u.name)}')"
-              style="height:34px;padding:0 12px;border-radius:8px;border:1.5px solid var(--border);background:white;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;flex-shrink:0">💬 채팅</button>
             ${u.requestedRole && u.requestedRole !== (u.role||'') ? `
             <button onclick="approveRoleRequest('${u.id}')"
               style="height:34px;padding:0 12px;border-radius:8px;border:none;background:var(--gold);color:#1a0e00;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;flex-shrink:0">신청 부여</button>
             <button onclick="rejectRoleRequest('${u.id}')"
               style="height:34px;padding:0 10px;border-radius:8px;border:1.5px solid var(--border);background:white;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;flex-shrink:0">반려</button>` : ''}
-            <button onclick="openAssignRole('${u.id}','${escHtml(u.name)}')"
-              style="height:34px;padding:0 12px;border-radius:8px;border:1.5px solid var(--border);background:white;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;flex-shrink:0">직분 변경</button>
             ${hasLeaderPerm('binder') && u.binderShareEnabled ? `
             <button onclick="openMemberBinder('${u.id}','${escHtml(u.name)}')"
               style="height:34px;padding:0 10px;border-radius:8px;border:1.5px solid rgba(41,128,185,0.4);
@@ -1006,6 +1002,8 @@ function renderMembersScreenHtml(allUsers) {
                      cursor:pointer;font-family:inherit;color:#2980B9;flex-shrink:0">
               바인더
             </button>` : ''}
+            <button onclick="startDmFromMembers('${u.id}','${escHtml(u.name)}')"
+              style="height:34px;padding:0 12px;border-radius:8px;border:1.5px solid var(--border);background:white;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;flex-shrink:0">💬 채팅</button>
             ${!(LEADER_ROLES[u.orgType||'church']||[]).includes(u.role||'') ? `
             <button onclick="openAppointModal('${u.id}')"
               style="height:34px;padding:0 12px;border:1.5px solid var(--border);border-radius:8px;
@@ -1013,6 +1011,8 @@ function renderMembersScreenHtml(allUsers) {
                      color:${appointed?'var(--gold)':'var(--muted)'};flex-shrink:0">
               ${appointed ? '권한 수정' : '리더 임명'}
             </button>` : ''}
+            <button onclick="openAssignRole('${u.id}','${escHtml(u.name)}')"
+              style="height:34px;padding:0 12px;border-radius:8px;border:1.5px solid var(--border);background:white;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;flex-shrink:0">직분 변경</button>
           </div>` : ''}
         </div>`;
       }).join('')}</div>`;
