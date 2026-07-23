@@ -148,11 +148,11 @@ function _createMatchGroupRoom(req, memberMap) {
   saveChatRooms(rooms);
   if (window._fbReady && window._fb) {
     // 전체 멤버 배열로 덮어써 새로 합류한 멤버도 방을 받도록 함
-    window._fb.ensureChatRoom(roomId, room).catch(() => {});
+    window._fb.ensureChatRoom(roomId, room).catch(e => { if (window._fbErr) window._fbErr('매칭 그룹방 생성', e); });
     window._fb.sendChatMsg(roomId, {
       text: `${roomName}에 ${memberIds.length}명이 모였어요! 반갑게 인사 나눠보세요 `,
       senderId: 'system', senderName: '스마트처치', senderRole: '', senderPhoto: null
-    }).catch(() => {});
+    }).catch(e => { if (window._fbErr) window._fbErr('매칭 그룹방 안내 메시지', e); });
   }
   toast(`${roomName} 채팅방이 열렸어요! (${memberIds.length}명)`);
 }
@@ -184,11 +184,11 @@ function createMatchDMRoom(req) {
   }
   // Firestore 저장 → 상대방도 listenMyRooms 로 방을 받게 됨
   if (window._fbReady && window._fb) {
-    window._fb.ensureChatRoom(room.id, room).catch(() => {});
+    window._fb.ensureChatRoom(room.id, room).catch(e => { if (window._fbErr) window._fbErr('매칭 1:1방 생성', e); });
     window._fb.sendChatMsg(room.id, {
       text: `${matchTypeLabel(req.type)} 매칭으로 연결되었어요! 반갑게 인사해보세요 `,
       senderId: 'system', senderName: '스마트처치', senderRole: '', senderPhoto: null
-    }).catch(() => {});
+    }).catch(e => { if (window._fbErr) window._fbErr('매칭 1:1방 안내 메시지', e); });
   }
   toast('매칭 상대와 1:1 채팅방이 열렸어요!');
 }
