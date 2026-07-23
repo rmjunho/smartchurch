@@ -7350,6 +7350,14 @@ function dmRoomId(a, b) { return 'dm_' + [a, b].sort().join('_'); }
 function dmDisplayName(room) {
   if (!room || room.type !== 'dm') return (room && room.name) || '채팅';
   const idx = (room.members || []).findIndex(id => id !== me.id);
+  const partnerId = idx >= 0 ? room.members[idx] : null;
+  if (partnerId) {
+    // 라이브 프로필 이름 우선 — 구버전 방의 name(만든 사람 기준)이 상대 쪽에서 틀리는 문제 + 개명 반영
+    const u = DB.get('users', []).find(x => x.id === partnerId);
+    if (u && u.name) return u.name;
+    const f = getFriends().find(x => x.userId === partnerId);
+    if (f && f.name) return f.name;
+  }
   if (idx >= 0 && room.memberNames && room.memberNames[idx]) return room.memberNames[idx];
   return room.name || '1:1 채팅';   // 구버전 방 호환
 }
