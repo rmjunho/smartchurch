@@ -8157,6 +8157,20 @@ async function syncFriendsFromFirestore() {
     sent.forEach(d => { const r = d.data(); if (r.status === 'accepted') addIfNew(r.toId, r.toName, r.toRole, r.toChurch); });
     recv.forEach(d => { const r = d.data(); if (r.status === 'accepted') addIfNew(r.fromId, r.fromName, r.fromRole, r.fromChurch); });
     if (changed) saveFriends(friends);
+
+    // 삭제된 계정 정리 — users 문서가 없거나(관리자 삭제) deleted 플래그면 친구에서 제거
+    const checks = await Promise.all(getFriends().map(async f => {
+      try {
+        const s = await window._fb.getUser(f.userId);
+        return (!s.exists() || s.data().deleted) ? f.userId : null;
+      } catch(_) { return null; }   // 조회 실패(오프라인 등)면 지우지 않음 — 오탐 방지
+    }));
+    const gone = checks.filter(Boolean);
+    if (gone.length) {
+      saveFriends(getFriends().filter(f => !gone.includes(f.userId)));
+      gone.forEach(id => _deleteFriendDocs(id));   // fr_ 원본도 정리 → 재부활 방지
+      renderFriendsList();
+    }
   } catch(e) { console.warn('친구 동기화 실패:', e); }
 }
 
