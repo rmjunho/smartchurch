@@ -8169,7 +8169,14 @@ async function syncFriendsFromFirestore() {
     if (gone.length) {
       saveFriends(getFriends().filter(f => !gone.includes(f.userId)));
       gone.forEach(id => _deleteFriendDocs(id));   // fr_ 원본도 정리 → 재부활 방지
+      // 삭제된 계정과의 1:1 방도 자동으로 나가기
+      gone.forEach(id => {
+        getChatRooms().concat(_allRooms || [])
+          .filter(r => r && r.type === 'dm' && (r.members || []).includes(id))
+          .forEach(r => _leaveRoomCore(r.id));
+      });
       renderFriendsList();
+      renderChatRooms();
     }
   } catch(e) { console.warn('친구 동기화 실패:', e); }
 }
