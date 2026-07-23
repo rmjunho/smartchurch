@@ -7717,7 +7717,10 @@ function renderFriendsList() {
     const role  = getUserRole(f.userId, f.role || '성도');
     const photo = getUserPhoto(f.userId) || f.photoURL;
     return `
-      <div class="friend-item">
+      <div class="friend-item" style="user-select:none;-webkit-user-select:none"
+        onpointerdown="_friendPressStart('${f.userId}','${escHtml(name)}')"
+        onpointerup="_friendPressEnd()" onpointercancel="_friendPressEnd()" onpointerleave="_friendPressEnd()"
+        oncontextmenu="event.preventDefault()">
         <div class="friend-avatar">${photo ? `<img src="${photo}">` : '👤'}</div>
         <div style="flex:1;min-width:0">
           <div class="friend-name">${escHtml(name)}</div>
@@ -8081,6 +8084,58 @@ function rejectFriendRequest(fromId) {
   }
   toast('요청을 거절했어요');
   renderFriendRequests();
+}
+
+// ── 친구 길게 누르기 메뉴 (채팅 / 삭제 / 차단) ──
+var _friendPressTimer = null;
+function _friendPressStart(userId, name) {
+  _friendPressEnd();
+  _friendPressTimer = setTimeout(() => openFriendMenu(userId, name), 550);
+}
+function _friendPressEnd() {
+  if (_friendPressTimer) { clearTimeout(_friendPressTimer); _friendPressTimer = null; }
+}
+function openFriendMenu(userId, name) {
+  let menu = document.getElementById('friend-action-menu');
+  if (!menu) {
+    menu = document.createElement('div');
+    menu.id = 'friend-action-menu';
+    menu.onclick = e => { if (e.target.id === 'friend-action-menu') closeFriendMenu(); };
+    document.body.appendChild(menu);
+  }
+  menu.innerHTML = `<div class="ram-sheet">
+    <div class="ram-title">${escHtml(name)}</div>
+    <button class="ram-item" onclick="closeFriendMenu();startDmWith('${userId}','${escHtml(name)}')">💬 채팅하기</button>
+    <button class="ram-item danger" onclick="deleteFriend('${userId}','${escHtml(name)}')">친구 삭제</button>
+    <button class="ram-item danger" onclick="blockFriendFromMenu('${userId}','${escHtml(name)}')">차단하기</button>
+    <button class="ram-item" onclick="closeFriendMenu()">취소</button>
+  </div>`;
+  menu.style.display = 'flex';
+}
+function closeFriendMenu() { const m = document.getElementById('friend-action-menu'); if (m) m.style.display = 'none'; }
+
+// 서버의 친구 관계 원본(fr_ 문서)도 삭제 — syncFriendsFromFirestore 가 다시 살리는 것 방지
+function _deleteFriendDocs(userId) {
+  if (!window._fbReady || !window._fb) return;
+  // 요청 방향(누가 신청했는지)을 모르므로 두 ID 모두 삭제 (없는 문서는 no-op)
+  window._fb.deleteFriendRequest(`fr_${userId}_${me.id}`).catch(e => { if (window._fbErr) window._fbErr('친구 삭제 동기화', e); });
+  window._fb.deleteFriendRequest(`fr_${me.id}_${userId}`).catch(e => { if (window._fbErr) window._fbErr('친구 삭제 동기화', e); });
+}
+function deleteFriend(userId, name) {
+  closeFriendMenu();
+  if (!confirm(`${name}님을 친구에서 삭제할까요?`)) return;
+  saveFriends(getFriends().filter(f => f.userId !== userId));
+  _deleteFriendDocs(userId);
+  renderFriendsList();
+  toast('친구를 삭제했어요');
+}
+function blockFriendFromMenu(userId, name) {
+  closeFriendMenu();
+  if (!confirm(`${name}님을 차단할까요?\n\n· 서로 메시지를 받지 않아요\n· 친구 목록에서 제거돼요`)) return;
+  blockUser(userId, name);
+  _deleteFriendDocs(userId);
+  renderFriendsList();
+  toast(`${name}님을 차단했어요`);
 }
 
 // 수락된 요청을 로컬 친구 목록에 병합 (양방향) — 다른 기기/상대 수락 반영
