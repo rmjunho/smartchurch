@@ -880,6 +880,13 @@ function rejectRoleRequest(userId) {
   if (cur) setTimeout(() => openSubscreen(cur), 150);
 }
 
+// 리더 전용 — 교인 관리에서 바로 1:1 채팅 (버튼 노출은 isLeader() 블록이 제한)
+function startDmFromMembers(userId, name) {
+  closeSubscreen();
+  switchTab('chat', '채팅', document.getElementById('nav-chat'));
+  setTimeout(() => startDmWith(userId, name), 150);
+}
+
 function renderMembersScreen() {
   setTimeout(loadMembersScreenData, 80);
   return `<div id="members-screen-body" style="padding:40px 16px;text-align:center;color:var(--muted)">
@@ -983,6 +990,8 @@ function renderMembersScreenHtml(allUsers) {
           </div>
           ${!isMe && isLeader() ? `
           <div style="display:flex;gap:6px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end;margin-top:6px;width:100%">
+            <button onclick="startDmFromMembers('${u.id}','${escHtml(u.name)}')"
+              style="height:34px;padding:0 12px;border-radius:8px;border:1.5px solid var(--border);background:white;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;flex-shrink:0">💬 채팅</button>
             ${u.requestedRole && u.requestedRole !== (u.role||'') ? `
             <button onclick="approveRoleRequest('${u.id}')"
               style="height:34px;padding:0 12px;border-radius:8px;border:none;background:var(--gold);color:#1a0e00;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;flex-shrink:0">신청 부여</button>
