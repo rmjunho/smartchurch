@@ -969,6 +969,8 @@ function renderMembersScreenHtml(allUsers) {
       <div class="ss-card">${group.map(u => {
         const isMe = u.id === me.id;
         const appointed = u.isAppointedLeader && (u.leaderPerms||[]).length > 0;
+        // 직분 자체가 리더 — u.orgType 폴백(church) 버그 수정: 교회의 orgType 기준으로 비교 (기관장 등 인식)
+        const roleLeader = (LEADER_ROLES[orgType]||[]).includes(u.role||'');
         const permSummary = appointed
           ? (u.leaderPerms||[]).map(p => PERM_LABELS[p]).join(', ')
           : '';
@@ -979,7 +981,7 @@ function renderMembersScreenHtml(allUsers) {
             ${memberAvatarHtml(u, '🙏')}
             <div class="member-info">
               <div class="member-name">
-                ${escHtml(u.name)}
+                ${escHtml(u.name)}${(roleLeader || appointed) ? ' 👑' : ''}
                 ${isMe ? '<span class="ss-card-badge ss-badge-gold" style="margin-left:4px">나</span>' : ''}
                 ${appointed ? `<span class="appointed-badge" style="margin-left:4px">임명 리더</span>` : ''}
               </div>
@@ -1004,15 +1006,15 @@ function renderMembersScreenHtml(allUsers) {
             </button>` : ''}
             <button onclick="startDmFromMembers('${u.id}','${escHtml(u.name)}')"
               style="height:34px;padding:0 10px;border-radius:8px;border:1.5px solid rgba(201,169,110,0.55);background:rgba(201,169,110,0.15);font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;flex-shrink:0">💬</button>
-            ${!(LEADER_ROLES[u.orgType||'church']||[]).includes(u.role||'') ? `
+            ${!roleLeader ? `
             <button onclick="openAppointModal('${u.id}')"
-              style="height:34px;padding:0 12px;border:1.5px solid var(--border);border-radius:8px;
-                     background:white;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;
+              style="height:34px;padding:0 10px;border:1.5px solid var(--border);border-radius:8px;
+                     background:white;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;
                      color:${appointed?'var(--gold)':'var(--muted)'};flex-shrink:0">
-              ${appointed ? '권한 수정' : '리더 임명'}
+              ${appointed ? '⚙️' : '🎖️'}
             </button>` : ''}
             <button onclick="openAssignRole('${u.id}','${escHtml(u.name)}')"
-              style="height:34px;padding:0 12px;border-radius:8px;border:1.5px solid var(--border);background:white;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;flex-shrink:0">직분 변경</button>
+              style="height:34px;padding:0 10px;border-radius:8px;border:1.5px solid var(--border);background:white;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;flex-shrink:0">🏷️</button>
           </div>` : ''}
         </div>`;
       }).join('')}</div>`;
