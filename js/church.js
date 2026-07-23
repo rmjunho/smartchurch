@@ -998,12 +998,12 @@ function renderMembersScreenHtml(allUsers) {
             ${hasLeaderPerm('binder') && u.binderShareEnabled ? `
             <button onclick="openMemberBinder('${u.id}','${escHtml(u.name)}')"
               style="height:34px;padding:0 10px;border-radius:8px;border:1.5px solid rgba(41,128,185,0.4);
-                     background:rgba(41,128,185,0.08);font-size:12px;font-weight:600;
+                     background:rgba(41,128,185,0.08);font-size:14px;font-weight:600;
                      cursor:pointer;font-family:inherit;color:#2980B9;flex-shrink:0">
-              바인더
+              📖
             </button>` : ''}
             <button onclick="startDmFromMembers('${u.id}','${escHtml(u.name)}')"
-              style="height:34px;padding:0 12px;border-radius:8px;border:1.5px solid var(--border);background:white;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;flex-shrink:0">💬 채팅</button>
+              style="height:34px;padding:0 10px;border-radius:8px;border:1.5px solid rgba(201,169,110,0.55);background:rgba(201,169,110,0.15);font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;flex-shrink:0">💬</button>
             ${!(LEADER_ROLES[u.orgType||'church']||[]).includes(u.role||'') ? `
             <button onclick="openAppointModal('${u.id}')"
               style="height:34px;padding:0 12px;border:1.5px solid var(--border);border-radius:8px;
