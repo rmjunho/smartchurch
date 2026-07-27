@@ -127,7 +127,9 @@ function _createMatchGroupRoom(req, memberMap) {
   const roomId      = 'match_' + req.profileId;   // 프로필당 하나의 그룹방 (결정적 ID)
   const memberIds   = [...memberMap.keys()];
   const memberNames = [...memberMap.values()];
-  const roomName    = matchTypeLabel(req.type) + ' 그룹';
+  // 취미 모임은 개설자가 붙인 이름을 채팅방 이름으로 사용
+  const _prof       = DB.get(matchProfilesKey(), []).find(x => x.id === req.profileId);
+  const roomName    = (_prof && _prof.groupName) || (matchTypeLabel(req.type) + ' 그룹');
   const rooms = getChatRooms();
   const existing = rooms.find(r => r.id === roomId);
   const room = {
@@ -322,7 +324,7 @@ function _renderMatchProfileCard(p, sentReqs) {
     (p.lookingFor ? ` <span style="background:var(--cream2);border-radius:20px;padding:3px 10px;font-size:11.5px;font-weight:600">${escHtml(p.lookingFor)}</span>` : '');
 
   let actionHtml = '';
-  if (p.status === 'matched') {
+  if (p.status === 'matched' && p.type !== 'hobby') {   // 모임은 정원이 찰 때까지 계속 열려 있음
     actionHtml = `<div style="font-size:12px;color:var(--muted);text-align:center;padding:6px;background:var(--cream2);border-radius:8px;font-weight:600">이미 매칭 완료됨</div>`;
   } else if (isFull && (!sentReq || sentReq.status !== 'accepted')) {
     actionHtml = `<div style="font-size:12px;color:#E74C3C;text-align:center;padding:6px;background:rgba(231,76,60,0.08);border-radius:8px;font-weight:700">모집 마감</div>`;
@@ -349,14 +351,21 @@ function _renderMatchProfileCard(p, sentReqs) {
       const [bg, color, label] = (colors[sentReq.status]||'var(--cream2)/var(--muted)/알 수 없음').split('/');
       actionHtml = `<div style="text-align:center"><span style="font-size:12px;background:${bg};color:${color};border-radius:6px;padding:4px 12px;font-weight:700">${label}</span></div>`;
     }
+  } else if (p.type === 'hobby') {
+    // 취미 모임은 승인 없이 바로 참여
+    actionHtml = `<button onclick="joinHobbyGroup('${p.id}','${p.userId}','${(p.groupName||'').replace(/'/g,"\\'")}')" style="width:100%;height:38px;border-radius:10px;border:none;background:var(--black);color:white;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">참여하기</button>`;
   } else {
     actionHtml = `<button onclick="openMatchReqModal('${p.id}','${p.userId}','${p.userName.replace(/'/g,"\\'")}','${p.type}')" style="width:100%;height:38px;border-radius:10px;border:none;background:var(--black);color:white;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">매칭 신청</button>`;
   }
   return `
     <div style="background:white;border-radius:14px;border:1.5px solid ${isFull&&(!sentReq||sentReq.status!=='accepted')?'rgba(231,76,60,0.2)':'var(--border)'};padding:14px;margin-bottom:12px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-        <div style="font-size:14.5px;font-weight:800">${escHtml(getUserName(p.userId, p.userName))}</div>
-        <span style="font-size:11px;color:var(--muted)">${p.createdAt ? new Date(p.createdAt).toLocaleDateString('ko-KR',{month:'numeric',day:'numeric'}) : ''}</span>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+        <div style="min-width:0">
+          <!-- 취미는 모임 중심 → 제목이 모임 이름, 개설자는 아래 보조 표기 -->
+          <div style="font-size:14.5px;font-weight:800">${escHtml(p.type === 'hobby' ? (p.groupName || (p.hobbies||[]).join('·') + ' 모임') : getUserName(p.userId, p.userName))}</div>
+          ${p.type === 'hobby' ? `<div style="font-size:11.5px;color:var(--muted);margin-top:2px">개설 ${escHtml(getUserName(p.userId, p.userName))}</div>` : ''}
+        </div>
+        <span style="font-size:11px;color:var(--muted);flex-shrink:0">${p.createdAt ? new Date(p.createdAt).toLocaleDateString('ko-KR',{month:'numeric',day:'numeric'}) : ''}</span>
       </div>
       ${chips ? `<div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px">${chips}</div>` : ''}
       ${p.bio ? `<div style="font-size:13px;color:#444;line-height:1.6;margin-bottom:10px">${escHtml(p.bio)}</div>` : ''}
@@ -440,13 +449,13 @@ function renderHobbyMatch() {
   const sentReqs  = getMatchReqsSent('hobby');
   let html = `
     <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
-      <span style="font-size:13px;font-weight:700;color:var(--muted)">취미 매칭</span>
-      <button onclick="openHobbyProfileModal()" style="height:34px;padding:0 14px;border-radius:20px;border:none;background:var(--black);color:white;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit">${myProfile ? '내 프로필 수정' : '+ 프로필 등록'}</button>
+      <span style="font-size:13px;font-weight:700;color:var(--muted)">취미 모임</span>
+      <button onclick="openHobbyProfileModal()" style="height:34px;padding:0 14px;border-radius:20px;border:none;background:var(--black);color:white;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit">${myProfile ? '내 모임 수정' : '+ 모임 만들기'}</button>
     </div>
     <div style="padding:14px 16px 24px">`;
   if (myProfile) html += _renderMyMatchBanner(myProfile, 'hobby');
   if (!others.length) {
-    html += `<div class="ss-empty" style="padding:24px 0"><div class="ss-empty-icon">🎯</div><div class="ss-empty-title">아직 없어요</div><div class="ss-empty-sub">${myProfile ? '다른 교인이 등록하면 보여요' : '첫 번째로 등록해보세요!'}</div></div>`;
+    html += `<div class="ss-empty" style="padding:24px 0"><div class="ss-empty-icon">🎯</div><div class="ss-empty-title">아직 모임이 없어요</div><div class="ss-empty-sub">${myProfile ? '다른 교인이 모임을 만들면 보여요' : '첫 번째 모임을 만들어보세요!'}</div></div>`;
   } else {
     others.forEach(p => { html += _renderMatchProfileCard(p, sentReqs); });
   }
@@ -738,6 +747,7 @@ function submitMatchReq() {
 function openHobbyProfileModal() {
   const existing = getMyMatchProfile('hobby');
   _hobbySelected = new Set(existing?.hobbies || []);
+  document.getElementById('hobby-group-name').value = existing?.groupName || '';
   document.getElementById('hobby-bio').value = existing?.bio || '';
   document.getElementById('hobby-max').value = existing?.maxCount ?? 5;
   _renderHobbyChips();
@@ -766,14 +776,51 @@ function _toggleHobby(h) {
 }
 
 function saveHobbyProfile() {
+  const groupName = document.getElementById('hobby-group-name').value.trim();
+  if (!groupName) { toast('모임 이름을 입력해 주세요'); return; }
   if (_hobbySelected.size === 0) { toast('취미를 하나 이상 선택해 주세요'); return; }
   const bio      = document.getElementById('hobby-bio').value.trim();
   const maxCount = parseInt(document.getElementById('hobby-max').value) || 5;
   if (maxCount < 2 || maxCount > 100) { toast('인원은 2~100명 사이로 입력해 주세요'); return; }
-  saveMatchProfile({ type:'hobby', hobbies: Array.from(_hobbySelected), bio, maxCount, status:'open' });
+  saveMatchProfile({ type:'hobby', groupName, hobbies: Array.from(_hobbySelected), bio, maxCount, status:'open' });
   closeHobbyProfileModal();
-  toast('취미 매칭 프로필이 등록됐어요!');
+  toast(`"${groupName}" 모임이 만들어졌어요!`);
   setTimeout(() => openSubscreen('hobby-match'), 150);
+}
+
+// 취미 모임 바로 참여 — 신청·수락 단계 없이 즉시 합류 후 그룹 채팅방 생성
+function joinHobbyGroup(profileId, ownerId, groupName) {
+  const p = DB.get(matchProfilesKey(), []).find(x => x.id === profileId);
+  if (!p) { toast('모임을 찾을 수 없어요'); return; }
+  const reqs = DB.get(matchReqsKey(), []);
+  if (reqs.find(r => r.fromId === me.id && r.profileId === profileId && r.status === 'accepted')) {
+    toast('이미 참여 중인 모임이에요'); return;
+  }
+  if (p.maxCount) {
+    const accepted = reqs.filter(r => r.profileId === profileId && r.status === 'accepted').length;
+    if (accepted >= p.maxCount - 1) { toast('모집 인원이 다 찼어요'); return; }
+  }
+  const now = new Date().toISOString();
+  const req = { id: uid(), fromId: me.id, fromName: me.name, toId: ownerId, profileId,
+                type: 'hobby', msg: '', status: 'accepted', createdAt: now, respondedAt: now,
+                churchCode: matchScope() };
+  reqs.push(req);
+  DB.set(matchReqsKey(), reqs);
+  if (window._fbReady && window._fb)
+    window._fb.setMatchRequestDoc(req.id, req).catch(e => { if (window._fbErr) window._fbErr('모임 참여', e); });
+  _createMatchGroupRoom(req, _hobbyGroupMembers(p));   // 모임은 인원과 무관하게 항상 그룹방
+  toast(`"${groupName || p.groupName || '모임'}"에 참여했어요!`);
+  setTimeout(() => openSubscreen('hobby-match'), 150);
+}
+
+// 모임 구성원 맵 (개설자 + 참여 확정자) — 이름은 최신 프로필 우선
+function _hobbyGroupMembers(p) {
+  const map = new Map();
+  map.set(p.userId, getUserName(p.userId, p.userName || '개설자'));
+  DB.get(matchReqsKey(), [])
+    .filter(r => r.profileId === p.id && r.status === 'accepted')
+    .forEach(r => map.set(r.fromId, getUserName(r.fromId, r.fromName || '멤버')));
+  return map;
 }
 
 function deleteHobbyProfile() {
