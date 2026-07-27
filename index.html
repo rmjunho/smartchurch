@@ -2510,13 +2510,13 @@
 
   <div class="modal-backdrop" id="modal-church-info-edit" onclick="closeChurchInfoEdit(event)">
     <div class="modal-sheet" style="max-height:90vh;overflow-y:auto">
-      <div class="modal-title">교회 정보 편집</div>
+      <div class="modal-title" id="ci-modal-title">교회 정보 편집</div>
       <div class="form-group">
-        <label class="form-label">교회 주소</label>
+        <label class="form-label" id="ci-address-label">교회 주소</label>
         <input id="ci-address" type="text" class="form-input" placeholder="예: 경기도 안성시 ○○동 ○○번지">
       </div>
       <div class="form-group">
-        <label class="form-label">교회 소개 <span style="font-weight:400;font-size:11.5px;color:var(--muted)">선택</span></label>
+        <label class="form-label" id="ci-desc-label">교회 소개 <span style="font-weight:400;font-size:11.5px;color:var(--muted)">선택</span></label>
         <textarea id="ci-description" class="qt-ta" rows="4"
           placeholder="교회 비전, 역사, 분위기 등을 소개해보세요"
           style="resize:none"></textarea>
@@ -2528,11 +2528,11 @@
           style="resize:none"></textarea>
       </div>
       <div class="form-group">
-        <label class="form-label">담임 목사 이름 <span style="font-weight:400;font-size:11.5px;color:var(--muted)">선택</span></label>
+        <label class="form-label" id="ci-pastor-name-label">담임 목사 이름 <span style="font-weight:400;font-size:11.5px;color:var(--muted)">선택</span></label>
         <input id="ci-pastor-name" type="text" class="form-input" placeholder="예: 홍길동">
       </div>
       <div class="form-group">
-        <label class="form-label">목사 소개 <span style="font-weight:400;font-size:11.5px;color:var(--muted)">선택</span></label>
+        <label class="form-label" id="ci-pastor-bio-label">목사 소개 <span style="font-weight:400;font-size:11.5px;color:var(--muted)">선택</span></label>
         <textarea id="ci-pastor-bio" class="qt-ta" rows="3"
           placeholder="목사님 약력, 메시지 등을 입력해보세요"
           style="resize:none"></textarea>

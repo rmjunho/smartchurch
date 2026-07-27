@@ -728,6 +728,28 @@ function renderChurchManage() {
   return html + '</div>';
 }
 
+// 정보 편집 모달 문구를 공동체 유형(교회 / 기관·단체)에 맞게 교체
+function applyChurchInfoLabels() {
+  const isOrg = getOrgTypeForChurch(me.churchCode) === 'org';
+  const noun  = isOrg ? '기관·단체' : '교회';
+  const opt   = '<span style="font-weight:400;font-size:11.5px;color:var(--muted)">선택</span>';
+  const set = (id, html) => { const el = document.getElementById(id); if (el) el.innerHTML = html; };
+  const ph  = (id, text) => { const el = document.getElementById(id); if (el) el.placeholder = text; };
+
+  set('ci-modal-title',      `${noun} 정보 편집`);
+  set('ci-address-label',    `${noun} 주소`);
+  set('ci-desc-label',       `${noun} 소개 ${opt}`);
+  ph('ci-description', isOrg ? '기관·단체의 목적, 활동, 분위기 등을 소개해보세요'
+                            : '교회 비전, 역사, 분위기 등을 소개해보세요');
+  set('ci-pastor-name-label', isOrg ? `대표자 이름 ${opt}` : `담임 목사 이름 ${opt}`);
+  set('ci-pastor-bio-label',  isOrg ? `대표자 소개 ${opt}` : `목사 소개 ${opt}`);
+  ph('ci-pastor-bio', isOrg ? '대표자 약력, 인사말 등을 입력해보세요'
+                            : '목사님 약력, 메시지 등을 입력해보세요');
+  // 기관·단체는 주제 말씀 대신 소개글만 사용 → 입력칸 숨김
+  const themeRow = document.getElementById('ci-theme-verse')?.closest('.form-group');
+  if (themeRow) themeRow.style.display = isOrg ? 'none' : '';
+}
+
 function openChurchInfoEdit() {
   if (!isLeader()) { toast('리더만 수정할 수 있어요'); return; }
   // 기존 데이터 로드 후 모달 열기
@@ -743,9 +765,7 @@ function openChurchInfoEdit() {
       document.getElementById('ci-pastor-bio').value  = d.pastorBio   || '';
     }).catch(() => {});
   }
-  // 기관·단체는 주제 말씀 대신 소개글만 사용 → 입력칸 숨김
-  const themeRow = document.getElementById('ci-theme-verse')?.closest('.form-group');
-  if (themeRow) themeRow.style.display = getOrgTypeForChurch(me.churchCode) === 'org' ? 'none' : '';
+  applyChurchInfoLabels();
   modal.classList.add('open');
 }
 
