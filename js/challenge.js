@@ -500,6 +500,28 @@ function chResultBadge(c) {
   return `<span style="display:inline-block;font-size:11.5px;font-weight:700;color:var(--muted);background:var(--cream2);border-radius:6px;padding:2px 9px">목표 ${r.n}${unit} 중 ${r.m}${unit} 달성</span>`;
 }
 
+// 날짜가 속한 주기 키 (주/월/연) — 무기한 챌린지 집계용
+function chPeriodKey(d, freqType) {
+  switch (freqType) {
+    case 'weekly':  return getISOWeekKey(d);
+    case 'monthly': return d.slice(0, 7);
+    case 'yearly':  return d.slice(0, 4);
+    default:        return d;            // daily — 하루가 곧 주기
+  }
+}
+// 무기한(종료일 없음) 챌린지의 달성 집계 — 목표를 채운 주기 수
+function chOpenDone(c) {
+  const freqType = c.freqType || (c.type === 'weekly' ? 'weekly' : 'daily');
+  const dates = [...new Set(c.checkedDates || [])];
+  const unit = { weekly:'주', monthly:'달', yearly:'해' }[freqType] || '일';
+  if (freqType === 'daily') return { done: dates.length, unit, freqType };
+  const target = c.freqTarget || c.target || 1;
+  const byPeriod = {};
+  dates.forEach(d => { const k = chPeriodKey(d, freqType); byPeriod[k] = (byPeriod[k] || 0) + 1; });
+  const done = Object.values(byPeriod).filter(n => n >= target).length;
+  return { done, unit, freqType };
+}
+
 // 챌린지 횟수 라벨 (모든 화면 공통) — 일/주/월/연간 전부 처리
 function chFreqLabel(c) {
   const n = c.freqTarget || c.target;
@@ -756,18 +778,29 @@ function renderCompletedChallenges(myList) {
   if (!container) return;
   myList = myList || myChallenges();
   const today = todayDateKey();
-  // 기간이 끝났고(endDate 지남) 목표 100% 달성한 챌린지만 = 완료
-  const completed = myList.filter(c => c.endDate && c.endDate < today && chResult(c).success);
+  const row = (label, badge) => `<div class="challenge-done-row" style="display:flex;align-items:center;gap:8px">
+      <span style="flex:1;min-width:0">${escHtml(label)}</span>
+      <span style="flex-shrink:0;font-size:11px;font-weight:800;color:var(--gold)">${badge}</span>
+    </div>`;
 
-  container.innerHTML = completed.length
-    ? completed.map(c => {
-        const r = chResult(c);
-        const unit = r.freqType === 'daily' ? '일' : '회';
-        return `<div class="challenge-done-row" style="display:flex;align-items:center;gap:8px">
-          <span style="flex:1;min-width:0">${escHtml(c.label)}</span>
-          <span style="flex-shrink:0;font-size:11px;font-weight:800;color:var(--gold)">🏆 ${r.m}${unit} 달성</span>
-        </div>`;
-      }).join('')
+  // 1) 기간이 끝났고 목표 100% 달성 = 완료
+  const finished = myList
+    .filter(c => c.endDate && c.endDate < today && chResult(c).success)
+    .map(c => {
+      const r = chResult(c);
+      return row(c.label, `🏆 ${r.m}${r.freqType === 'daily' ? '일' : '회'} 달성`);
+    });
+
+  // 2) 무기한(종료일 없음) — 목표를 채운 주기가 있으면 진행형으로 표시
+  const ongoing = myList
+    .filter(c => !c.endDate)
+    .map(c => ({ c, o: chOpenDone(c) }))
+    .filter(x => x.o.done > 0)
+    .map(x => row(x.c.label, `🔥 ${x.o.done}${x.o.unit} 달성 중`));
+
+  const rows = finished.concat(ongoing);
+  container.innerHTML = rows.length
+    ? rows.join('')
     : `<div class="todo-empty" style="padding:24px 4px">아직 완료한 챌린지가 없어요.<br>챌린지 탭에서 시작해보세요! </div>`;
 }
 
