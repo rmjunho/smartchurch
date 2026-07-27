@@ -1653,8 +1653,8 @@ function updateChurchHero() {
   if (!window._fbReady || !window._fb || !me.churchCode) return;
   window._fb.getChurchInfo(me.churchCode).then(snap => {
     const d = snap.exists() ? snap.data() : {};
-    // 교회: 주제 말씀 > 소개글 > 기본 성구 / 기관: 소개글만
-    const text = isOrg ? d.description : (d.themeVerse || d.description);
+    // 교회: 주제 말씀만 (없으면 기본 성구 유지) / 기관: 소개글
+    const text = isOrg ? d.description : d.themeVerse;
     if (text) sEl.textContent = text;
   }).catch(e => { if (window._fbErr) window._fbErr('교회 히어로 정보 조회', e); });
 }
