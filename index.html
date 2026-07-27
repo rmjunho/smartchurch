@@ -9142,6 +9142,8 @@ function updateProfileDisplay() {
   updateProfileAvatarDisplay();
   // 친구 코드 카드 업데이트
   updateFriendCodeDisplay();
+  // 완료된 챌린지(종료+목표 달성) 목록 갱신 — 마이페이지 열 때 최신 반영
+  if (typeof renderCompletedChallenges === 'function') renderCompletedChallenges();
   // 4번째 탭 라벨(교회/기관·단체/개인) 갱신
   updateCommunityTabLabel();
 }

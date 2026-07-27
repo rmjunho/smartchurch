@@ -237,6 +237,7 @@ function renderMyChallenges() {
           <span class="c-streak">${rightLbl}</span>
         </div>
         ${periodTag ? `<div style="margin-top:4px;display:flex;align-items:center;gap:4px">${periodTag}</div>` : ''}
+        ${isExpired ? `<div style="margin-top:6px">${chResultBadge(c)}</div>` : ''}
         <div class="c-progress"><div class="c-progress-fill" style="width:${Math.round(prog*100)}%"></div></div>
         <button class="ac-check-btn ${btnClass}" ${disabled?'disabled':''}
           onclick="checkChallengeToday('${c.uid}');setTimeout(()=>openSubscreen('my-challenges'),200)">
@@ -465,6 +466,38 @@ function submitEditChallenge() {
   closeCreateChallengeModal();
   renderChallenge();
   toast(`"${label}" 챌린지가 수정됐어요!`);
+}
+
+// 챌린지 종료 결과 계산 — M(기간 내 체크 수) / N(총 목표) / 성공(M≥N, 100% 기준)
+function chResult(c) {
+  const freqType = c.freqType || (c.type === 'weekly' ? 'weekly' : 'daily');
+  const dates = (c.checkedDates || []).filter(d =>
+    (!c.startDate || d >= c.startDate) && (!c.endDate || d <= c.endDate));
+  const m = dates.length;
+  const freq = c.freqTarget || c.target;
+  let periods = 1;
+  if (c.startDate && c.endDate) {
+    const s = new Date(c.startDate + 'T00:00:00');
+    const e = new Date(c.endDate + 'T00:00:00');
+    const days = Math.floor((e - s) / 86400000) + 1;
+    if (freqType === 'daily')        periods = days;
+    else if (freqType === 'weekly')  periods = Math.max(1, Math.ceil(days / 7));
+    else if (freqType === 'monthly') periods = Math.max(1, (e.getFullYear()*12 + e.getMonth()) - (s.getFullYear()*12 + s.getMonth()) + 1);
+    else if (freqType === 'yearly')  periods = Math.max(1, e.getFullYear() - s.getFullYear() + 1);
+  } else if (freqType === 'daily') {
+    periods = Math.max(m, 1);   // 시작일 미상 → 달성분 기준(성공 처리)
+  }
+  const n = freqType === 'daily' ? periods : (freq ? freq * periods : 0);
+  const success = n > 0 ? m >= n : m > 0;
+  return { m, n, success, freqType };
+}
+// 종료된 챌린지 결과 배지 (성공: 🏆 목표 달성 / 미달: 목표 N회 중 M회 달성)
+function chResultBadge(c) {
+  const r = chResult(c);
+  const unit = r.freqType === 'daily' ? '일' : '회';
+  if (r.success)
+    return `<span style="display:inline-block;font-size:11.5px;font-weight:800;color:#1a0e00;background:var(--gold);border-radius:6px;padding:2px 9px">🏆 목표 달성</span>`;
+  return `<span style="display:inline-block;font-size:11.5px;font-weight:700;color:var(--muted);background:var(--cream2);border-radius:6px;padding:2px 9px">목표 ${r.n}${unit} 중 ${r.m}${unit} 달성</span>`;
 }
 
 // 챌린지 횟수 라벨 (모든 화면 공통) — 일/주/월/연간 전부 처리
@@ -722,10 +755,19 @@ function renderCompletedChallenges(myList) {
   const container = document.getElementById('completed-challenges');
   if (!container) return;
   myList = myList || myChallenges();
-  const completed = myList.filter(c => c.type === 'weekly' && c.current >= c.target);
+  const today = todayDateKey();
+  // 기간이 끝났고(endDate 지남) 목표 100% 달성한 챌린지만 = 완료
+  const completed = myList.filter(c => c.endDate && c.endDate < today && chResult(c).success);
 
   container.innerHTML = completed.length
-    ? completed.map(c => `<div class="challenge-done-row">${escHtml(c.label)}</div>`).join('')
+    ? completed.map(c => {
+        const r = chResult(c);
+        const unit = r.freqType === 'daily' ? '일' : '회';
+        return `<div class="challenge-done-row" style="display:flex;align-items:center;gap:8px">
+          <span style="flex:1;min-width:0">${escHtml(c.label)}</span>
+          <span style="flex-shrink:0;font-size:11px;font-weight:800;color:var(--gold)">🏆 ${r.m}${unit} 달성</span>
+        </div>`;
+      }).join('')
     : `<div class="todo-empty" style="padding:24px 4px">아직 완료한 챌린지가 없어요.<br>챌린지 탭에서 시작해보세요! </div>`;
 }
 
