@@ -467,10 +467,32 @@ function submitEditChallenge() {
   toast(`"${label}" 챌린지가 수정됐어요!`);
 }
 
+// 챌린지 횟수 라벨 (모든 화면 공통) — 일/주/월/연간 전부 처리
+function chFreqLabel(c) {
+  const n = c.freqTarget || c.target;
+  switch (c.freqType) {
+    case 'daily':   return '매일';
+    case 'weekly':  return n ? `주 ${n}회` : '주간';
+    case 'monthly': return n ? `월 ${n}회` : '월간';
+    case 'yearly':  return n ? `연 ${n}회` : '연간';
+    default:        return '';
+  }
+}
+// 챌린지 기간 라벨 (시작~종료 + D-day) — 모든 화면 공통
+function chPeriodLabel(c) {
+  let out = '';
+  if (c.endDate) {
+    const dLeft = Math.ceil((new Date(c.endDate + ' 23:59') - new Date()) / 86400000);
+    out = dLeft < 0 ? '기간 종료' : dLeft === 0 ? '오늘 종료' : `D-${dLeft}`;
+  }
+  if (c.startDate && c.endDate) out += (out ? ' · ' : '') + `${c.startDate} ~ ${c.endDate}`;
+  else if (c.startDate)         out += (out ? ' · ' : '') + `${c.startDate} 시작`;
+  return out;
+}
+
 function _cmChCard(ch, showActions) {
-  const freqLabel = ch.freqType === 'daily' ? '매일' :
-    ch.freqType === 'weekly' ? `주 ${ch.freqTarget}회` :
-    ch.freqType === 'monthly' ? `월 ${ch.freqTarget}회` : '';
+  const freqLabel  = chFreqLabel(ch);
+  const periodLabel = chPeriodLabel(ch);
   const scopeLabel = ch.scope === 'personal' ? '개인'
     : ch.isPublic ? '전체 공개' : '교회';
   const scopeColor = ch.scope === 'personal' ? 'rgba(142,68,173,0.12)'
@@ -487,6 +509,7 @@ function _cmChCard(ch, showActions) {
             <span style="font-size:11.5px;background:var(--cream2);border-radius:6px;padding:2px 8px;font-weight:600">${escHtml(ch.tag||'기타')}</span>
             ${freqLabel ? `<span style="font-size:11.5px;background:var(--cream2);border-radius:6px;padding:2px 8px;font-weight:600">${freqLabel}</span>` : ''}
             <span style="font-size:11.5px;background:${scopeColor};color:${scopeText};border-radius:6px;padding:2px 8px;font-weight:700">${scopeLabel}</span>
+            ${periodLabel ? `<span style="font-size:11.5px;color:var(--muted);font-weight:600">📅 ${periodLabel}</span>` : ''}
           </div>
         </div>
       </div>
