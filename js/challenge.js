@@ -1072,3 +1072,194 @@ function renderObChallenges() {
   ).join('');
 }
 
+// ═══════════════════════════════════════════════════
+//  만보기 — 앱 내 가속도 센서 기반 걸음 측정
+//  웹 제약: 앱이 열려 있고 화면이 켜져 있는 동안에만 측정됨 (백그라운드 측정 불가)
+// ═══════════════════════════════════════════════════
+var _pedOn = false, _pedArmed = false, _pedLastStep = 0, _pedFilt = 1, _pedWakeLock = null, _pedSaveTimer = null;
+// ponytail: 기기별 센서 감도 차이가 커서 임계값은 설정에서 조절 가능하게 뺌
+var PED_MIN_MS = 260;                                  // 걸음 최소 간격 (분당 ~230보 상한)
+function pedSens()      { return DB.get('stepsSens_' + me.id, 1.15); }   // 피크 임계값(g)
+function setPedSens(v)  { DB.set('stepsSens_' + me.id, v); }
+
+function getStepGoal()  { return DB.get('stepsGoal_' + me.id, 10000); }
+function getStepData()  { return DB.get('steps_' + me.id, {}); }
+function getStepsFor(d) { return getStepData()[d] || 0; }
+
+function addSteps(n) {
+  const data = getStepData();
+  const d = todayDateKey();
+  data[d] = (data[d] || 0) + n;
+  const keys = Object.keys(data).sort();
+  while (keys.length > 60) delete data[keys.shift()];   // 최근 60일만 보관
+  DB.set('steps_' + me.id, data);
+  _pedQueueSync(data);
+  return data[d];
+}
+
+// 기기 간 동기화 — 잦은 쓰기를 막기 위해 5초 디바운스
+function _pedQueueSync(data) {
+  if (!window._fbReady || !window._fb) return;
+  clearTimeout(_pedSaveTimer);
+  _pedSaveTimer = setTimeout(() => {
+    window._fb.updateUser(me.id, { steps: data })
+      .catch(e => { if (window._fbErr) window._fbErr('걸음 수 동기화', e); });
+  }, 5000);
+}
+// 로그인 시 서버 기록 병합 (같은 날짜는 큰 값 채택 — 기기별 부분 측정 보존)
+function syncStepsFromMe() {
+  if (!me || !me.steps || typeof me.steps !== 'object') return;
+  const local = getStepData();
+  let changed = false;
+  Object.keys(me.steps).forEach(d => {
+    if ((me.steps[d] || 0) > (local[d] || 0)) { local[d] = me.steps[d]; changed = true; }
+  });
+  if (changed) DB.set('steps_' + me.id, local);
+}
+
+// 가속도 크기의 피크를 세는 단순 검출 — 저역 통과 후 임계값 상향 교차 시 1보
+function _pedOnMotion(e) {
+  const a = e.accelerationIncludingGravity;
+  if (!a || a.x == null) return;
+  const mag = Math.sqrt(a.x * a.x + a.y * a.y + a.z * a.z) / 9.81;   // g 단위 (중력 포함 → 정지 시 ≈1)
+  _pedFilt = _pedFilt * 0.8 + mag * 0.2;
+  const now = Date.now();
+  if (!_pedArmed && _pedFilt > pedSens() && now - _pedLastStep > PED_MIN_MS) {
+    _pedArmed = true;
+    _pedLastStep = now;
+    _pedPaint(addSteps(1));
+  } else if (_pedArmed && _pedFilt < 1.03) {
+    _pedArmed = false;                                   // 히스테리시스 — 한 걸음에 여러 번 세는 것 방지
+  }
+}
+
+async function startPedometer() {
+  if (_pedOn) return;
+  if (typeof DeviceMotionEvent === 'undefined') { toast('이 기기는 걸음 측정을 지원하지 않아요'); return; }
+  // iOS 13+ 는 사용자 제스처 안에서 센서 권한을 받아야 함
+  if (typeof DeviceMotionEvent.requestPermission === 'function') {
+    try {
+      if (await DeviceMotionEvent.requestPermission() !== 'granted') {
+        toast('동작 센서 권한을 허용해 주세요'); return;
+      }
+    } catch (_) { toast('센서 권한 요청에 실패했어요'); return; }
+  }
+  window.addEventListener('devicemotion', _pedOnMotion);
+  _pedOn = true;
+  // 화면이 꺼지면 측정이 멈추므로 가능한 기기에서는 화면을 깨워 둠
+  if (navigator.wakeLock) {
+    navigator.wakeLock.request('screen').then(l => { _pedWakeLock = l; }).catch(() => {});
+  }
+  _pedRefresh();
+  toast('걸음 측정을 시작했어요');
+}
+
+function stopPedometer() {
+  if (!_pedOn) return;
+  window.removeEventListener('devicemotion', _pedOnMotion);
+  _pedOn = false;
+  if (_pedWakeLock) { _pedWakeLock.release().catch(() => {}); _pedWakeLock = null; }
+  _pedRefresh();
+  toast('걸음 측정을 멈췄어요');
+}
+
+function togglePedometer() { _pedOn ? stopPedometer() : startPedometer(); }
+
+function setStepGoal() {
+  const v = prompt('하루 목표 걸음 수를 입력하세요', getStepGoal());
+  if (v === null) return;
+  const n = parseInt(v, 10);
+  if (!n || n < 100 || n > 100000) { toast('100~100,000 사이로 입력해 주세요'); return; }
+  DB.set('stepsGoal_' + me.id, n);
+  _pedRefresh();
+}
+
+function setPedSensPrompt() {
+  const v = prompt('걸음 감지 민감도 (숫자가 작을수록 민감하게 셉니다)\n권장 1.05 ~ 1.30', pedSens());
+  if (v === null) return;
+  const n = parseFloat(v);
+  if (!(n >= 1.0 && n <= 2.0)) { toast('1.0 ~ 2.0 사이로 입력해 주세요'); return; }
+  setPedSens(n);
+  toast('민감도를 저장했어요');
+}
+
+// 걸음 수만 빠르게 갱신 (측정 중 매 걸음 호출 — 전체 렌더는 하지 않음)
+function _pedPaint(total) {
+  const c = document.getElementById('ped-count');
+  if (!c) return;
+  const goal = getStepGoal();
+  c.textContent = total.toLocaleString();
+  const bar = document.getElementById('ped-bar');
+  if (bar) bar.style.width = Math.min(100, Math.round(total / goal * 100)) + '%';
+  const pct = document.getElementById('ped-pct');
+  if (pct) pct.textContent = Math.round(total / goal * 100) + '%';
+}
+
+function _pedRefresh() {
+  const ss = document.getElementById('subscreen');
+  if (ss && ss.classList.contains('open') && ss.dataset.current === 'pedometer')
+    document.getElementById('subscreen-body').innerHTML = renderPedometer();
+}
+
+function renderPedometer() {
+  const today = todayDateKey();
+  const cnt   = getStepsFor(today);
+  const goal  = getStepGoal();
+  const pct   = Math.min(100, Math.round(cnt / goal * 100));
+  const data  = getStepData();
+
+  // 최근 7일 (이전 6일 + 오늘)
+  let hist = '';
+  for (let i = 6; i >= 0; i--) {
+    const dt = new Date(today + 'T00:00:00');
+    dt.setDate(dt.getDate() - i);
+    const k = ymdLocal(dt);
+    const v = data[k] || 0;
+    const p = Math.min(100, Math.round(v / goal * 100));
+    hist += `
+      <div style="display:flex;align-items:center;gap:10px;padding:7px 0">
+        <span style="width:52px;flex-shrink:0;font-size:12px;color:var(--muted)">${dt.getMonth()+1}/${dt.getDate()}</span>
+        <div style="flex:1;height:8px;background:var(--cream2);border-radius:10px;overflow:hidden">
+          <div style="height:100%;width:${p}%;background:${v>=goal?'var(--gold)':'var(--black)'};border-radius:10px"></div>
+        </div>
+        <span style="width:62px;flex-shrink:0;text-align:right;font-size:12px;font-weight:700">${v.toLocaleString()}</span>
+      </div>`;
+  }
+
+  return `
+    <div style="padding:18px 16px 32px">
+      <div style="background:white;border-radius:16px;border:1.5px solid var(--border);padding:22px 18px;text-align:center;margin-bottom:14px">
+        <div style="font-size:12px;font-weight:700;color:var(--muted);letter-spacing:0.5px">오늘 걸음 수</div>
+        <div id="ped-count" style="font-size:44px;font-weight:900;line-height:1.2;margin:4px 0">${cnt.toLocaleString()}</div>
+        <div style="font-size:12.5px;color:var(--muted);margin-bottom:12px">목표 ${goal.toLocaleString()}보 · <span id="ped-pct">${pct}%</span></div>
+        <div style="height:10px;background:var(--cream2);border-radius:10px;overflow:hidden;margin-bottom:16px">
+          <div id="ped-bar" style="height:100%;width:${pct}%;background:${cnt>=goal?'var(--gold)':'var(--black)'};border-radius:10px;transition:width 0.3s"></div>
+        </div>
+        ${cnt >= goal ? `<div style="font-size:13px;font-weight:800;color:var(--gold);margin-bottom:12px">🎉 오늘 목표를 달성했어요!</div>` : ''}
+        <button onclick="togglePedometer()"
+          style="width:100%;height:46px;border-radius:12px;border:none;
+                 background:${_pedOn ? '#C0392B' : 'var(--black)'};color:white;
+                 font-size:14.5px;font-weight:800;cursor:pointer;font-family:inherit">
+          ${_pedOn ? '■ 측정 멈추기' : '▶ 걷기 시작'}
+        </button>
+        ${_pedOn ? `<div style="font-size:11.5px;color:#27AE60;font-weight:700;margin-top:8px">측정 중 · 앱을 켜둔 채로 걸어주세요</div>` : ''}
+      </div>
+
+      <div style="background:rgba(41,128,185,0.06);border:1.5px solid rgba(41,128,185,0.18);border-radius:12px;padding:12px 14px;margin-bottom:16px">
+        <div style="font-size:12.5px;color:#2980B9;font-weight:700;margin-bottom:4px">측정 안내</div>
+        <div style="font-size:12px;color:var(--muted);line-height:1.7">
+          웹앱이라 <b>앱 화면이 켜져 있는 동안만</b> 걸음이 세어져요.<br>
+          화면을 끄거나 다른 앱으로 이동하면 측정이 멈춥니다.
+        </div>
+      </div>
+
+      <div class="ss-section-title">최근 7일</div>
+      <div class="ss-card" style="padding:8px 14px">${hist}</div>
+
+      <div style="display:flex;gap:8px;margin-top:14px">
+        <button onclick="setStepGoal()" style="flex:1;height:40px;border-radius:10px;border:1.5px solid var(--border);background:white;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">목표 변경</button>
+        <button onclick="setPedSensPrompt()" style="flex:1;height:40px;border-radius:10px;border:1.5px solid var(--border);background:white;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">민감도 조절</button>
+      </div>
+    </div>`;
+}
+

@@ -902,6 +902,14 @@
       </div>
       <div style="padding:24px 20px">
         <div id="ch-leader-bar"></div>
+        <div class="newfeature-card" onclick="openSubscreen('pedometer')" style="margin-bottom:18px">
+          <div class="newfeature-icon">👟</div>
+          <div class="newfeature-info">
+            <div class="newfeature-title">만보기 <span class="newfeature-badge">NEW</span></div>
+            <div class="newfeature-desc" id="ped-teaser">오늘 걸음 수를 확인하고 목표에 도전해요</div>
+          </div>
+          <span class="newfeature-arrow">›</span>
+        </div>
         <div class="section-label">이번 주 추천 챌린지 (<em>AI 추천</em>)</div>
         <div id="ch-recommended"></div>
         <div class="section-label" style="margin-top:26px">내가 진행하고 있는 <em>챌린지</em></div>
@@ -3496,6 +3504,7 @@ function bootApp() {
 
   // 차단 목록 기기 간 동기화 (Firestore me.blocked → 로컬)
   syncBlockedFromMe();
+  if (typeof syncStepsFromMe === 'function') syncStepsFromMe();   // 걸음 기록 기기 간 병합
 
   // 계정 삭제 감지 + 내 직분·권한 실시간 반영
   startSelfDocWatch();
@@ -6374,6 +6383,7 @@ var SUBSCREEN_TITLES = {
   'mentor-match'   : '멘토링',
   'romance-match'  : '이성 교제',
   'match-inbox'    : '받은 매칭 신청',
+  'pedometer'      : '만보기',
   'invite-codes'   : '초대 코드 관리',
   'member-binder'  : '삶의 예배 열람',
   'app-settings'   : '앱 설정',
@@ -6451,6 +6461,7 @@ function renderSubscreenContent(id) {
     case 'notifications':   return renderNotifications();
     case 'board':           return renderBoard();
     case 'board-post':      return renderBoardPost();
+    case 'pedometer':       return renderPedometer();
     case 'my-challenges':    return renderMyChallenges();
     case 'challenge-manage': return renderChallengeManage();
     case 'my-events':       return renderMyEvents();
