@@ -7289,7 +7289,30 @@ function initChatRoomsList() {
     saveChatRooms(_allRooms);
     renderChatRooms();
     _updateChatNavBadge();
+    cleanupDeletedDmRooms();   // 삭제된 계정과의 1:1 방 자동 나가기 (친구 여부와 무관)
   });
+}
+
+// 채팅방 목록 기준으로 상대 계정이 삭제된 1:1 방을 자동으로 나감 — 친구 목록과 독립
+var _dmPartnerChecked = new Set();   // 이미 확인한 상대(살아있음/삭제 무관) → 스냅샷마다 재조회 방지
+async function cleanupDeletedDmRooms() {
+  if (!window._fbReady || !window._fb || !me) return;
+  const targets = (_allRooms || [])
+    .filter(r => r && r.type === 'dm')
+    .map(r => ({ id: r.id, pid: (r.members || []).find(x => x !== me.id) }))
+    .filter(t => t.pid && !_dmPartnerChecked.has(t.pid));
+  if (!targets.length) return;
+  const gone = (await Promise.all(targets.map(async t => {
+    try {
+      const s = await window._fb.getUser(t.pid);
+      _dmPartnerChecked.add(t.pid);                       // 확인 완료 표시 (성공 시에만)
+      return (!s.exists() || s.data().deleted) ? t.id : null;
+    } catch (_) { return null; }                          // 조회 실패는 미확인으로 두고 다음 기회 재시도
+  }))).filter(Boolean);
+  if (gone.length) {
+    gone.forEach(id => _leaveRoomCore(id));
+    renderChatRooms();
+  }
 }
 
 function renderChatRooms() {
