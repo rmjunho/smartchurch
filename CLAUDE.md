@@ -6,7 +6,7 @@
 
 **SmartChurch(스마트처치)** 는 한국어 교회 커뮤니티 앱입니다. 묵상/QT, 챌린지, 채팅, 교회 관리, 마이페이지 기능을 제공합니다.
 
-- **구조**: 단일 파일 SPA. 모든 HTML·CSS·JS가 [index.html](index.html) 하나에 들어 있습니다 (약 14,900줄, ~1.3MB).
+- **구조**: 빌드 없는 SPA. 진입점은 [index.html](index.html)(약 9,800줄 — 화면 마크업 + 앱 코어)이고, 기능별 로직은 `js/*.js`, 스타일은 [css/style.css](css/style.css)로 분리돼 있습니다. `js/*.js`는 일반 `<script>`라 **모두 하나의 전역 스코프를 공유**합니다(import/export 없음 → 함수명 충돌 주의).
 - **프레임워크 없음**: 순수 바닐라 JS. 빌드 단계·번들러·npm·`package.json`이 없습니다. 파일을 브라우저에서 바로 엽니다.
 - **백엔드**: Firebase (Auth + Firestore). 서버 코드 없음, 클라이언트 전용.
 - **배포**: GitHub Pages. 커스텀 도메인은 [CNAME](CNAME) 파일의 `smartchurch.kro.kr`. `main` 브랜치에 푸시하면 배포됩니다.
@@ -14,25 +14,38 @@
 
 ## 편집 시 핵심 주의사항
 
-- **단일 파일이므로 변경은 항상 [index.html](index.html)에 합니다.** 정밀한 `Edit`(고유한 문자열 매칭)을 사용하고, 대용량 파일이니 전체를 다시 읽지 말고 필요한 구간만 읽으세요.
-- 새 파일을 만들거나 모듈로 쪼개지 마세요. 의도적으로 단일 HTML 구조입니다.
-- CSS는 `<style>` 블록(약 라인 158–2956) 안에 있습니다. 색상은 `:root` CSS 변수(`--gold`, `--cream`, `--dark`, `--danger`, `--success` 등)를 씁니다.
+- **기능에 맞는 기존 파일에 수정을 넣으세요** (아래 파일 지도 참고). 새 파일·새 모듈은 만들지 마세요.
+- 정밀한 `Edit`(고유한 문자열 매칭)을 사용하고, 대용량 파일이니 전체를 다시 읽지 말고 필요한 구간만 읽으세요.
+- CSS는 [css/style.css](css/style.css)에 있습니다. 색상은 `:root` CSS 변수(`--gold`, `--cream`, `--dark`, `--danger`, `--success` 등)를 씁니다.
+- 화면 출력에 사용자 입력을 넣을 때는 반드시 `escHtml()`로 이스케이프하세요(렌더링이 문자열 HTML → `innerHTML` 방식이라 XSS에 노출됩니다).
+- `onclick="..."` 문자열로 이벤트를 연결하므로 핸들러는 **전역 함수**여야 합니다.
 
-## index.html 내부 구조
+## 파일 지도
 
-파일은 3개의 `<script>` 영역으로 나뉩니다.
+| 파일 | 담당 |
+|---|---|
+| [index.html](index.html) | 화면 마크업 전체, 앱 코어(묵상/바인더, 채팅, 친구, 프로필, 화면 전환) |
+| [js/firebase-config.js](js/firebase-config.js) | Firebase 연결 + `window._fb` DB 접근 창구 |
+| [js/church.js](js/church.js) | 교회·기관 탭, 교인 관리, 행사, 게시판 |
+| [js/challenge.js](js/challenge.js) | 챌린지, 만보기(진입 카드 주석 처리로 비노출) |
+| [js/matching.js](js/matching.js) | 취미 모임·기도·멘토링·이성 매칭 |
+| [js/admin.js](js/admin.js) | 앱 관리자 패널 |
+| [js/feed.js](js/feed.js) | 피드 |
+| [css/style.css](css/style.css) | 전체 스타일 |
 
-1. **Firebase ESM 모듈** (라인 18–157, `<script type="module">")
+## 코드 구성
+
+1. **Firebase 계층** ([js/firebase-config.js](js/firebase-config.js), `<script type="module">`)
    - Firebase SDK를 gstatic ESM(`firebasejs/12.15.0`)에서 import 합니다.
    - `firebaseConfig`가 **인라인 하드코딩**되어 있습니다 (projectId: `smartchurch-868e3`).
-   - 모듈 스코프 밖에서 쓰기 위해 `window._fb` 파사드 객체에 모든 Firestore/Auth 호출을 노출합니다. 준비 완료 플래그는 `window._fbReady`.
-   - **새 Firestore 접근이 필요하면 여기 `window._fb`에 메서드를 추가**하고, 아래 앱 스크립트에서 호출하세요. 앱 스크립트는 일반 `<script>`라 Firebase 모듈을 직접 import 할 수 없습니다.
+   - 모듈 스코프 밖에서 쓰기 위해 `window._fb` 파사드 객체에 모든 Firestore/Auth 호출을 노출합니다. 준비 완료 플래그는 `window._fbReady`, 오류 표시는 `window._fbErr(위치, e)`.
+   - **새 Firestore 접근이 필요하면 먼저 `window._fb`에 메서드를 추가**하고 앱 코드에서 호출하세요. 앱 코드는 일반 `<script>`라 Firebase 모듈을 직접 import 할 수 없습니다.
 
-2. **HTML 화면 마크업** (`<style>` 종료 이후 ~5376)
+2. **HTML 화면 마크업** ([index.html](index.html) 앞부분)
    - 화면(screen): `screen-splash`, `screen-login`, `screen-pending`, `screen-register`, `screen-onboard`, `screen-main`.
    - `go('login'|'main'|'onboard'|'pending')` 로 화면 전환.
 
-3. **앱 로직** (라인 5376–14899, 일반 `<script>`)
+3. **앱 로직** ([index.html](index.html) 뒷부분 + `js/*.js`)
    - 로그인 후 `bootApp()` → 메인 화면.
    - 하단 탭 5개: `switchTab(tab, label, el)` 로 전환.
      - `worship`(묵상/예배), `challenge`(챌린지), `chat`(채팅), `church`(교회), `mypage`(마이페이지).
