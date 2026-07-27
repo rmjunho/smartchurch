@@ -931,9 +931,9 @@
     .date-nav {
       background: var(--dark);
       display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
+      flex-direction: column;   /* 년/월 헤더 위, 주간 스트립 아래로 세로 배치 (좁은 폰에서 라벨이 옆으로 밀려 찌그러지던 문제 수정) */
+      align-items: stretch;
+      gap: 2px;
       padding: 13px 16px;
       position: relative;
     }
@@ -986,6 +986,7 @@
     }
     .cal-strip-month {
       font-size: 13px; font-weight: 700; color: rgba(255,255,255,0.7);
+      white-space: nowrap;   /* "2026년 7월"이 여러 줄로 쪼개지지 않게 */
     }
     .cal-strip {
       display: flex; align-items: center; gap: 2px;
