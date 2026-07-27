@@ -738,10 +738,14 @@ function openChurchInfoEdit() {
       const d = snap.exists() ? snap.data() : {};
       document.getElementById('ci-address').value     = d.address     || '';
       document.getElementById('ci-description').value = d.description || '';
+      document.getElementById('ci-theme-verse').value = d.themeVerse  || '';
       document.getElementById('ci-pastor-name').value = d.pastorName  || '';
       document.getElementById('ci-pastor-bio').value  = d.pastorBio   || '';
     }).catch(() => {});
   }
+  // 기관·단체는 주제 말씀 대신 소개글만 사용 → 입력칸 숨김
+  const themeRow = document.getElementById('ci-theme-verse')?.closest('.form-group');
+  if (themeRow) themeRow.style.display = getOrgTypeForChurch(me.churchCode) === 'org' ? 'none' : '';
   modal.classList.add('open');
 }
 
@@ -755,6 +759,7 @@ function saveChurchInfoEdit() {
   const data = {
     address:     document.getElementById('ci-address').value.trim(),
     description: document.getElementById('ci-description').value.trim(),
+    themeVerse:  document.getElementById('ci-theme-verse').value.trim(),
     pastorName:  document.getElementById('ci-pastor-name').value.trim(),
     pastorBio:   document.getElementById('ci-pastor-bio').value.trim(),
     updatedBy:   me.name,
@@ -1611,7 +1616,27 @@ async function loadMyChurchData() {
 function initChurchTab() {
   const cx = document.getElementById('church-box-title');
   if (cx) cx.textContent = me.church || '';
+  updateChurchHero();
   renderChurchMembers();
+}
+
+// 교회 탭 히어로 — 제목은 소속 공동체 이름, 부제는 주제 말씀/소개글 (기관은 소개글만)
+var CHURCH_HERO_DEFAULT_SUB = '또 만물을 그의 발 아래에 복종하게 하시고<br>그를 만물 위에 교회의 머리로 삼으셨느니라';
+function updateChurchHero() {
+  const tEl = document.getElementById('church-hero-title');
+  const sEl = document.getElementById('church-hero-sub');
+  if (!tEl || !sEl) return;
+  const isOrg = getOrgTypeForChurch(me.churchCode) === 'org';
+  tEl.textContent = me.church || (isOrg ? '기관·단체' : '교회');
+  // 기본값 먼저 적용 후, churchInfo 를 받아오면 덮어씀 (미소속·조회 실패 시에도 빈 화면 방지)
+  sEl.innerHTML = isOrg ? '함께 세워가는 우리 공동체' : CHURCH_HERO_DEFAULT_SUB;
+  if (!window._fbReady || !window._fb || !me.churchCode) return;
+  window._fb.getChurchInfo(me.churchCode).then(snap => {
+    const d = snap.exists() ? snap.data() : {};
+    // 교회: 주제 말씀 > 소개글 > 기본 성구 / 기관: 소개글만
+    const text = isOrg ? d.description : (d.themeVerse || d.description);
+    if (text) sEl.textContent = text;
+  }).catch(e => { if (window._fbErr) window._fbErr('교회 히어로 정보 조회', e); });
 }
 
 function renderChurchMembers() {
