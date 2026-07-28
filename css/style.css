@@ -486,12 +486,14 @@
     .topbar {
       position: absolute;
       top: 0; left: 0; right: 0;
-      height: 56px;
+      /* status-bar-style=black-translucent 라 콘텐츠가 상태바 아래까지 확장된다.
+         box-sizing:border-box 이므로 height 도 함께 키워야 내용이 눌리지 않는다. */
+      height: calc(56px + env(safe-area-inset-top, 0px));
       background: var(--black);
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 0 12px 0 16px;
+      padding: env(safe-area-inset-top, 0px) 12px 0 16px;
       z-index: 50;
     }
     .topbar-label {
@@ -675,7 +677,9 @@
     /* Tab content areas */
     .tab-panel {
       position: absolute;
-      top: 56px; bottom: calc(72px + env(safe-area-inset-bottom, 0px));   /* 높아진 하단 내비에 가리지 않게 */
+      /* 헤더·내비가 safe-area 만큼 커지므로 콘텐츠 영역도 같은 식으로 맞춘다 */
+      top: calc(56px + env(safe-area-inset-top, 0px));
+      bottom: calc(72px + env(safe-area-inset-bottom, 0px));
       left: 0; right: 0;
       overflow-y: auto;
       overflow-x: hidden;
@@ -834,7 +838,9 @@
          box-sizing:border-box 라 height 를 함께 키우지 않으면 아이콘이 눌린다. */
       height: calc(72px + env(safe-area-inset-bottom, 0px));
       display: none; /* go('main') 호출 시 JS로 flex 전환 */
-      align-items: center;
+      /* flex-end — 콘텐츠 박스(72px) 아래쪽에 붙여 라벨 밑 여백을 홈 인디케이터 몫(inset)만 남긴다.
+         center 로 두면 위아래로 나뉘어 라벨 아래가 inset+14px 로 넓어 보인다. inset 0 이면 동작 동일. */
+      align-items: flex-end;
       justify-content: space-around;
       padding: 0 4px env(safe-area-inset-bottom, 0px);
       background: var(--black);
