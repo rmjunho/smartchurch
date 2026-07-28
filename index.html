@@ -5,6 +5,14 @@
   <script>
     // 전역 에러 잡기 — JS 오류를 화면에 표시
     window.addEventListener('error', function(e) {
+      // 크로스오리진 스크립트(gstatic Firebase SDK 등)의 오류는 브라우저가 상세를 가려
+      // 'Script error. (line 0)' 형태로만 도착한다. 화면에 띄워도 정보가 없고
+      // 성도에게는 앱이 고장 난 것처럼 보이므로 콘솔에만 남긴다.
+      // ※ 조건을 넓히지 말 것 — 이 두 조건이 동시에 맞을 때만 생략하고, 나머지는 전부 표시.
+      if (e.message === 'Script error.' && e.lineno === 0) {
+        console.warn('[오버레이 생략] Script error. (line 0) — 크로스오리진 스크립트 오류라 상세가 가려짐', e);
+        return;
+      }
       const box = document.getElementById('_err_overlay');
       if (box) { box.style.display = 'block'; box.textContent = 'JS Error: ' + e.message + ' (line ' + e.lineno + ')'; }
     });
@@ -2718,13 +2726,23 @@ function setupPWA() {
 // iOS: 홈 화면 추가 안내 (standalone 으로 이미 실행 중이면 표시 안 함)
 // 카카오톡 인앱브라우저: 외부 브라우저로 열도록 안내 (로그인·설치가 제한됨)
 // 한 번 닫으면 localStorage 에 기록해 다시 띄우지 않는다.
+// iPadOS 13+ 사파리는 UA 에 'iPad' 가 아니라 'Macintosh' 를 넣는다 → 터치 포인트 수로 구분.
+// (이전엔 navigator.platform==='MacIntel' 로 판별했는데 platform 은 폐기 예정 API 라 UA 기준으로 통일)
+function isIOSDevice() {
+  const ua = navigator.userAgent || '';
+  return /iPad|iPhone|iPod/.test(ua)
+      || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+}
+function isStandalonePWA() {
+  return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)
+      || window.navigator.standalone === true;
+}
+
 function showPwaTip() {
   const ua = navigator.userAgent || '';
-  const standalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)
-                     || window.navigator.standalone === true;
+  const standalone = isStandalonePWA();
   const isKakao = /KAKAOTALK/i.test(ua);
-  const isIOS   = /iPad|iPhone|iPod/.test(ua)
-                  || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);  // iPadOS 대응
+  const isIOS   = isIOSDevice();
 
   let key, icon, title, desc;
   if (isKakao) {
@@ -2787,24 +2805,95 @@ function showSystemNotification(notif) {
 window.addEventListener('beforeinstallprompt', e => {
   e.preventDefault();
   _deferredInstallPrompt = e;
-  const btn = document.getElementById('pwa-install-row');
-  if (btn) btn.style.display = '';
+  // 앱 설정 화면이 열려 있으면 설치 행을 다시 그려 "설치하기" 상태로 갱신
+  const ss = document.getElementById('subscreen');
+  if (ss && ss.classList.contains('open') && ss.dataset.current === 'app-settings')
+    document.getElementById('subscreen-body').innerHTML = renderAppSettings();
 });
 function canInstallPWA() {
-  return !!_deferredInstallPrompt ||
-    (/iphone|ipad|ipod/i.test(navigator.userAgent) && !navigator.standalone);
+  return !!_deferredInstallPrompt || (isIOSDevice() && !isStandalonePWA());
 }
-async function promptPWAInstall() {
-  if (_deferredInstallPrompt) {
-    _deferredInstallPrompt.prompt();
-    const { outcome } = await _deferredInstallPrompt.userChoice;
-    _deferredInstallPrompt = null;
-    toast(outcome === 'accepted' ? '홈 화면에 설치됐어요! ' : '언제든 다시 설치할 수 있어요');
-  } else if (/iphone|ipad|ipod/i.test(navigator.userAgent)) {
-    toast('사파리 공유 버튼 → "홈 화면에 추가"를 눌러주세요 ');
-  } else {
-    toast('브라우저 메뉴 → "홈 화면에 추가"를 선택해 주세요 ');
+
+// 설치 행을 4가지 상태로 렌더 — 앱 설정 화면에서 호출
+//  ① 이미 설치됨(standalone)            → "설치됨", 버튼 비활성
+//  ② iOS/iPadOS (beforeinstallprompt 없음) → "설치 방법 보기" → 단계 안내
+//  ③ beforeinstallprompt 지원            → "설치하기" (기존 동작)
+//  ④ 그 외                               → 행 자체를 숨김
+function _pwaInstallRowHtml() {
+  const installed = isStandalonePWA();
+  const ios       = isIOSDevice();
+  const prompt    = !!_deferredInstallPrompt;
+  if (!installed && !ios && !prompt) return '';   // ④ 설치를 지원하지 않는 브라우저
+
+  let desc, label, onclick, disabled = '';
+  if (installed) {                                 // ①
+    desc = '이미 홈 화면 앱으로 실행 중이에요';
+    label = '설치됨'; onclick = '';
+    disabled = 'disabled style="opacity:0.5;cursor:default"';
+  } else if (prompt) {                             // ③
+    desc = '앱처럼 전체화면으로 실행돼요';
+    label = '설치하기'; onclick = 'onclick="promptPWAInstall()"';
+  } else {                                         // ② iOS/iPadOS
+    desc = '사파리에서는 직접 추가해야 해요';
+    label = '설치 방법 보기'; onclick = 'onclick="showIOSInstallGuide()"';
   }
+  return `
+    <div style="font-size:12px;font-weight:700;color:var(--muted);letter-spacing:0.5px;margin-bottom:8px">앱 설치</div>
+    <div id="pwa-install-row" style="background:white;border-radius:14px;border:1.5px solid var(--border);padding:14px 16px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;gap:12px">
+      <div>
+        <div style="font-size:13.5px;font-weight:700">홈 화면에 설치</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:2px">${desc}</div>
+      </div>
+      <button ${onclick} ${disabled}
+        style="height:34px;padding:0 16px;border-radius:10px;border:none;background:var(--black);color:white;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit;flex-shrink:0">${label}</button>
+    </div>`;
+}
+
+// iOS/iPadOS 전용 설치 절차 안내 (beforeinstallprompt 미지원 → 자동 설치 불가)
+function showIOSInstallGuide() {
+  let m = document.getElementById('ios-install-guide');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'ios-install-guide';
+    m.className = 'modal-backdrop';
+    m.onclick = e => { if (e.target.id === 'ios-install-guide') closeIOSInstallGuide(); };
+    document.body.appendChild(m);
+  }
+  const step = (n, t) => `
+    <div style="display:flex;gap:11px;align-items:flex-start;padding:9px 0">
+      <span style="flex-shrink:0;width:22px;height:22px;border-radius:50%;background:var(--gold);color:var(--black);
+                   font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center">${n}</span>
+      <span style="font-size:13.5px;line-height:1.6">${t}</span>
+    </div>`;
+  m.innerHTML = `
+    <div class="modal-sheet">
+      <div class="modal-title">홈 화면에 추가하기</div>
+      <div style="font-size:12.5px;color:var(--muted);line-height:1.7;margin:-6px 0 12px">
+        사파리는 자동 설치를 지원하지 않아 직접 추가해야 해요.
+      </div>
+      ${step(1, '화면 아래(또는 위)의 <b>공유 버튼</b>을 누르세요')}
+      ${step(2, '목록에서 <b>"홈 화면에 추가"</b>를 선택하세요')}
+      ${step(3, '오른쪽 위 <b>"추가"</b>를 누르면 완료돼요')}
+      <div style="font-size:12px;color:var(--muted);line-height:1.6;margin-top:10px;padding-top:12px;border-top:1px solid var(--border)">
+        추가 후에는 홈 화면 아이콘으로 열어야 전체화면으로 실행돼요.
+      </div>
+      <div class="modal-actions">
+        <button class="btn-confirm" onclick="closeIOSInstallGuide()">알겠어요</button>
+      </div>
+    </div>`;
+  m.classList.add('open');
+}
+function closeIOSInstallGuide() {
+  const m = document.getElementById('ios-install-guide');
+  if (m) m.classList.remove('open');
+}
+
+async function promptPWAInstall() {
+  if (!_deferredInstallPrompt) { showIOSInstallGuide(); return; }
+  _deferredInstallPrompt.prompt();
+  const { outcome } = await _deferredInstallPrompt.userChoice;
+  _deferredInstallPrompt = null;
+  toast(outcome === 'accepted' ? '홈 화면에 설치됐어요!' : '언제든 다시 설치할 수 있어요');
 }
 setupPWA();
 
@@ -6673,16 +6762,8 @@ function renderAppSettings() {
         <div style="border-top:1px solid var(--border)">${toggleRow('notifBoard','게시판 알림','공지 및 건의함 답변 알림',notifBoard)}</div>
       </div>
 
-      <!-- 홈 화면 설치 (PWA) -->
-      <div style="font-size:12px;font-weight:700;color:var(--muted);letter-spacing:0.5px;margin-bottom:8px">앱 설치</div>
-      <div style="background:white;border-radius:14px;border:1.5px solid var(--border);padding:14px 16px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;gap:12px">
-        <div>
-          <div style="font-size:13.5px;font-weight:700">홈 화면에 설치</div>
-          <div style="font-size:12px;color:var(--muted);margin-top:2px">앱처럼 전체화면으로 실행돼요</div>
-        </div>
-        <button onclick="promptPWAInstall()"
-          style="height:34px;padding:0 16px;border-radius:10px;border:none;background:var(--black);color:white;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit">설치하기</button>
-      </div>
+      <!-- 홈 화면 설치 (PWA) — 설치 상태·브라우저 지원 여부에 따라 4가지로 분기 -->
+      ${_pwaInstallRowHtml()}
 
       <!-- 화면 설정 -->
       <div style="font-size:12px;font-weight:700;color:var(--muted);letter-spacing:0.5px;margin-bottom:8px">화면 설정</div>
