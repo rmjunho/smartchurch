@@ -2720,8 +2720,27 @@ function setupPWA() {
     });
   }
   window.addEventListener('load', showPwaTip);
-  // ?debug=1 일 때만 safe-area 실측 오버레이 (원인 확인 후 제거 예정)
-  if (/[?&]debug=1/.test(location.search)) window.addEventListener('load', () => setTimeout(showSafeAreaDebug, 600));
+  // safe-area 실측 오버레이 — ?debug=1(데스크톱) 또는 앱 설정 '앱 버전' 5회 탭.
+  // standalone 은 start_url("/") 로 열려 쿼리가 유지되지 않으므로 localStorage 로 상태를 남긴다.
+  if (/[?&]debug=1/.test(location.search)) { try { localStorage.setItem('saDebug', '1'); } catch (_) {} }
+  if (_saDebugOn()) window.addEventListener('load', () => setTimeout(showSafeAreaDebug, 600));
+}
+
+function _saDebugOn() { try { return localStorage.getItem('saDebug') === '1'; } catch (_) { return false; } }
+
+// 앱 설정 '앱 버전' 행 5회 연속 탭 → 진단 오버레이 토글 (히든 제스처)
+var _debugTapCount = 0, _debugTapTimer = null;
+function _debugTap() {
+  clearTimeout(_debugTapTimer);
+  _debugTapCount++;
+  _debugTapTimer = setTimeout(() => { _debugTapCount = 0; }, 1200);   // 1.2초 안에 연속으로 눌러야 인정
+  if (_debugTapCount < 5) return;
+  _debugTapCount = 0;
+  const on = !_saDebugOn();
+  try { localStorage.setItem('saDebug', on ? '1' : '0'); } catch (_) {}
+  if (on) showSafeAreaDebug();
+  else { const b = document.getElementById('sa-debug'); if (b) b.remove(); }
+  toast(on ? '진단 오버레이를 켰어요' : '진단 오버레이를 껐어요');
 }
 
 // ── [임시] safe-area 진단 오버레이 — 아이폰 하단 여백 원인 실측용. 확인 후 삭제할 것 ──
@@ -2748,18 +2767,34 @@ function showSafeAreaDebug() {
   box.id = 'sa-debug';
   box.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99998;background:rgba(0,0,0,0.92);color:#0f0;'
     + 'font:11px/1.5 monospace;padding:8px 10px;white-space:pre-wrap;word-break:break-all;max-height:52vh;overflow:auto';
+  // 하단 검은 영역의 실제 요소를 특정 — 이게 핵심 단서
+  const hitY = window.innerHeight - 20;
+  const hit  = document.elementFromPoint(Math.round(window.innerWidth / 2), hitY);
+  const desc = e => e ? '<' + e.tagName.toLowerCase() + (e.id ? '#' + e.id : '')
+                        + (e.className && typeof e.className === 'string' ? '.' + e.className.trim().split(/\s+/).join('.') : '') + '>' : 'null';
+  const app  = document.getElementById('app');
+  const vv   = window.visualViewport;
+
   box.textContent =
     `[safe-area 진단]  탭하면 닫힘\n`
   + `inset  top=${insetTop}  bottom=${insetBottom}\n`
   + `standalone=${window.matchMedia('(display-mode: standalone)').matches} / nav.standalone=${window.navigator.standalone}\n`
-  + `innerHeight=${window.innerHeight}  clientHeight=${document.documentElement.clientHeight}\n`
+  + `innerHeight=${window.innerHeight}\n`
+  + `clientHeight=${document.documentElement.clientHeight}\n`
+  + `visualViewport.h=${vv ? Math.round(vv.height) : '없음'}  offsetTop=${vv ? Math.round(vv.offsetTop) : '-'}\n`
   + `screen.height=${screen.height}  dpr=${window.devicePixelRatio}\n`
+  + `--- 요소 rect ---\n`
+  + `#app         ${r(app)}\n`
+  + (app ? `  computed h=${getComputedStyle(app).height} overflow=${getComputedStyle(app).overflow}\n` : '')
+  + `body         ${r(document.body)}\n`
   + `.bottom-nav  ${r(nav)}\n`
-  + (navCs ? `  computed h=${navCs.height} padBottom=${navCs.paddingBottom} align=${navCs.alignItems} pos=${navCs.position}\n` : '')
+  + (navCs ? `  computed h=${navCs.height} padBottom=${navCs.paddingBottom}\n  align=${navCs.alignItems} pos=${navCs.position} offsetParent=${desc(nav.offsetParent)}\n` : '')
   + `.tab-panel   ${r(pan)}\n`
-  + `nav 다음형제 ${sib ? '<' + sib.tagName.toLowerCase() + ' class="' + sib.className + '"> ' + r(sib) : '없음'}\n`
-  + `#app         ${r(document.getElementById('app'))}\n`
-  + `body         ${r(document.body)}`;
+  + `nav 다음형제 ${sib ? desc(sib) + ' ' + r(sib) : '없음'}\n`
+  + `--- 하단 20px 지점 실제 요소 ---\n`
+  + `y=${hitY} → ${desc(hit)}\n`
+  + `  ${hit ? r(hit) : ''}\n`
+  + `  부모: ${hit && hit.parentElement ? desc(hit.parentElement) : '-'}`;
   box.onclick = () => box.remove();
   document.body.appendChild(box);
 }
@@ -6835,7 +6870,7 @@ function renderAppSettings() {
       <div style="font-size:12px;font-weight:700;color:var(--muted);letter-spacing:0.5px;margin-bottom:8px">ℹ앱 정보</div>
       <div style="background:white;border-radius:14px;border:1.5px solid var(--border);overflow:hidden;margin-bottom:16px">
         <div class="ss-setting-row">
-          <div><div class="ss-setting-label">앱 버전</div><div class="ss-setting-sub">SmartChurch v1.2.0</div></div>
+          <div onclick="_debugTap()" style="cursor:pointer"><div class="ss-setting-label">앱 버전</div><div class="ss-setting-sub">SmartChurch v1.2.0</div></div>
           <span style="font-size:12px;background:rgba(39,174,96,0.1);color:#27AE60;border-radius:6px;padding:2px 8px;font-weight:700">최신</span>
         </div>
         <div class="ss-setting-row" style="border-top:1px solid var(--border);cursor:pointer"
