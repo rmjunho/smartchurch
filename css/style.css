@@ -675,7 +675,7 @@
     /* Tab content areas */
     .tab-panel {
       position: absolute;
-      top: 56px; bottom: 72px;
+      top: 56px; bottom: calc(72px + env(safe-area-inset-bottom, 0px));   /* 높아진 하단 내비에 가리지 않게 */
       left: 0; right: 0;
       overflow-y: auto;
       overflow-x: hidden;
@@ -830,13 +830,44 @@
       transform: translateX(-50%);
       width: 100%;
       max-width: 480px;
-      height: 72px;
+      /* 홈 인디케이터(iOS)·제스처 바 영역만큼 아래로 늘리고 그만큼 안쪽 여백을 준다.
+         box-sizing:border-box 라 height 를 함께 키우지 않으면 아이콘이 눌린다. */
+      height: calc(72px + env(safe-area-inset-bottom, 0px));
       display: none; /* go('main') 호출 시 JS로 flex 전환 */
       align-items: center;
       justify-content: space-around;
-      padding: 0 4px;
+      padding: 0 4px env(safe-area-inset-bottom, 0px);
       background: var(--black);
       z-index: 50;
+    }
+
+    /* ── PWA 안내 배너 (iOS 홈 화면 추가 / 카카오톡 인앱브라우저) ── */
+    .pwa-tip {
+      position: fixed;
+      bottom: 0; left: 50%;
+      transform: translateX(-50%);
+      width: 100%; max-width: 480px;
+      display: none;              /* JS 가 .on 을 붙일 때만 표시 */
+      align-items: flex-start;
+      gap: 10px;
+      padding: 14px 16px calc(14px + env(safe-area-inset-bottom, 0px));
+      background: var(--dark);
+      border-top: 1.5px solid var(--gold);
+      z-index: 200;               /* .bottom-nav(50) 위 */
+    }
+    .pwa-tip.on { display: flex; }
+    .pwa-tip-icon  { font-size: 19px; line-height: 1.4; flex-shrink: 0; }
+    .pwa-tip-body  { flex: 1; min-width: 0; }
+    .pwa-tip-title { font-size: 13.5px; font-weight: 800; color: var(--gold); margin-bottom: 3px; }
+    .pwa-tip-desc  { font-size: 12.5px; line-height: 1.65; color: rgba(255,255,255,0.72); }
+    .pwa-tip-close {
+      flex-shrink: 0;
+      width: 28px; height: 28px;
+      border: none; border-radius: 8px;
+      background: rgba(255,255,255,0.1);
+      color: var(--white);
+      font-size: 15px; line-height: 1;
+      cursor: pointer; font-family: inherit;
     }
 
     .nav-btn {

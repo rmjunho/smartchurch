@@ -9,17 +9,22 @@
       if (box) { box.style.display = 'block'; box.textContent = 'JS Error: ' + e.message + ' (line ' + e.lineno + ')'; }
     });
   </script>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <!-- viewport-fit=cover — 노치/홈 인디케이터 영역까지 그린 뒤 env(safe-area-inset-*) 로 여백 확보 -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>스마트처치</title>
-  <!-- PWA / 홈 화면 설치 (item 7) — 매니페스트는 단일 파일 유지를 위해 런타임 Blob 으로 주입 -->
-  <meta name="theme-color" content="#C9A96E">
+  <!-- PWA / 홈 화면 설치 -->
+  <!-- 실제 UI(.topbar/.bottom-nav/#screen-splash)가 var(--black) 이라 manifest 와 동일하게 맞춤 -->
+  <meta name="theme-color" content="#0D0D0D">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="스마트처치">
   <!-- 파비콘 — favicon.png 는 검은색 로고(밝은 탭에서도 보이게). logo.png 는 흰색 버전이라 파비콘에 부적합 -->
   <link rel="icon" type="image/png" href="favicon.png">
-  <link rel="apple-touch-icon" href="favicon.png">
+
+  <!-- PWA — 정적 매니페스트 (TWA 는 고정 URL 이 필요해 런타임 Blob 주입을 쓰지 않는다) -->
+  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="/icons/icon-192.png">
 
   <!-- 공유 미리보기(OG) — og.png (1200×630) -->
   <meta name="description" content="교회와 성도를 잇는 신앙생활 플랫폼. 삶의 예배, 챌린지, 채팅, 교회 관리를 한 곳에서.">
@@ -2691,57 +2696,69 @@ var DB = {
 
 // ================================================
 //  PWA — 홈 화면 설치 (item 7)
-//  단일 HTML 유지 원칙에 따라 매니페스트/아이콘을 런타임에 생성해 주입한다.
-//  (서비스워커는 별도 파일이 필요해 이 구조에선 생략 — iOS/안드로이드 홈 화면 추가는 동작)
+//  매니페스트(manifest.json)·아이콘(icons/)·서비스워커(sw.js)는 정적 파일로 관리한다.
+//  런타임 Blob 주입은 TWA(Play Store)에서 쓸 수 없어 제거됨.
 // ================================================
 var _deferredInstallPrompt = null;
-function _pwaMakeIcon(size) {
-  // 앱 아이콘을 캔버스로 그려 dataURL 반환 (골드 배경 + + SmartChurch)
-  const c = document.createElement('canvas');
-  c.width = c.height = size;
-  const x = c.getContext('2d');
-  x.fillStyle = '#C9A96E';
-  x.fillRect(0, 0, size, size);
-  x.fillStyle = '#1A1A1A';
-  x.textAlign = 'center';
-  x.textBaseline = 'middle';
-  x.font = `${Math.round(size * 0.5)}px serif`;
-  x.fillText('🙏', size / 2, size * 0.44);
-  x.fillStyle = '#1A1A1A';
-  x.font = `bold ${Math.round(size * 0.13)}px Pretendard, sans-serif`;
-  x.fillText('스마트처치', size / 2, size * 0.82);
-  return c.toDataURL('image/png');
-}
 function setupPWA() {
-  try {
-    const icon192 = _pwaMakeIcon(192);
-    const icon512 = _pwaMakeIcon(512);
-    const manifest = {
-      name: '스마트처치',
-      short_name: '스마트처치',
-      description: '교회 커뮤니티 · 묵상 · 챌린지 · 채팅',
-      start_url: '.',
-      scope: '.',
-      display: 'standalone',
-      orientation: 'portrait',
-      background_color: '#FBF7F0',
-      theme_color: '#C9A96E',
-      lang: 'ko',
-      icons: [
-        { src: icon192, sizes: '192x192', type: 'image/png', purpose: 'any maskable' },
-        { src: icon512, sizes: '512x512', type: 'image/png', purpose: 'any maskable' }
-      ]
-    };
-    _appIconUrl = icon192;   // 시스템 알림 아이콘으로 재사용 (item 9)
-    const blobUrl = URL.createObjectURL(new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' }));
-    let link = document.querySelector('link[rel="manifest"]');
-    if (!link) { link = document.createElement('link'); link.rel = 'manifest'; document.head.appendChild(link); }
-    link.href = blobUrl;
-    // iOS 홈 화면 아이콘
-    let apple = document.querySelector('link[rel="apple-touch-icon"]');
-    if (!apple) { apple = document.createElement('link'); apple.rel = 'apple-touch-icon'; document.head.appendChild(apple); }
-    apple.href = icon192;
-  } catch (e) { /* 캔버스 미지원 등 — 무시 */ }
+  // 매니페스트·아이콘은 <head> 의 정적 링크(manifest.json, icons/)가 담당한다.
+  // 런타임 Blob 주입은 TWA(Play Store)에서 쓸 수 없어 제거됨.
+  _appIconUrl = 'icons/icon-192.png';   // 시스템 알림 아이콘
+
+  // 서비스워커 등록 — 오프라인 폴백용. 페이지 로드 경쟁을 피해 load 이후에 등록.
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js').catch(() => {});
+    });
+  }
+  window.addEventListener('load', showPwaTip);
+}
+
+// ── 설치/브라우저 안내 배너 ──
+// iOS: 홈 화면 추가 안내 (standalone 으로 이미 실행 중이면 표시 안 함)
+// 카카오톡 인앱브라우저: 외부 브라우저로 열도록 안내 (로그인·설치가 제한됨)
+// 한 번 닫으면 localStorage 에 기록해 다시 띄우지 않는다.
+function showPwaTip() {
+  const ua = navigator.userAgent || '';
+  const standalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)
+                     || window.navigator.standalone === true;
+  const isKakao = /KAKAOTALK/i.test(ua);
+  const isIOS   = /iPad|iPhone|iPod/.test(ua)
+                  || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);  // iPadOS 대응
+
+  let key, icon, title, desc;
+  if (isKakao) {
+    key = 'kakao'; icon = '🌐';
+    title = '다른 브라우저로 열어주세요';
+    desc  = '카카오톡 안에서는 로그인과 홈 화면 추가가 제한돼요. 오른쪽 아래 ⋯ 버튼 → "다른 브라우저로 열기"를 눌러주세요.';
+  } else if (isIOS && !standalone) {
+    key = 'ios'; icon = '📲';
+    title = '홈 화면에 추가하면 앱처럼 쓸 수 있어요';
+    desc  = '아래 공유 버튼을 누른 뒤 "홈 화면에 추가"를 선택해 주세요.';
+  } else {
+    return;
+  }
+
+  try { if (localStorage.getItem('pwaTipClosed_' + key) === '1') return; } catch (_) {}
+  if (document.getElementById('pwa-tip')) return;
+
+  const el = document.createElement('div');
+  el.id = 'pwa-tip';
+  el.className = 'pwa-tip on';
+  el.innerHTML = `
+    <span class="pwa-tip-icon">${icon}</span>
+    <div class="pwa-tip-body">
+      <div class="pwa-tip-title">${title}</div>
+      <div class="pwa-tip-desc">${desc}</div>
+    </div>
+    <button class="pwa-tip-close" onclick="closePwaTip('${key}')" aria-label="닫기">✕</button>`;
+  document.body.appendChild(el);
+}
+
+function closePwaTip(key) {
+  try { localStorage.setItem('pwaTipClosed_' + key, '1'); } catch (_) {}
+  const el = document.getElementById('pwa-tip');
+  if (el) el.remove();
 }
 
 // ── 브라우저 로컬 알림 (item 9) ──
