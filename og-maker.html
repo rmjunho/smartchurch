@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>스마트처치 OG 이미지 만들기</title>
+<link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css" rel="stylesheet">
+<style>
+  body { font-family:'Pretendard',sans-serif; background:#F2EDE5; margin:0; padding:28px;
+         display:flex; flex-direction:column; align-items:center; gap:16px; }
+  h1 { font-size:18px; font-weight:800; color:#1a1a1a; margin:0 }
+  p  { font-size:13.5px; color:#888; margin:0; line-height:1.7; text-align:center }
+  canvas { width:600px; height:315px; border:1px solid #D5CFCA; border-radius:10px; background:#fff }
+  button { height:44px; padding:0 22px; border:none; border-radius:11px; background:#1a1a1a; color:#fff;
+           font-family:inherit; font-size:14px; font-weight:800; cursor:pointer }
+  button:disabled { background:#D5CFCA; cursor:default }
+</style>
+</head>
+<body>
+  <h1>스마트처치 OG 이미지</h1>
+  <p>아래 버튼을 누르면 <b>og.png</b> (1200×630) 파일이 내려받아집니다.<br>
+     그 파일을 프로젝트 폴더(smartchurch)에 넣어주세요.</p>
+  <canvas id="cv" width="1200" height="630"></canvas>
+  <button id="dl" disabled>준비 중…</button>
+
+<script>
+const TITLE   = '스마트처치';
+const TAGLINE = '교회와 성도를 잇는 신앙생활 플랫폼';
+const GOLD = '#C9A96E', BLACK = '#1a1a1a', MUTED = '#888888';
+
+function draw(logo) {
+  const c = document.getElementById('cv'), x = c.getContext('2d');
+  x.fillStyle = '#FFFFFF';  x.fillRect(0, 0, 1200, 630);
+
+  // 상하 골드 라인 — 미니멀한 포인트
+  x.fillStyle = GOLD;
+  x.fillRect(0, 0, 1200, 8);
+  x.fillRect(0, 622, 1200, 8);
+
+  // 로고 (있으면) — 중앙 상단
+  const hasLogo = !!logo;
+  const logoSize = 168;
+  const blockTop = hasLogo ? 150 : 215;
+  if (hasLogo) x.drawImage(logo, (1200 - logoSize) / 2, blockTop, logoSize, logoSize);
+
+  x.textAlign = 'center';
+  const titleY = hasLogo ? blockTop + logoSize + 92 : blockTop + 60;
+
+  x.fillStyle = BLACK;
+  x.font = '800 84px Pretendard, sans-serif';
+  x.letterSpacing = '-2px';
+  x.fillText(TITLE, 600, titleY);
+
+  // 제목과 부제 사이 짧은 구분선
+  x.fillStyle = GOLD;
+  x.fillRect(600 - 26, titleY + 34, 52, 3);
+
+  x.fillStyle = MUTED;
+  x.font = '500 30px Pretendard, sans-serif';
+  x.letterSpacing = '-0.5px';
+  x.fillText(TAGLINE, 600, titleY + 86);
+}
+
+function ready() {
+  const b = document.getElementById('dl');
+  b.disabled = false;
+  b.textContent = '↓ og.png 내려받기';
+  b.onclick = () => {
+    try {
+      document.getElementById('cv').toBlob(bl => {
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(bl);
+        a.download = 'og.png';
+        a.click();
+        URL.revokeObjectURL(a.href);
+      }, 'image/png');
+    } catch (e) {
+      // file:// 로 열면 로고 이미지 때문에 캔버스가 오염돼 내보내기가 막힘
+      alert('내려받기가 막혔어요.\n\n주소창에 https://smartchurch.kro.kr/og-maker.html 로 열어주세요.\n(파일을 직접 여는 file:// 방식은 브라우저 보안 때문에 저장이 안 됩니다)');
+    }
+  };
+}
+
+// 폰트가 로드된 뒤 그려야 Pretendard 로 렌더됨
+document.fonts.ready.then(() => {
+  const img = new Image();
+  img.onload  = () => { draw(img);  ready(); };
+  img.onerror = () => { draw(null); ready(); };   // 로고를 못 찾으면 글자만
+  img.src = 'favicon.png';
+});
+</script>
+</body>
+</html>
