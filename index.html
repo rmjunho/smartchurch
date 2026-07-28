@@ -2720,6 +2720,48 @@ function setupPWA() {
     });
   }
   window.addEventListener('load', showPwaTip);
+  // ?debug=1 일 때만 safe-area 실측 오버레이 (원인 확인 후 제거 예정)
+  if (/[?&]debug=1/.test(location.search)) window.addEventListener('load', () => setTimeout(showSafeAreaDebug, 600));
+}
+
+// ── [임시] safe-area 진단 오버레이 — 아이폰 하단 여백 원인 실측용. 확인 후 삭제할 것 ──
+function showSafeAreaDebug() {
+  // env() 실제 계산값은 CSS 로만 얻을 수 있어 측정 전용 요소에 넣고 computed 로 읽는다
+  const probe = document.createElement('div');
+  probe.style.cssText = 'position:fixed;left:-9999px;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)';
+  document.body.appendChild(probe);
+  const cs = getComputedStyle(probe);
+  const insetTop = cs.paddingTop, insetBottom = cs.paddingBottom;
+  probe.remove();
+
+  const r = el => {
+    if (!el) return '없음';
+    const b = el.getBoundingClientRect();
+    return `top=${Math.round(b.top)} bottom=${Math.round(b.bottom)} h=${Math.round(b.height)}`;
+  };
+  const nav  = document.querySelector('.bottom-nav');
+  const pan  = document.querySelector('.tab-panel.active') || document.querySelector('.tab-panel');
+  const sib  = nav && nav.nextElementSibling;
+  const navCs = nav ? getComputedStyle(nav) : null;
+
+  const box = document.createElement('div');
+  box.id = 'sa-debug';
+  box.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99998;background:rgba(0,0,0,0.92);color:#0f0;'
+    + 'font:11px/1.5 monospace;padding:8px 10px;white-space:pre-wrap;word-break:break-all;max-height:52vh;overflow:auto';
+  box.textContent =
+    `[safe-area 진단]  탭하면 닫힘\n`
+  + `inset  top=${insetTop}  bottom=${insetBottom}\n`
+  + `standalone=${window.matchMedia('(display-mode: standalone)').matches} / nav.standalone=${window.navigator.standalone}\n`
+  + `innerHeight=${window.innerHeight}  clientHeight=${document.documentElement.clientHeight}\n`
+  + `screen.height=${screen.height}  dpr=${window.devicePixelRatio}\n`
+  + `.bottom-nav  ${r(nav)}\n`
+  + (navCs ? `  computed h=${navCs.height} padBottom=${navCs.paddingBottom} align=${navCs.alignItems} pos=${navCs.position}\n` : '')
+  + `.tab-panel   ${r(pan)}\n`
+  + `nav 다음형제 ${sib ? '<' + sib.tagName.toLowerCase() + ' class="' + sib.className + '"> ' + r(sib) : '없음'}\n`
+  + `#app         ${r(document.getElementById('app'))}\n`
+  + `body         ${r(document.body)}`;
+  box.onclick = () => box.remove();
+  document.body.appendChild(box);
 }
 
 // ── 설치/브라우저 안내 배너 ──
