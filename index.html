@@ -374,6 +374,8 @@
 
         <!-- ② 교회/기관 섹션 (교회·기관 선택 시만) -->
         <div id="ob2-church-section">
+        <!-- 메인: 교회 코드 + 직분. 교회 등록·초대 코드는 아래 링크로 분리된 화면에서 처리 -->
+        <div id="ob2-main">
           <div class="form-label" style="margin-bottom:10px;font-size:14px;font-weight:800">② 교회 코드 입력 (6자리)</div>
           <input id="ob-code" class="ob-code-input" type="text" maxlength="6"
                  placeholder="SC0001" oninput="obCodeInput(this)"
@@ -382,7 +384,11 @@
             <svg width="16" height="14" viewBox="0 0 16 14" fill="none"><path d="M1 7l5 5L15 1" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
             <span id="ob-code-church-name"></span> 연결됨!
           </div>
-          <div class="ob-or"><span class="ob-or-text">코드가 없다면</span></div>
+        </div><!-- /ob2-main -->
+
+        <!-- 교회 등록 — 하단 링크로 진입하는 별도 화면 -->
+        <div id="ob2-panel-register" style="display:none">
+          <div onclick="obShowPanel('main')" style="font-size:13px;color:var(--muted);font-weight:600;cursor:pointer;margin-bottom:12px">← 돌아가기</div>
           <div style="background:var(--white);border:1.5px solid var(--border);border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;gap:10px">
             <div style="font-size:13px;color:var(--black);font-weight:600">목사님·전도사님이신가요?</div>
             <div style="font-size:12.5px;color:var(--muted);line-height:1.6">
@@ -399,8 +405,11 @@
             </div>
           </div>
 
-          <!-- 초대 코드로 입장 -->
-          <div class="ob-or" style="margin-top:16px"><span class="ob-or-text">초대 코드가 있다면</span></div>
+        </div><!-- /ob2-panel-register -->
+
+        <!-- 초대 코드 — 하단 링크로 진입하는 별도 화면 -->
+        <div id="ob2-panel-invite" style="display:none">
+          <div onclick="obShowPanel('main')" style="font-size:13px;color:var(--muted);font-weight:600;cursor:pointer;margin-bottom:12px">← 돌아가기</div>
           <div style="background:var(--white);border:1.5px solid rgba(201,169,110,0.4);border-radius:14px;padding:14px 16px">
             <div style="font-size:13px;font-weight:600;color:var(--black);margin-bottom:8px">초대 코드로 바로 입장</div>
             <div style="font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.5">
@@ -422,6 +431,7 @@
               이 코드로 바로 입장하기 →
             </button>
           </div>
+        </div><!-- /ob2-panel-invite -->
 
           <!-- ③ 직분 선택 -->
           <div id="ob-role-wrap" style="margin-top:18px;padding-top:16px;border-top:1px solid var(--border)">
@@ -431,6 +441,15 @@
             </div>
             <select id="ob-role-select" class="form-select"></select>
           </div>
+
+          <!-- 로그인 화면 하단 링크와 같은 형태 — 각각 별도 화면으로 이동 -->
+          <p id="ob2-links" style="text-align:center;font-size:13px;color:var(--muted);margin-top:18px;line-height:2.1">
+            교회·기관을 새로 만드시나요?
+            <span style="color:var(--black);font-weight:700;cursor:pointer" onclick="obShowPanel('register')">교회 등록 →</span>
+            <br>
+            초대 코드를 받으셨나요?
+            <span style="color:var(--black);font-weight:700;cursor:pointer" onclick="obShowPanel('invite')">초대 코드 입력 →</span>
+          </p>
         </div><!-- /ob2-church-section -->
 
         <!-- 개인 선택 시 안내 -->
@@ -3100,7 +3119,28 @@ function setObOrgType(type) {
     const sel = document.getElementById('ob-role-select');
     if (sel) sel.innerHTML = ORG_ROLES[type].map(r =>
       `<option value="${r.value}">${r.label}</option>`).join('');
+    obShowPanel('main');   // 유형을 다시 고르면 항상 메인부터
   }
+}
+
+// 온보딩 2단계 화면 전환 — 메인(교회 코드+직분) / 교회 등록 / 초대 코드
+// 교회 등록·초대 코드는 대부분의 교인에게 필요 없어 메인에서 빼고 하단 링크로만 진입한다.
+function obShowPanel(which) {
+  const show = (id, on) => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = on ? '' : 'none';
+  };
+  const isMain = which !== 'register' && which !== 'invite';
+  show('ob2-main',           isMain);
+  show('ob-role-wrap',       isMain);
+  show('ob2-links',          isMain);
+  show('ob2-panel-register', which === 'register');
+  show('ob2-panel-invite',   which === 'invite');
+  // 메인에서만 하단 내비(건너뛰기/다음) 노출 — 패널에서는 '돌아가기' 로 빠져나간다
+  const nav = document.querySelector('#ob2 .ob-nav');
+  if (nav) nav.style.display = isMain ? '' : 'none';
+  const card = document.querySelector('#ob2 .ob-card');
+  if (card) card.scrollTop = 0;
 }
 
 function _initObRoleSelect() {
