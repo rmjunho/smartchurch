@@ -330,6 +330,18 @@ async function loadAdminPanelData() {
   body.outerHTML = renderAdminPanelHtml(allUsers);
 }
 
+// 교회·기관 관리 섹션으로 스크롤.
+// scrollIntoView 는 대상을 화면 맨 위로 올리려다 스크롤 끝을 넘어서, 아래가 배경(검정)으로 남았다.
+// 컨테이너 최대 스크롤량으로 잘라 그 현상을 막는다.
+function scrollToAdminChurches() {
+  const el = document.getElementById('admin-church-section');
+  if (!el) return;
+  const box = el.closest('.subscreen-body') || document.getElementById('subscreen-body');
+  if (!box) { el.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); return; }
+  const max = Math.max(0, box.scrollHeight - box.clientHeight);
+  box.scrollTo({ top: Math.min(el.offsetTop - 12, max), behavior: 'smooth' });
+}
+
 // churchInfo 컬렉션 → 로컬 customChurches 병합 (name 필드가 있는 문서 = 등록된 교회)
 async function syncChurchesFromFirestore() {
   if (!window._fbReady || !window._fb) return;
@@ -421,7 +433,7 @@ function renderAdminPanelHtml(allUsers) {
         <div class="ss-card-info"><div class="ss-card-title">전체 사용자</div><div class="ss-card-sub">${allUsers.length}명 등록됨</div></div>
         <span class="sm-arrow">›</span>
       </div>
-      <div class="ss-card-row" onclick="document.getElementById('admin-church-section')?.scrollIntoView({behavior:'smooth'})" style="cursor:pointer">
+      <div class="ss-card-row" onclick="scrollToAdminChurches()" style="cursor:pointer">
         <div class="ss-card-icon">⛪</div>
         <div class="ss-card-info"><div class="ss-card-title">등록된 교회/기관</div><div class="ss-card-sub">${churches.length}개</div></div>
         <span class="sm-arrow">›</span>
@@ -597,8 +609,16 @@ function renderAdminPanelHtml(allUsers) {
   }
 
   // ── 교회/기관 관리 ──
+  // customChurches(로컬) 만 보면, churchInfo 문서에 name 이 없는 교회는 병합되지 않아
+  // 실제로 교인이 있는 교회가 목록에서 통째로 빠진다(현황 요약은 2개인데 여기만 0개였던 원인).
+  // → 사용자 소속(churchCode/church)에서도 교회를 모아 합친다.
   const customChurches = DB.get('customChurches', {});
-  const churchCodes = Object.keys(customChurches);
+  const churchMap = Object.assign({}, customChurches);
+  allUsers.forEach(u => {
+    if (!u.churchCode || churchMap[u.churchCode]) return;
+    churchMap[u.churchCode] = { name: u.church || u.churchCode, code: u.churchCode };
+  });
+  const churchCodes = Object.keys(churchMap);
 
   html += `<div id="admin-church-section" style="display:flex;justify-content:space-between;align-items:center;padding:0 16px;margin:16px 0 10px">
     <span style="font-size:12px;font-weight:700;color:var(--muted);letter-spacing:0.5px">교회·기관 관리 (${churchCodes.length}개)</span>
@@ -614,7 +634,7 @@ function renderAdminPanelHtml(allUsers) {
   } else {
     html += `<div style="padding:0 16px;margin-bottom:16px">`;
     churchCodes.forEach(code => {
-      const c     = customChurches[code];
+      const c     = churchMap[code];
       const data  = typeof c === 'string' ? { name: c, code, type: 'church', emoji: '⛪' } : (c || {});
       const emoji = data.emoji || (CHURCH_TYPES.find(t=>t.value===data.type)||CHURCH_TYPES[0]).emoji;
       const type  = (CHURCH_TYPES.find(t=>t.value===data.type)||CHURCH_TYPES[0]).label;
