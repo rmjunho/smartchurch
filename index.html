@@ -7017,21 +7017,29 @@ var LEADER_ROLES = {
   personal: []
 };
 
+// 직분 자체가 리더인지 판별.
+// 예전에는 me.orgType 으로 목록을 골랐는데, 사용자 문서에 orgType 이 없으면 'church' 로 폴백돼
+// 기관 직분(기관장 등)이 리더로 인식되지 않았다(직분은 바뀌는데 권한이 안 붙던 원인).
+// 교회/기관 목록에 겹치는 직분명이 없으므로 전체에서 찾아도 오판 위험이 없고,
+// localStorage 캐시(customChurches) 유무에 영향받지 않아 어느 기기에서나 동일하게 동작한다.
+function isLeaderRole(role) {
+  if (!role) return false;
+  return Object.keys(LEADER_ROLES).some(k => (LEADER_ROLES[k] || []).includes(role));
+}
+
 function isLeader() {
   if (!me) return false;
   if (me.isAppAdmin) return true;
-  // 임명 리더 체크 (나중에 구현 — 지금은 권한 배열로 체크)
+  // 임명 리더 — 권한이 하나라도 부여됐으면 리더
   if (me.leaderPerms && me.leaderPerms.length > 0) return true;
-  const orgType = me.orgType || 'church';
-  return (LEADER_ROLES[orgType] || []).includes(me.role || '');
+  return isLeaderRole(me.role);
 }
 
 function hasLeaderPerm(perm) {
   if (!me) return false;
   if (me.isAppAdmin) return true;
-  const orgType = me.orgType || 'church';
-  // 기본 리더는 모든 권한
-  if ((LEADER_ROLES[orgType] || []).includes(me.role || '')) return true;
+  // 기본 리더(직분 자체가 리더)는 모든 권한 — isLeaderRole 이 orgType 누락에도 안전하다
+  if (isLeaderRole(me.role)) return true;
   // 임명 리더는 부여된 권한만
   return (me.leaderPerms || []).includes(perm);
 }

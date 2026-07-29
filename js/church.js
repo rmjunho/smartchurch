@@ -873,13 +873,16 @@ function assignRole(userId, role) {
   const users = DB.get('users', []);
   const u = _resolveMemberForAction(users, userId);
   if (!u) return;
+  // 소속 유형도 함께 채워 둔다 — orgType 이 비어 있던 계정들이 스스로 정합해지도록
+  const orgType = getOrgTypeForChurch(u.churchCode || me.churchCode);
   u.role = role;
+  u.orgType = orgType;
   delete u.requestedRole;
   DB.set('users', users);
   const cached = _membersCache.find(x => x.id === userId);
-  if (cached) { cached.role = role; delete cached.requestedRole; }
+  if (cached) { cached.role = role; cached.orgType = orgType; delete cached.requestedRole; }
   if (window._fbReady && window._fb) {
-    window._fb.updateUser(userId, { role, requestedRole: '' })
+    window._fb.updateUser(userId, { role, orgType, requestedRole: '' })
       .catch(e => { if (window._fbErr) window._fbErr('직분 변경 저장', e); toast('동기화 실패 — 다시 시도해 주세요'); });
   }
   toast(`${u.name || '교인'}님을 "${role}"(으)로 지정했어요`);
