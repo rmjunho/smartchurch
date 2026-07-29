@@ -2828,7 +2828,11 @@ function showPwaTip() {
   if (isKakao) {
     key = 'kakao'; icon = '🌐';
     title = '다른 브라우저로 열어주세요';
-    desc  = '카카오톡 안에서는 로그인과 홈 화면 추가가 제한돼요. 오른쪽 아래 ⋯ 버튼 → "다른 브라우저로 열기"를 눌러주세요.';
+    // 카카오톡 인앱브라우저는 OS 별로 UI 가 달라 분기한다.
+    // iOS: 하단 공유 버튼 → 공유 시트의 "Safari에서 열기" / 안드로이드: 오른쪽 '위' ⋯ 메뉴
+    desc  = isIOS
+      ? '카카오톡 안에서는 로그인과 홈 화면 추가가 제한돼요. 화면 아래 <b>공유 버튼(⬆️)</b> → <b>"Safari에서 열기"</b>를 눌러주세요.'
+      : '카카오톡 안에서는 로그인과 홈 화면 추가가 제한돼요. 오른쪽 위 <b>⋯ 메뉴</b> → <b>"다른 브라우저로 열기"</b>를 눌러주세요.';
   } else if (isIOS && !standalone) {
     key = 'ios'; icon = '📲';
     title = '홈 화면에 추가하면 앱처럼 쓸 수 있어요';
@@ -2954,7 +2958,8 @@ function showIOSInstallGuide() {
       <div style="background:var(--cream2);border-radius:12px;padding:12px 14px;margin-bottom:6px">
         <div style="font-size:13px;font-weight:800;color:var(--danger);margin-bottom:5px">⚠️ 먼저 확인해 주세요</div>
         <div style="font-size:12.5px;line-height:1.7;color:var(--dark)">
-          카카오톡에서 바로 열지 마시고, <b>주소를 복사해 Safari에 붙여넣어</b> 주세요.<br>
+          카카오톡에서 바로 열지 마시고 <b>Safari로 옮겨서</b> 진행해 주세요.<br>
+          카톡 화면 아래 <b>공유 버튼(⬆️)</b> → <b>"Safari에서 열기"</b><br>
           (카톡 내부 브라우저에서는 설치가 되지 않아요)
         </div>
       </div>
