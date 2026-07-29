@@ -38,6 +38,20 @@
       box-shadow: 0 0 60px rgba(0,0,0,0.8);
     }
 
+    /* 글자 크기 — 앱 전체를 배율로 확대/축소한다.
+       CSS 대부분이 px 고정값이라 font-size 변수만으로는 반영되지 않기 때문.
+       배율만큼 max-width/height 를 나눠 두어 실제 렌더 크기는 480px·100dvh 로 유지된다.
+       zoom 미지원 브라우저는 @supports 로 통째로 건너뛰어 기존 레이아웃을 그대로 쓴다. */
+    @supports (zoom: 1) {
+      #app {
+        zoom: var(--app-zoom, 1);
+        max-width: calc(480px / var(--app-zoom, 1));
+        height: calc(100dvh / var(--app-zoom, 1));
+      }
+      /* .bottom-nav 는 fixed 라 zoom 배율만큼 넓어지므로 함께 보정 */
+      .bottom-nav { max-width: calc(480px / var(--app-zoom, 1)); }
+    }
+
     /* =============================================
        SCREEN SYSTEM
     ============================================= */

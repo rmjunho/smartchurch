@@ -3663,9 +3663,7 @@ function ensureFriendCode() {
 var _selfDocUnsub = null;   // 내 사용자 문서 실시간 감시 (삭제 시 자동 로그아웃)
 function bootApp() {
   // 저장된 글자 크기 적용
-  const sz = DB.get('fontSize_' + me.id, 'md');
-  const sizes = { sm:'13px', md:'15px', lg:'17px' };
-  document.documentElement.style.setProperty('--app-font-size', sizes[sz] || '15px');
+  applyFontSize(DB.get('fontSize_' + me.id, 'md'));
   // 구 기본 카테고리(신앙/생활/학습)만 저장된 사용자 → 새 기본값으로 자동 업그레이드
   const stored = DB.get('todoCats_' + me.id, null);
   if (JSON.stringify(stored) === JSON.stringify(['신앙','생활','학습'])) {
@@ -7055,10 +7053,15 @@ function toggleSetting(storageKey, toggle) {
   toast(on ? '켰어요 ' : '껐어요');
 }
 // 글자 크기 설정
+// 앱 전체 배율 — css/style.css 의 @supports(zoom) 블록이 이 값을 소비한다.
+// 이전에는 --app-font-size 를 설정했는데 CSS 에서 쓰는 곳이 없어 아무 효과가 없었다.
+var FONT_ZOOM = { sm: '0.92', md: '1', lg: '1.1' };
+function applyFontSize(sz) {
+  document.documentElement.style.setProperty('--app-zoom', FONT_ZOOM[sz] || '1');
+}
 function setFontSize(sz) {
   DB.set('fontSize_' + me.id, sz);
-  const sizes = { sm:'13px', md:'15px', lg:'17px' };
-  document.documentElement.style.setProperty('--app-font-size', sizes[sz] || '15px');
+  applyFontSize(sz);
   const lbl = { sm:'작게', md:'보통', lg:'크게' };
   toast(`글자 크기: ${lbl[sz]||sz}`);
   setTimeout(() => openSubscreen('app-settings'), 200);
