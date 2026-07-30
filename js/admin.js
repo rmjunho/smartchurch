@@ -335,12 +335,13 @@ async function loadAdminPanelData() {
   body.outerHTML = renderAdminPanelHtml(allUsers);
 }
 
-// 교회·기관 관리 섹션으로 스크롤.
+// 관리자 패널 안의 섹션으로 스크롤.
 // scrollIntoView 는 대상을 화면 맨 위로 올리려다 스크롤 끝을 넘어서, 아래가 배경(검정)으로 남았다.
 // 컨테이너 최대 스크롤량으로 잘라 그 현상을 막는다.
-function scrollToAdminChurches() {
-  const el = document.getElementById('admin-church-section');
-  if (!el) return;
+// 대기 0건이면 섹션 자체가 렌더되지 않으므로, 눌러도 반응 없어 보이지 않게 안내를 띄운다.
+function scrollToAdminSection(sectionId, emptyMsg) {
+  const el = document.getElementById(sectionId);
+  if (!el) { if (emptyMsg) toast(emptyMsg); return; }
   const box = el.closest('.subscreen-body') || document.getElementById('subscreen-body');
   if (!box) { el.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); return; }
   const max = Math.max(0, box.scrollHeight - box.clientHeight);
@@ -438,7 +439,7 @@ function renderAdminPanelHtml(allUsers) {
         <div class="ss-card-info"><div class="ss-card-title">전체 사용자</div><div class="ss-card-sub">${allUsers.length}명 등록됨</div></div>
         <span class="sm-arrow">›</span>
       </div>
-      <div class="ss-card-row" onclick="scrollToAdminChurches()" style="cursor:pointer">
+      <div class="ss-card-row" onclick="scrollToAdminSection('admin-church-section')" style="cursor:pointer">
         <div class="ss-card-icon">⛪</div>
         <div class="ss-card-info"><div class="ss-card-title">등록된 교회/기관</div><div class="ss-card-sub">${churches.length}개</div></div>
         <span class="sm-arrow">›</span>
@@ -448,10 +449,10 @@ function renderAdminPanelHtml(allUsers) {
         <div class="ss-card-info"><div class="ss-card-title">교회 등록 대기</div><div class="ss-card-sub">관리자 승인 필요</div></div>
         <span class="ss-card-badge ${pendingChurch.length > 0 ? 'ss-badge-gold' : 'ss-badge-gray'}">${pendingChurch.length}</span>
       </div>
-      <div class="ss-card-row">
+      <div class="ss-card-row" onclick="scrollToAdminSection('admin-minor-section','대기 중인 미성년자 가입 신청이 없어요')" style="cursor:pointer">
         <div class="ss-card-icon">⏳</div>
-        <div class="ss-card-info"><div class="ss-card-title">미성년자 승인 대기</div></div>
-        <span class="ss-card-badge ${minorPending.length > 0 ? 'ss-badge-gold' : 'ss-badge-gray'}">${minorPending.length}</span>
+        <div class="ss-card-info"><div class="ss-card-title">미성년자 승인 대기</div><div class="ss-card-sub">눌러서 승인/거절</div></div>
+        <span class="ss-card-badge ${minorPending.length > 0 ? 'ss-badge-gold' : 'ss-badge-gray'}">${minorPending.length}</span><span class="sm-arrow">›</span>
       </div>
       <div class="ss-card-row">
         <div class="ss-card-icon">🤝</div>
@@ -591,16 +592,22 @@ function renderAdminPanelHtml(allUsers) {
     html += `</div>`;
   }
 
-  // 미성년자 승인 대기
+  // 미성년자 승인 대기 — 가입 직후 교회를 아직 못 고른 상태라 교회 리더에게는 안 보인다(운영팀이 처리).
   if (minorPending.length) {
-    html += `<div class="ss-section-title">미성년자 승인 대기</div><div class="ss-card">`;
+    html += `<div class="ss-section-title" id="admin-minor-section">미성년자 승인 대기</div><div class="ss-card">`;
     minorPending.forEach(u => {
+      const gPhone = (u.guardianContact || '').replace(/[^0-9]/g, '');
       html += `<div style="padding:14px 16px;border-bottom:1px solid var(--border)">
         <div style="font-size:14px;font-weight:700;margin-bottom:4px">
           ${escHtml(u.name)}<span style="font-size:12px;color:var(--muted);font-weight:400"> · ${escHtml(u.church||'교회 미지정')}</span>
         </div>
+        <div style="font-size:12.5px;color:var(--muted);margin-bottom:4px">
+          ${escHtml(u.email||'')}${u.birthdate ? ' · ' + escHtml(u.birthdate) : ''} · 신청 ${(u.createdAt||'').split('T')[0]}
+        </div>
         <div style="font-size:12.5px;color:var(--muted);margin-bottom:10px">
-          보호자: ${escHtml(u.guardianName||'—')} / ${escHtml(u.guardianContact||'—')}
+          보호자: ${escHtml(u.guardianName||'—')} /
+          ${gPhone ? `<a href="tel:${gPhone}" style="color:#2980B9;font-weight:600;text-decoration:none">📞 ${escHtml(u.guardianContact)}</a>`
+                   : escHtml(u.guardianContact||'—')}
         </div>
         <div style="display:flex;gap:8px">
           <button onclick="approveMinor('${u.id}')"

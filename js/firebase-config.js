@@ -37,6 +37,8 @@ window._fb = {
           e => window._fbErr && window._fbErr('교인 실시간 동기화', e)),
       // 전체 사용자 (관리자용)
       getAllUsers: () => getDocs(collection(fbDb, 'users')),
+      // 승인 대기(미성년자) 사용자만 — 배지 숫자용. 전체를 받아 세면 사용자가 늘수록 비싸다.
+      getPendingUsers: () => getDocs(query(collection(fbDb, 'users'), where('status','==','pending'))),
       // 교회별 사용자
       getUsersByChurch: (churchCode) =>
         getDocs(query(collection(fbDb, 'users'), where('churchCode','==',churchCode))),
