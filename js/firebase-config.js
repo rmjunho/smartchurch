@@ -54,6 +54,11 @@ window._fb = {
         getDocs(query(collection(fbDb, 'challenges'), where('scope','==','personal'), where('createdByUid','==',uid))),
       // 프로필 사진 (users 문서에서 분리 저장 → 목록 조회 시 base64 미포함)
       setUserPhoto:    (uid, data) => setDoc(doc(fbDb, 'userPhotos', uid), data, { merge: true }),
+      // 전화번호는 users 문서에 두면 로그인한 모든 교인이 읽을 수 있어(규칙상 read: signedIn)
+      // 별도 컬렉션으로 분리한다. 본인·같은 교회 리더·앱 관리자만 읽도록 규칙에서 제한.
+      setUserPhone:    (uid, phone) => setDoc(doc(fbDb, 'userPhones', uid),
+                         { phone, updatedAt: new Date().toISOString() }, { merge: true }),
+      getUserPhone:    (uid)        => getDoc(doc(fbDb, 'userPhones', uid)),
       getUserPhotoDoc: (uid)       => getDoc(doc(fbDb, 'userPhotos', uid)),
       getUserPhotosByChurch: (churchCode) =>
         getDocs(query(collection(fbDb, 'userPhotos'), where('churchCode', '==', churchCode))),

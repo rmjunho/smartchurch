@@ -52,6 +52,21 @@ service cloud.firestore {
       allow write: if signedIn() && (uid() == photoId || isLeader());
     }
 
+    // ── 전화번호 (문서 ID = uid) ──
+    // users 문서는 read: signedIn 이라 거기에 두면 모든 교인이 읽는다. 그래서 분리했다.
+    // 읽기: 본인 / 앱 관리자(운영 목적 열람) / 같은 교회 리더. 그 외 교인은 서버에서 차단된다.
+    // ※ 파라미터명을 phoneUid 로 둔 이유 — uid 로 쓰면 헬퍼 함수 uid() 를 가린다.
+    match /userPhones/{phoneUid} {
+      allow read: if signedIn() && (
+                    uid() == phoneUid ||
+                    isAdmin() ||
+                    (isLeader() &&
+                     exists(/databases/$(database)/documents/users/$(phoneUid)) &&
+                     get(/databases/$(database)/documents/users/$(phoneUid)).data.churchCode == profile().churchCode)
+                  );
+      allow write: if signedIn() && (uid() == phoneUid || isAdmin());
+    }
+
     // ── 공유 바인더 (key = uid_date, 교회 내 공개 열람) ──
     match /binderEntries/{key} {
       allow read:  if signedIn();

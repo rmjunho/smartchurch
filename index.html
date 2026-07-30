@@ -3257,7 +3257,9 @@ var TERMS_CONTENT = {
 <p>서비스는 운영상 필요에 의해 내용을 변경하거나 종료할 수 있으며, 이 경우 7일 전 앱 내 공지를 통해 사전 안내합니다.</p>
 <h4>제5조 (면책)</h4>
 <p>서비스는 이용자가 입력한 데이터의 분실에 대해 책임지지 않으며, 이용자 스스로 중요한 데이터를 백업할 것을 권장합니다.</p>
-<h4>제6조 (준거법)</h4>
+<h4>제6조 (광고 게재)</h4>
+<p>① 서비스는 운영 및 유지를 위해 서비스 화면(마이 페이지 등)에 광고를 게재할 수 있습니다.<br>② 광고는 모든 이용자에게 동일하게 표시되며, 이용자의 개인정보를 이용한 맞춤형 광고는 별도 동의 없이 제공하지 않습니다.<br>③ 푸시·문자·이메일 등으로 광고성 정보를 전송하는 경우에는 "광고·마케팅 정보 수신 동의"를 받은 이용자에게만 발송합니다.</p>
+<h4>제7조 (준거법)</h4>
 <p>본 약관은 대한민국 법률에 따라 해석되며, 분쟁 발생 시 관할 법원은 서울중앙지방법원으로 합니다.</p>`
   },
   privacy: {
@@ -3269,7 +3271,12 @@ var TERMS_CONTENT = {
 <h4>개인정보 보유 및 이용 기간</h4>
 <p>회원 탈퇴 시까지 보유하며, 탈퇴 즉시 파기합니다. 단, 관계 법령에 따라 일정 기간 보존이 필요한 경우 해당 기간 동안 보유합니다.</p>
 <h4>개인정보의 제3자 제공</h4>
-<p>수집된 개인정보는 제3자에게 제공·판매하지 않습니다. 교회 코드로 연결된 같은 교회 구성원에게 이름과 직분이 공개될 수 있습니다.</p>
+<p>수집된 개인정보는 제3자에게 제공·판매하지 않습니다.</p>
+<p>• <b>같은 교회 구성원</b>: 이름, 직분, 프로필 사진이 공개됩니다.<br>
+• <b>전화번호</b>: 소속 교회의 <b>리더(교역자·기관장 등)</b> 에게만 공개되며, 일반 교인에게는 공개되지 않습니다.<br>
+• <b>운영팀</b>: 문의 대응·부정 이용 방지 등 서비스 운영 목적에 한해 열람할 수 있습니다.</p>
+<h4>이용자가 직접 선택하는 공개</h4>
+<p>매칭 기능 등에서 이용자가 스스로 연락처 공개를 선택한 경우에만 해당 상대에게 공개됩니다. 선택하지 않으면 공개되지 않습니다.</p>
 <h4>동의 거부 권리</h4>
 <p>이용자는 개인정보 수집·이용 동의를 거부할 권리가 있습니다. 단, 필수 항목 거부 시 서비스 이용이 제한됩니다.</p>
 <h4>개인정보 보호책임자</h4>
@@ -3440,7 +3447,7 @@ async function doRegister() {
       const uid  = cred.user.uid;
 
       const userData = {
-        id: uid, name, email, phone, birthdate: birth,
+        id: uid, name, email, birthdate: birth,   // phone 은 userPhones 로 분리 저장 (아래)
         church:      '',
         churchCode:  '',
         role:        '교인',   // 온보딩 ob2에서 선택
@@ -3458,10 +3465,13 @@ async function doRegister() {
 
       // Firestore에 저장
       await window._fb.setUser(uid, userData);
-      // localStorage에도 캐시
-      DB.saveUser(userData);
+      // 전화번호는 별도 컬렉션 — 본인·같은 교회 리더·운영팀만 읽도록 규칙에서 제한한다
+      window._fb.setUserPhone(uid, phone)
+        .catch(e => { if (window._fbErr) window._fbErr('전화번호 저장', e); });
+      // localStorage·me 에는 phone 을 포함 (내 기기에서 내 번호를 보여주기 위함)
+      me = Object.assign({}, userData, { phone });
+      DB.saveUser(me);
       DB.setSession(uid);
-      me = userData;
 
       hideLoadingOverlay();
       if (isMinor) {
