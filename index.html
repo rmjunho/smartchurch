@@ -6615,9 +6615,15 @@ function rememberAccount(u) {
   } catch (_) {}
 }
 
-function switchAccount(email) {
+// 목록이 비어 있어도 전환할 수 있는 경로 (이메일 직접 입력). 입력 자체가 확인이라 confirm 은 건너뛴다.
+function switchAccountPrompt() {
+  const email = (prompt('전환할 계정의 이메일을 입력해 주세요') || '').trim();
+  if (email) switchAccount(email, true);
+}
+
+function switchAccount(email, skipConfirm) {
   if (!email) return;
-  if (!confirm(`${email} 계정으로 전환할까요?\n\n로그아웃 후 비밀번호를 입력하면 돼요.`)) return;
+  if (!skipConfirm && !confirm(`${email} 계정으로 전환할까요?\n\n로그아웃 후 비밀번호를 입력하면 돼요.`)) return;
   closeSubscreen();
   doLogout();
   setTimeout(() => {

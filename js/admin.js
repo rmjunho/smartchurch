@@ -622,14 +622,11 @@ function renderAdminPanelHtml(allUsers) {
 
   // ── 계정 전환 (관리자 패널 전용) ──
   // 이 기기에서 로그인한 적 있는 계정 목록. 비밀번호는 저장하지 않으므로 전환 시 한 번 입력해야 한다.
+  // recentAccounts 는 로그인 폼(doLogin)을 거칠 때만 쌓인다. 세션이 유지된 채 들어오면
+  // 목록이 비어 섹션이 쓸모없어 보였다 → 이메일 직접 입력 항목을 항상 둔다.
   const recentAccts = DB.get('recentAccounts', []).filter(a => a && a.email && a.email !== me.email);
-  html += `<div class="ss-section-title" style="margin-top:14px">계정 전환</div>`;
-  if (!recentAccts.length) {
-    html += `<div class="ss-card"><div style="padding:18px 16px;text-align:center;font-size:12.5px;color:var(--muted);line-height:1.7">
-      이 기기에서 로그인한 다른 계정이 없어요.<br>한 번 로그인하면 여기에 쌓여 빠르게 전환할 수 있어요.
-    </div></div>`;
-  } else {
-    html += `<div class="ss-card">` + recentAccts.map(a => `
+  html += `<div class="ss-section-title" style="margin-top:14px">계정 전환</div><div class="ss-card">`
+    + recentAccts.map(a => `
       <div class="ss-card-row" onclick="switchAccount('${escHtml(a.email).replace(/'/g, "\\'")}')" style="cursor:pointer">
         <div class="ss-card-icon">🔄</div>
         <div class="ss-card-info">
@@ -637,11 +634,18 @@ function renderAdminPanelHtml(allUsers) {
           <div class="ss-card-sub">${escHtml(a.email)}${a.role ? ' · ' + escHtml(a.role) : ''}</div>
         </div>
         <span class="sm-arrow">›</span>
-      </div>`).join('') + `</div>
+      </div>`).join('')
+    + `<div class="ss-card-row" onclick="switchAccountPrompt()" style="cursor:pointer">
+        <div class="ss-card-icon">✏️</div>
+        <div class="ss-card-info">
+          <div class="ss-card-title">이메일 직접 입력</div>
+          <div class="ss-card-sub">${recentAccts.length ? '목록에 없는 계정으로 전환' : '이 기기에 로그인 기록이 아직 없어요'}</div>
+        </div>
+        <span class="sm-arrow">›</span>
+      </div></div>
       <div style="font-size:11.5px;color:var(--muted);padding:8px 16px 0;line-height:1.6">
         보안을 위해 비밀번호는 저장하지 않아요. 전환할 때 한 번만 입력하면 돼요.
       </div>`;
-  }
 
   html += `<div id="admin-church-section" style="display:flex;justify-content:space-between;align-items:center;padding:0 16px;margin:16px 0 10px">
     <span style="font-size:12px;font-weight:700;color:var(--muted);letter-spacing:0.5px">교회·기관 관리 (${churchCodes.length}개)</span>

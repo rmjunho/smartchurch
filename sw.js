@@ -68,8 +68,11 @@ self.addEventListener('fetch', event => {
   if (BYPASS_HOST_PATTERN.test(url.hostname)) return;
 
   // 3) 같은 origin GET 만 network-first 로 처리
+  //    GitHub Pages 가 max-age=600 을 주므로 그냥 fetch 하면 브라우저 HTTP 캐시에서
+  //    최대 10분간 옛 파일이 나온다(푸시했는데 앱에 안 보이는 원인). no-cache 로
+  //    항상 ETag 재검증 → 안 바뀌었으면 304 라 비용은 거의 없다.
   event.respondWith(
-    fetch(req)
+    fetch(req, { cache: 'no-cache' })
       .then(res => {
         // 정상 응답만 캐시 갱신 (opaque/에러 응답은 저장하지 않음)
         if (res && res.ok && res.type === 'basic') {
