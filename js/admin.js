@@ -232,10 +232,44 @@ function activateAdminCode() {
   toast('앱 관리자 권한이 활성화됐어요! 사이드 메뉴를 확인해 주세요');
 }
 
+// 교회 등록 신청 목록 — 신청은 신청자의 users 문서(pendingChurchCode)에 남는다.
+// 로컬 pendingChurches 는 신청한 그 기기에만 있어, 관리자가 다른 기기면 목록이 통째로 비어 있었다.
+// 서버(users)를 기준으로 삼고 로컬은 오프라인·구버전 신청을 잃지 않도록 합치기만 한다.
+var _pendingChurchCache = [];
+
+function _collectPendingChurches(allUsers) {
+  const byCode = {};
+  DB.get('pendingChurches', []).forEach(c => { if (c && c.code) byCode[c.code] = c; });
+  (allUsers || []).forEach(u => {
+    if (!u || !u.pendingChurchCode) return;
+    byCode[u.pendingChurchCode] = {
+      code:            u.pendingChurchCode,
+      name:            u.pendingChurchName || u.pendingChurchCode,
+      requestedBy:     u.id,
+      requestedByName: u.name || '',
+      requestedByEmail:u.email || '',
+      requestedAt:     u.pendingChurchAt || u.createdAt || '',
+      orgType:         u.orgType || 'church'
+    };
+  });
+  _pendingChurchCache = Object.values(byCode);
+  return _pendingChurchCache;
+}
+
+function _findPendingChurch(code) {
+  return (_pendingChurchCache || []).find(c => c.code === code)
+      || DB.get('pendingChurches', []).find(c => c.code === code);
+}
+
+// 승인/거절 후 로컬·캐시 양쪽에서 신청을 지운다(목록 재조회 전까지 남아 보이지 않도록).
+function _dropPendingChurch(code) {
+  DB.set('pendingChurches', DB.get('pendingChurches', []).filter(c => c.code !== code));
+  _pendingChurchCache = (_pendingChurchCache || []).filter(c => c.code !== code);
+}
+
 function approveChurchRegistration(code) {
-  const pending = DB.get('pendingChurches', []);
-  const entry   = pending.find(c => c.code === code);
-  if (!entry) return;
+  const entry = _findPendingChurch(code);
+  if (!entry) { toast('신청 정보를 찾을 수 없어요. 목록을 새로고침해 주세요'); return; }
   // customChurches에 전체 객체로 저장
   const custom = DB.get('customChurches', {});
   custom[code] = {
@@ -247,12 +281,12 @@ function approveChurchRegistration(code) {
     active: true
   };
   DB.set('customChurches', custom);
-  DB.set('pendingChurches', pending.filter(c => c.code !== code));
+  _dropPendingChurch(code);
   const users = DB.get('users', []);
   const u = users.find(x => x.id === entry.requestedBy);
   if (u) {
     u.church = entry.name; u.churchCode = code; u.churchStatus = 'active';
-    u.pendingChurchCode = null; u.pendingChurchName = null;
+    u.pendingChurchCode = null; u.pendingChurchName = null; u.pendingChurchAt = null;
     DB.set('users', users);
   }
   // Firestore 동기화: 교회 정보 + 신청자 상태(다른 기기에도 반영)
@@ -260,18 +294,18 @@ function approveChurchRegistration(code) {
     window._fb.setChurchInfo(code, custom[code]).catch(() => {});
     window._fb.updateUser(entry.requestedBy, {
       church: entry.name, churchCode: code, churchStatus: 'active',
-      pendingChurchCode: null, pendingChurchName: null
-    }).catch(() => {});
+      pendingChurchCode: null, pendingChurchName: null, pendingChurchAt: null
+    }).catch(() => toast('서버 반영 실패 — 신청자 화면에 승인이 안 보일 수 있어요'));
   }
   toast(`"${entry.name}" [${code}] 교회 등록을 승인했어요!`);
   setTimeout(() => openSubscreen('admin-panel'), 150);
 }
 
 function rejectChurchRegistration(code) {
-  const pending = DB.get('pendingChurches', []);
-  const entry   = pending.find(c => c.code === code);
-  if (!entry) return;
-  DB.set('pendingChurches', pending.filter(c => c.code !== code));
+  const entry = _findPendingChurch(code);
+  if (!entry) { toast('신청 정보를 찾을 수 없어요. 목록을 새로고침해 주세요'); return; }
+  if (!confirm(`"${entry.name}" [${code}] 등록 신청을 거절할까요?\n\n신청자는 교회 없는 상태로 돌아가고, 다시 신청할 수 있어요.`)) return;
+  _dropPendingChurch(code);
   // 신청자 계정 초기화
   const users = DB.get('users', []);
   const u = users.find(x => x.id === entry.requestedBy);
@@ -279,13 +313,14 @@ function rejectChurchRegistration(code) {
     u.churchStatus      = null;
     u.pendingChurchCode = null;
     u.pendingChurchName = null;
+    u.pendingChurchAt   = null;
     DB.set('users', users);
   }
   // Firestore 동기화: 신청자 상태 초기화(다른 기기에도 반영)
   if (window._fbReady && window._fb) {
     window._fb.updateUser(entry.requestedBy, {
-      churchStatus: null, pendingChurchCode: null, pendingChurchName: null
-    }).catch(() => {});
+      churchStatus: null, pendingChurchCode: null, pendingChurchName: null, pendingChurchAt: null
+    }).catch(() => toast('서버 반영 실패 — 신청자 화면에 거절이 안 보일 수 있어요'));
   }
   toast(`"${entry.name}" 교회 등록 신청을 거절했어요`);
   setTimeout(() => openSubscreen('admin-panel'), 150);
@@ -366,7 +401,7 @@ async function syncChurchesFromFirestore() {
 }
 
 function renderAdminPanelHtml(allUsers) {
-  const pendingChurch = DB.get('pendingChurches', []);
+  const pendingChurch = _collectPendingChurches(allUsers);
   const minorPending  = allUsers.filter(u => u.status === 'pending');
   const churchJoinPen = allUsers.filter(u => u.status !== 'pending' && u.churchStatus === 'pending');
   const active        = allUsers.filter(u => u.status === 'active' || !u.status);
@@ -444,10 +479,10 @@ function renderAdminPanelHtml(allUsers) {
         <div class="ss-card-info"><div class="ss-card-title">등록된 교회/기관</div><div class="ss-card-sub">${churches.length}개</div></div>
         <span class="sm-arrow">›</span>
       </div>
-      <div class="ss-card-row">
+      <div class="ss-card-row" onclick="scrollToAdminSection('admin-church-pending-section','대기 중인 교회 등록 신청이 없어요')" style="cursor:pointer">
         <div class="ss-card-icon">📋</div>
-        <div class="ss-card-info"><div class="ss-card-title">교회 등록 대기</div><div class="ss-card-sub">관리자 승인 필요</div></div>
-        <span class="ss-card-badge ${pendingChurch.length > 0 ? 'ss-badge-gold' : 'ss-badge-gray'}">${pendingChurch.length}</span>
+        <div class="ss-card-info"><div class="ss-card-title">교회 등록 대기</div><div class="ss-card-sub">눌러서 승인/거절</div></div>
+        <span class="ss-card-badge ${pendingChurch.length > 0 ? 'ss-badge-gold' : 'ss-badge-gray'}">${pendingChurch.length}</span><span class="sm-arrow">›</span>
       </div>
       <div class="ss-card-row" onclick="scrollToAdminSection('admin-minor-section','대기 중인 미성년자 가입 신청이 없어요')" style="cursor:pointer">
         <div class="ss-card-icon">⏳</div>
@@ -574,12 +609,15 @@ function renderAdminPanelHtml(allUsers) {
 
   // 교회 등록 대기
   if (pendingChurch.length) {
-    html += `<div class="ss-section-title">교회 등록 승인 대기</div><div class="ss-card">`;
+    html += `<div class="ss-section-title" id="admin-church-pending-section">교회 등록 승인 대기</div><div class="ss-card">`;
     pendingChurch.forEach(c => {
+      const typeLabel = (CHURCH_TYPES.find(t => t.value === (c.orgType||'church')) || CHURCH_TYPES[0]);
       html += `<div style="padding:14px 16px;border-bottom:1px solid var(--border)">
-        <div style="font-size:15px;font-weight:800;letter-spacing:1px;margin-bottom:4px">${escHtml(c.name)}</div>
+        <div style="font-size:15px;font-weight:800;letter-spacing:1px;margin-bottom:4px">
+          ${typeLabel.emoji||'⛪'} ${escHtml(c.name)}
+        </div>
         <div style="font-size:12.5px;color:var(--muted);margin-bottom:10px">
-          코드: <b>${escHtml(c.code)}</b> · 신청자: ${escHtml(c.requestedByName)} · ${(c.requestedAt||'').split('T')[0]}
+          코드: <b>${escHtml(c.code)}</b> · 신청자: ${escHtml(c.requestedByName||'—')}${c.requestedByEmail?' ('+escHtml(c.requestedByEmail)+')':''} · ${(c.requestedAt||'').split('T')[0]}
         </div>
         <div style="display:flex;gap:8px">
           <button onclick="approveChurchRegistration('${c.code}')"

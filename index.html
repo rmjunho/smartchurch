@@ -3798,8 +3798,12 @@ function startSelfDocWatch() {
       const data = snap.data();
       const wasActive = me.churchStatus === 'active';
       const wasLeader = (typeof isLeader === 'function') ? isLeader() : false;
+      const wasChurchReq = !!me.pendingChurchCode;   // 교회 등록 신청 중이었나
       let changed = false;
-      ['status', 'churchStatus', 'role', 'orgType', 'isAppointedLeader', 'isAppAdmin', 'requestedRole'].forEach(f => {
+      // church/churchCode 가 빠져 있어, 교회 등록이 승인돼도 신청자 화면은 '소속 없음' 인 채
+      // 상태 배지만 바뀌었다(교회 이름은 승인 시 서버에서 채워진다).
+      ['status', 'churchStatus', 'church', 'churchCode', 'pendingChurchCode', 'pendingChurchName',
+       'role', 'orgType', 'isAppointedLeader', 'isAppAdmin', 'requestedRole'].forEach(f => {
         if (data[f] !== undefined && me[f] !== data[f]) { me[f] = data[f]; changed = true; }
       });
       // leaderPerms (배열) 비교
@@ -3810,7 +3814,12 @@ function startSelfDocWatch() {
       if (changed) {
         DB.saveUser(me);
         _userInfoCache[me.id] = { name: me.name || '', role: me.role || '' };   // 내 이름/직분 캐시 갱신
-        if (!wasActive && me.churchStatus === 'active') toast('교회 가입이 승인됐어요!');
+        // 교회 등록 신청은 승인되면 pendingChurchCode 가 지워지고 church 가 채워진다.
+        if (wasChurchReq && !me.pendingChurchCode) {
+          toast(me.churchStatus === 'active' && me.church
+            ? `"${me.church}" 등록이 승인됐어요!`
+            : '교회 등록 신청이 거절됐어요. 다시 신청할 수 있어요');
+        } else if (!wasActive && me.churchStatus === 'active') toast('교회 가입이 승인됐어요!');
         const nowLeader = (typeof isLeader === 'function') ? isLeader() : false;
         if (!wasLeader && nowLeader) toast('리더 권한이 부여됐어요');
         if (typeof updateProfileDisplay === 'function') updateProfileDisplay();  // 직분 배지·탭 라벨
@@ -6553,8 +6562,16 @@ function setAdminPendingBadge(cnt) {
 async function refreshAdminPendingBadge() {
   if (!me || !me.isAppAdmin || !window._fbReady || !window._fb?.getPendingUsers) return;
   try {
-    const snap = await window._fb.getPendingUsers();
-    setAdminPendingBadge(snap.size + DB.get('pendingChurches', []).length);
+    const [minors, churchReqs] = await Promise.all([
+      window._fb.getPendingUsers(),
+      window._fb.getPendingChurchRequests()
+    ]);
+    // 교회 등록 신청은 신청자 users 문서에 있다. 로컬 pendingChurches 는 오프라인 신청만
+    // 남아 있을 수 있으므로 서버에 없는 코드만 더한다(같은 신청을 두 번 세지 않도록).
+    const codes = new Set();
+    churchReqs.forEach(d => { const c = d.data().pendingChurchCode; if (c) codes.add(c); });
+    const localOnly = DB.get('pendingChurches', []).filter(c => c && !codes.has(c.code)).length;
+    setAdminPendingBadge(minors.size + codes.size + localOnly);
   } catch(e) { /* 네트워크/권한 실패 — 로컬 추정치를 그대로 둔다 */ }
 }
 

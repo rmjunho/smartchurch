@@ -397,11 +397,14 @@ function cancelTicketFromMyEvents(eventId) {
 }
 
 function renderChurchInfo() {
+  // 교회 등록을 신청한 사람은 아직 소속 교회가 없다(승인돼야 생김) → 신청 상태를 대신 보여준다.
   const statusBadge = me.church
     ? (me.churchStatus === 'pending'
         ? `<span style="color:#E67E22;font-size:11.5px;font-weight:700;background:rgba(230,126,34,0.1);border-radius:6px;padding:2px 7px">⏳ 승인 대기 중</span>`
         : `<span style="color:#27AE60;font-size:11.5px;font-weight:700;background:rgba(39,174,96,0.1);border-radius:6px;padding:2px 7px">정식 교인</span>`)
-    : '';
+    : (me.pendingChurchCode
+        ? `<span style="color:#E67E22;font-size:11.5px;font-weight:700;background:rgba(230,126,34,0.1);border-radius:6px;padding:2px 7px">⏳ 등록 승인 대기 중</span>`
+        : '');
 
   const editBtn = isLeader()
     ? `<button onclick="openChurchInfoEdit()" style="height:30px;padding:0 12px;border-radius:8px;
@@ -417,9 +420,9 @@ function renderChurchInfo() {
       <div class="ss-card-row">
         <div class="ss-card-icon">⛪</div>
         <div class="ss-card-info">
-          <div class="ss-card-title">${escHtml(me.church || '소속 없음')}</div>
+          <div class="ss-card-title">${escHtml(me.church || me.pendingChurchName || '소속 없음')}</div>
           <div class="ss-card-sub" style="display:flex;align-items:center;gap:6px;margin-top:4px">
-            코드: ${escHtml(me.churchCode || '—')} ${statusBadge}
+            코드: ${escHtml(me.churchCode || me.pendingChurchCode || '—')} ${statusBadge}
           </div>
         </div>
       </div>
@@ -2444,9 +2447,22 @@ function obRegisterNewChurch() {
   // 신청자 정보 임시 저장 (승인 후 활성화)
   me.pendingChurchCode = code;
   me.pendingChurchName = name;
+  me.pendingChurchAt   = new Date().toISOString();
   me.churchStatus      = 'church-pending'; // 교회 자체가 미승인
   me.role              = me.role || '목사';
   DB.saveUser(me);
+  // 신청 사실을 내 users 문서에도 남긴다 — DB.saveUser 는 localStorage 뿐이라
+  // 지금까지 신청은 신청한 기기 밖으로 나간 적이 없었고, 다른 기기의 앱 관리자에게는
+  // 목록이 늘 비어 있었다. users 는 본인이 쓰고 로그인한 사람이 읽으므로 규칙 변경이 필요 없다.
+  if (window._fbReady && window._fb) {
+    window._fb.updateUser(me.id, {
+      pendingChurchCode: code, pendingChurchName: name,
+      pendingChurchAt:   me.pendingChurchAt,
+      churchStatus:      'church-pending',
+      role:              me.role,
+      orgType:           me.orgType || 'church'
+    }).catch(e => { if (window._fbErr) window._fbErr('교회 등록 신청', e); });
+  }
   // UI 표시
   document.getElementById('ob-code-church-name').textContent = name;
   document.getElementById('ob-code-result').classList.add('show');

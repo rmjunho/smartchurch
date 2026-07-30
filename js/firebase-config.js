@@ -39,6 +39,10 @@ window._fb = {
       getAllUsers: () => getDocs(collection(fbDb, 'users')),
       // 승인 대기(미성년자) 사용자만 — 배지 숫자용. 전체를 받아 세면 사용자가 늘수록 비싸다.
       getPendingUsers: () => getDocs(query(collection(fbDb, 'users'), where('status','==','pending'))),
+      // 교회 등록 신청 — 신청은 신청자 users 문서의 pendingChurchCode 에 남는다(전용 컬렉션 X → 규칙 변경 불필요).
+      // 승인/거절 시 null 로 지워지고, != null 은 필드가 없는 문서도 제외하므로 대기 중인 신청만 잡힌다.
+      getPendingChurchRequests: () =>
+        getDocs(query(collection(fbDb, 'users'), where('pendingChurchCode','!=',null))),
       // 교회별 사용자
       getUsersByChurch: (churchCode) =>
         getDocs(query(collection(fbDb, 'users'), where('churchCode','==',churchCode))),
