@@ -62,8 +62,15 @@ window._fb = {
       setUserPhoto:    (uid, data) => setDoc(doc(fbDb, 'userPhotos', uid), data, { merge: true }),
       // 전화번호는 users 문서에 두면 로그인한 모든 교인이 읽을 수 있어(규칙상 read: signedIn)
       // 별도 컬렉션으로 분리한다. 본인·같은 교회 리더·앱 관리자만 읽도록 규칙에서 제한.
-      setUserPhone:    (uid, phone) => setDoc(doc(fbDb, 'userPhones', uid),
-                         { phone, updatedAt: new Date().toISOString() }, { merge: true }),
+      // 보호자 번호(guardianPhone)도 같은 문서에 둔다 — 필요한 접근 권한이 본인 번호와 완전히 같고
+      // (본인·같은 교회 리더·앱 관리자) users 에 두면 로그인한 모든 교인이 읽는다.
+      // 둘 다 선택 인자 — 넘기지 않은 필드는 merge 로 건드리지 않는다(undefined 는 Firestore 가 거부).
+      setUserPhone:    (uid, phone, guardianPhone) => {
+        const data = { updatedAt: new Date().toISOString() };
+        if (phone         !== undefined && phone         !== null) data.phone         = phone;
+        if (guardianPhone !== undefined && guardianPhone !== null) data.guardianPhone = guardianPhone;
+        return setDoc(doc(fbDb, 'userPhones', uid), data, { merge: true });
+      },
       getUserPhone:    (uid)        => getDoc(doc(fbDb, 'userPhones', uid)),
       getUserPhotoDoc: (uid)       => getDoc(doc(fbDb, 'userPhotos', uid)),
       getUserPhotosByChurch: (churchCode) =>

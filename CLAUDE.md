@@ -61,7 +61,7 @@
 - `matchProfiles`, `matchRequests` — 매칭 기능.
 - `binderEntries` — 묵상 바인더 공유(리더 열람용).
 - `churchInfo` — 교회 상세(위치·소개·목사 프로필). 문서 ID = 교회 코드.
-- `userPhones` — 전화번호. 문서 ID = uid, 필드 `{ phone }`. **`users` 에 `phone` 을 넣지 마세요** — `users` 는 로그인한 모든 교인이 읽을 수 있어 규칙상 번호가 새어나갑니다. 공유 로컬 캐시(`DB.get('users')`)에도 저장 금지(같은 기기의 다른 계정에 병합돼 노출됨). 읽기는 본인·같은 교회 리더·앱 관리자만 (`isLeader()` 가드 + 서버 규칙 이중 차단).
+- `userPhones` — 전화번호. 문서 ID = uid, 필드 `{ phone, guardianPhone }`(`guardianPhone` = 미성년자 보호자 번호). **`users` 에 `phone`·`guardianContact` 같은 번호를 넣지 마세요** — `users` 는 로그인한 모든 교인이 읽을 수 있어 규칙상 번호가 새어나갑니다. 공유 로컬 캐시(`DB.get('users')`)에도 저장 금지(같은 기기의 다른 계정에 병합돼 노출됨). 읽기는 본인·같은 교회 리더·앱 관리자만 (`isLeader()` 가드 + 서버 규칙 이중 차단). 보호자 *이름*(`guardianName`)은 `users` 에 그대로 있습니다.
 
 ## 자주 쓰는 헬퍼 (앱 스크립트)
 

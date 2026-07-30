@@ -961,10 +961,16 @@ async function loadMembersScreenData() {
   if (typeof ensurePhotosFor === 'function')  await ensurePhotosFor(allUsers);
   // 로컬 캐시(users)에서 딸려온 번호는 버린다 — 화면에는 서버가 허용한 조회 결과만 쓴다.
   // (예전 버전이 같은 기기에 남긴 번호가 다른 계정에게 보이던 유출 경로 차단)
-  allUsers.forEach(u => { delete u.phone; });
+  allUsers.forEach(u => { delete u.phone; delete u.guardianPhone; });
   const _lu = DB.get('users', []);
   let _cleaned = false;
-  _lu.forEach(x => { if (x && x.phone) { delete x.phone; _cleaned = true; } });
+  _lu.forEach(x => {
+    if (!x) return;
+    // 보호자 번호도 같은 이유로 공유 캐시에 두지 않는다(옛 버전이 users 에 저장했다)
+    ['phone', 'guardianPhone', 'guardianContact'].forEach(f => {
+      if (x[f]) { delete x[f]; _cleaned = true; }
+    });
+  });
   if (_cleaned) DB.set('users', _lu);
 
   await ensureMemberPhones(allUsers);
@@ -978,10 +984,12 @@ async function loadMembersScreenData() {
 async function ensureMemberPhones(users) {
   if (!(isLeader() || (me && me.isAppAdmin)) || !window._fbReady || !window._fb || !window._fb.getUserPhone) return;
   await Promise.all(users.map(async u => {
-    if (!u || !u.id || u.phone) return;
+    if (!u || !u.id || (u.phone && u.guardianPhone)) return;   // 보호자 번호도 같은 문서에 있다
     try {
       const snap = await window._fb.getUserPhone(u.id);
-      if (snap.exists()) u.phone = snap.data().phone || '';
+      if (!snap.exists()) return;
+      u.phone         = u.phone         || snap.data().phone         || '';
+      u.guardianPhone = u.guardianPhone || snap.data().guardianPhone || '';
     } catch (_) { /* 권한 없음 등 — 표시하지 않으면 그만 */ }
   }));
 }
@@ -1142,7 +1150,7 @@ function renderMembersScreenHtml(allUsers) {
             </div>
             <div style="background:var(--cream2);border-radius:10px;padding:10px 12px;font-size:13px;margin-bottom:10px">
               <div>보호자&nbsp; <b>${escHtml(u.guardianName||'—')}</b></div>
-              <div style="margin-top:5px">연락처&nbsp; <b>${escHtml(u.guardianContact||'—')}</b></div>
+              <div style="margin-top:5px">연락처&nbsp; <b>${escHtml(u.guardianPhone||u.guardianContact||'—')}</b></div>
             </div>
             <div style="display:flex;gap:8px">
               <button onclick="approveMinor('${u.id}')"

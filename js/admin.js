@@ -367,7 +367,31 @@ async function loadAdminPanelData() {
   await syncChurchesFromFirestore();
 
   _membersCache = allUsers;   // 승인/거절 핸들러 공유 캐시
+
+  // 보호자 번호는 userPhones 에 있다. 승인 판단에 필요한 건 대기 중인 미성년자뿐이라
+  // 전체 사용자에게 1건씩 조회를 돌리지 않는다(사용자 수만큼 읽기가 발생한다).
+  const pendingMinors = allUsers.filter(u => u.status === 'pending');
+  await migrateGuardianContacts(pendingMinors);
+  await ensureMemberPhones(pendingMinors);
+
   body.outerHTML = renderAdminPanelHtml(allUsers);
+}
+
+// 예전 가입자는 보호자 번호가 users 문서에 남아 있다 — 규칙상 로그인한 모든 교인이 읽는 위치다.
+// 관리자가 패널을 열 때 userPhones 로 옮기고 원본 값을 지운다(이 쓰기는 규칙상 관리자만 가능).
+// 옮긴 뒤 지우는 순서라 중간에 실패해도 번호가 사라지지는 않는다.
+async function migrateGuardianContacts(users) {
+  if (!me || !me.isAppAdmin || !window._fbReady || !window._fb) return;
+  const legacy = (users || []).filter(u => u && u.id && u.guardianContact);
+  if (!legacy.length) return;
+  await Promise.all(legacy.map(async u => {
+    try {
+      await window._fb.setUserPhone(u.id, null, u.guardianContact);
+      await window._fb.updateUser(u.id, { guardianContact: null });
+      u.guardianPhone = u.guardianContact;
+      delete u.guardianContact;
+    } catch (e) { console.warn('보호자 번호 이전 실패:', u.id, e); }
+  }));
 }
 
 // 관리자 패널 안의 섹션으로 스크롤.
@@ -634,7 +658,8 @@ function renderAdminPanelHtml(allUsers) {
   if (minorPending.length) {
     html += `<div class="ss-section-title" id="admin-minor-section">미성년자 승인 대기</div><div class="ss-card">`;
     minorPending.forEach(u => {
-      const gPhone = (u.guardianContact || '').replace(/[^0-9]/g, '');
+      const gRaw   = u.guardianPhone || u.guardianContact || '';   // 이전 전 계정은 users 에 남아 있다
+      const gPhone = gRaw.replace(/[^0-9]/g, '');
       html += `<div style="padding:14px 16px;border-bottom:1px solid var(--border)">
         <div style="font-size:14px;font-weight:700;margin-bottom:4px">
           ${escHtml(u.name)}<span style="font-size:12px;color:var(--muted);font-weight:400"> · ${escHtml(u.church||'교회 미지정')}</span>
@@ -644,8 +669,8 @@ function renderAdminPanelHtml(allUsers) {
         </div>
         <div style="font-size:12.5px;color:var(--muted);margin-bottom:10px">
           보호자: ${escHtml(u.guardianName||'—')} /
-          ${gPhone ? `<a href="tel:${gPhone}" style="color:#2980B9;font-weight:600;text-decoration:none">📞 ${escHtml(u.guardianContact)}</a>`
-                   : escHtml(u.guardianContact||'—')}
+          ${gPhone ? `<a href="tel:${gPhone}" style="color:#2980B9;font-weight:600;text-decoration:none">📞 ${escHtml(gRaw)}</a>`
+                   : '—'}
         </div>
         <div style="display:flex;gap:8px">
           <button onclick="approveMinor('${u.id}')"

@@ -3458,7 +3458,7 @@ async function doRegister() {
         orgType:     'church', // 온보딩 ob2에서 선택
         status:          isMinor ? 'pending' : 'active',
         churchStatus:    '',
-        isMinor, guardianName, guardianContact,
+        isMinor, guardianName,   // 보호자 '번호' 는 userPhones 로 분리 (아래) — users 는 전 교인이 읽는다
         isAppAdmin:      false,
         isAppointedLeader: false,
         leaderPerms:     [],
@@ -3469,14 +3469,16 @@ async function doRegister() {
 
       // Firestore에 저장
       await window._fb.setUser(uid, userData);
-      // 전화번호는 별도 컬렉션 — 본인·같은 교회 리더·운영팀만 읽도록 규칙에서 제한한다
-      window._fb.setUserPhone(uid, phone)
+      // 전화번호는 별도 컬렉션 — 본인·같은 교회 리더·운영팀만 읽도록 규칙에서 제한한다.
+      // 보호자 번호도 같은 문서에 넣는다(users 에 두면 전 교인이 읽음).
+      window._fb.setUserPhone(uid, phone, guardianContact || null)
         .catch(e => { if (window._fbErr) window._fbErr('전화번호 저장', e); });
       // 공유 로컬 배열(users)에는 phone 을 넣지 않는다 — 같은 기기의 다른 계정에 새어나간다.
       // 내 번호는 me 에만 두고, 다시 필요하면 userPhones 에서 본인 권한으로 불러온다.
       DB.saveUser(userData);
       DB.setSession(uid);
-      me = Object.assign({}, userData, { phone });
+      // 번호들은 공유 로컬 배열이 아니라 내 세션 객체에만 (대기 화면 표시용)
+      me = Object.assign({}, userData, { phone, guardianPhone: guardianContact });
       rememberAccount(me);   // 관리자 패널 계정 전환 목록에 기록 (비밀번호 미저장)
 
       hideLoadingOverlay();
@@ -3513,14 +3515,14 @@ async function doRegister() {
     role:    '교인',   // 온보딩 ob2에서 선택
     orgType: 'church', // 온보딩 ob2에서 선택
     status:          isMinor ? 'pending' : 'active',
-    isMinor, guardianName, guardianContact,
+    isMinor, guardianName,   // 로컬 모드에도 번호는 공유 배열(users)에 넣지 않는다 — 같은 기기의 다른 계정에 보인다
     isAppAdmin:      false,
     marketingConsent: marketing,
     createdAt:       new Date().toISOString()
   };
   DB.saveUser(user);
   DB.setSession(user.id);
-  me = user;
+  me = Object.assign({}, user, { phone, guardianPhone: guardianContact });
   if (isMinor) {
     toast(name + '님, 가입 신청이 접수됐어요! 교역자 승인 후 이용 가능해요 ');
     updatePendingScreen(user);
@@ -6330,8 +6332,17 @@ function updatePendingScreen(user) {
   const pgn = document.getElementById('pending-guardian-name');
   const pgc = document.getElementById('pending-guardian-contact');
   if (pna) pna.textContent = user.name || '';
-  if (pgn) pgn.textContent = user.guardianName    || '—';
-  if (pgc) pgc.textContent = user.guardianContact || '—';
+  if (pgn) pgn.textContent = user.guardianName || '—';
+  // 보호자 번호는 users 가 아니라 userPhones 에 있다(전 교인 열람을 막으려고 분리).
+  // 방금 가입했으면 메모리에 있고, 재로그인 후에는 본인 권한으로 서버에서 가져온다.
+  if (pgc) {
+    pgc.textContent = user.guardianPhone || user.guardianContact || '—';
+    if (!user.guardianPhone && !user.guardianContact && window._fbReady && window._fb?.getUserPhone) {
+      window._fb.getUserPhone(user.id)
+        .then(s => { const g = s.exists() ? (s.data().guardianPhone || '') : ''; if (g) pgc.textContent = g; })
+        .catch(() => {});
+    }
+  }
 
   // 보호자 정보 박스: 미성년자만 표시
   const pgBox = document.getElementById('pending-guardian-box');
