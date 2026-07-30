@@ -971,8 +971,9 @@ async function loadMembersScreenData() {
 // 전화번호는 userPhones 컬렉션에 분리돼 있고 규칙상 본인·같은 교회 리더·운영팀만 읽을 수 있다.
 // 권한이 없으면 조회가 거부되므로 조용히 건너뛴다(일반 교인 화면에는 아무것도 뜨지 않음).
 // ponytail: 교인 수만큼 개별 조회 — 교인 목록 규모가 커지면 한 번에 가져오는 쿼리로 바꿀 것
+// 앱 관리자도 규칙상 전체 열람이 허용돼 있어(firestore.rules 의 isAdmin) 같은 가드에 포함한다.
 async function ensureMemberPhones(users) {
-  if (!isLeader() || !window._fbReady || !window._fb || !window._fb.getUserPhone) return;
+  if (!(isLeader() || (me && me.isAppAdmin)) || !window._fbReady || !window._fb || !window._fb.getUserPhone) return;
   await Promise.all(users.map(async u => {
     if (!u || !u.id || u.phone) return;
     try {

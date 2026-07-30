@@ -22,6 +22,9 @@ async function loadAdminUsersData() {
   // 로컬 전용 플래그(isAppAdmin)만 보존 — 최신 Firestore 값이 우선
   const localUsers = DB.get('users', []);
   allUsers = allUsers.map(u => { const l = localUsers.find(x => x.id === u.id); return l ? { ...l, ...u, isAppAdmin: u.isAppAdmin || l.isAppAdmin } : u; });
+  // 로컬 캐시(users)에서 딸려온 번호는 버리고 서버가 허용한 조회 결과만 쓴다 (교인 관리와 동일한 유출 차단)
+  allUsers.forEach(u => { delete u.phone; });
+  await ensureMemberPhones(allUsers);   // userPhones 조회 — 앱 관리자는 규칙상 전체 열람 가능
   _adminUsersData = allUsers;
   _membersCache   = allUsers;   // 승인/거절 핸들러 공유 캐시
   body.outerHTML = renderAdminUsersHtml(allUsers);
@@ -118,6 +121,8 @@ function renderAdminUsersHtml(allUsers) {
                 ${u.isAppAdmin?'<span style="font-size:11px;background:rgba(231,76,60,0.12);color:#C0392B;border-radius:4px;padding:1px 6px;margin-left:4px;font-weight:700">관리자</span>':''}
               </div>
               <div style="font-size:12px;color:var(--muted)">${escHtml(u.email||'—')}</div>
+              ${(u.phone && me && me.isAppAdmin) ? `<a href="tel:${escHtml(u.phone.replace(/[^0-9]/g,''))}"
+                 style="display:inline-block;font-size:12px;color:#2980B9;font-weight:600;margin-top:3px;text-decoration:none">📞 ${escHtml(u.phone)}</a>` : ''}
             </div>
             <span style="font-size:11.5px;background:${st[1]};color:${st[0]};
                          border-radius:6px;padding:2px 8px;font-weight:700;flex-shrink:0">${st[2]}</span>
