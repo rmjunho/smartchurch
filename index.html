@@ -148,6 +148,12 @@
             <div class="form-error" id="r-birth-err">생년월일을 입력해 주세요.</div>
           </div>
           <div class="form-group">
+            <label class="form-label">전화번호</label>
+            <input id="r-phone" type="tel" class="form-input" placeholder="010-1234-5678"
+                   inputmode="numeric" maxlength="13" autocomplete="tel" oninput="formatPhoneInput(this)">
+            <div class="form-error" id="r-phone-err">전화번호를 입력해 주세요.</div>
+          </div>
+          <div class="form-group">
             <label class="form-label">이메일</label>
             <input id="r-email" type="email" class="form-input" placeholder="이메일 주소">
             <div class="form-error" id="r-email-err">올바른 이메일을 입력해 주세요.</div>
@@ -227,6 +233,17 @@
                 <div class="terms-label-main">
                   서비스 알림·업데이트 수신<span class="terms-optional">선택</span>
                 </div>
+              </div>
+            </div>
+
+            <!-- 광고·마케팅 정보 수신 동의 (선택) — 정보통신망법상 서비스 알림과 반드시 분리해 받아야 한다 -->
+            <div class="terms-item">
+              <div class="terms-cb" id="cb-ads" onclick="toggleTermsCb('ads')"></div>
+              <div class="terms-label">
+                <div class="terms-label-main">
+                  광고·마케팅 정보 수신<span class="terms-optional">선택</span>
+                </div>
+                <button class="terms-view-btn" onclick="openTermsModal('ads')">약관 전문 보기 ›</button>
               </div>
             </div>
 
@@ -3151,6 +3168,16 @@ function _initObRoleSelect() {
 var _origShowAuthTab = typeof showAuthTab === 'function' ? showAuthTab : null;
 var TERMS_CBS = ['terms','privacy','marketing']; // 'age'는 adult/minor 분리
 
+// 전화번호 — 숫자만 남기고 010-1234-5678 형태로 정리
+function fmtPhone(digits) {
+  const d = String(digits || '').replace(/[^0-9]/g, '').slice(0, 11);
+  if (d.length < 4)  return d;
+  if (d.length < 8)  return d.slice(0, 3) + '-' + d.slice(3);
+  if (d.length === 10) return d.slice(0, 3) + '-' + d.slice(3, 6) + '-' + d.slice(6);
+  return d.slice(0, 3) + '-' + d.slice(3, 7) + '-' + d.slice(7);
+}
+function formatPhoneInput(el) { el.value = fmtPhone(el.value); }
+
 function toggleTermsCb(id) {
   const el = document.getElementById('cb-' + id);
   if (!el) return;
@@ -3182,7 +3209,8 @@ function isAgeChecked() {
 }
 
 function toggleAllTerms() {
-  const required = ['terms','privacy','marketing'];
+  // '전체 동의' 대상 = 필수 + 선택 전부 (필수 여부 판정은 isRequiredTermsChecked 가 담당)
+  const required = ['terms','privacy','marketing','ads'];
   const ageOk    = isAgeChecked();
   const allChecked = required.every(id =>
     document.getElementById('cb-'+id)?.classList.contains('checked')) && ageOk;
@@ -3203,7 +3231,8 @@ function toggleAllTerms() {
 function syncAllTermsCb() {
   const allCb = document.getElementById('terms-all-cb');
   if (!allCb) return;
-  const required = ['terms','privacy','marketing'];
+  // '전체 동의' 대상 = 필수 + 선택 전부 (필수 여부 판정은 isRequiredTermsChecked 가 담당)
+  const required = ['terms','privacy','marketing','ads'];
   const allChecked = required.every(id =>
     document.getElementById('cb-'+id)?.classList.contains('checked')) && isAgeChecked();
   allChecked ? allCb.classList.add('checked') : allCb.classList.remove('checked');
@@ -3234,7 +3263,7 @@ var TERMS_CONTENT = {
   privacy: {
     title: '개인정보 수집·이용 동의',
     body: `<h4>수집하는 개인정보 항목</h4>
-<p>• 필수: 이름, 이메일 주소, 직분<br>• 선택: 소속 교회 이름</p>
+<p>• 필수: 이름, 생년월일, 전화번호, 이메일 주소, 직분<br>• 선택: 소속 교회 이름, 프로필 사진<br>• 만 14세 미만인 경우: 보호자 이름·연락처</p>
 <h4>개인정보 수집·이용 목적</h4>
 <p>• 회원 식별 및 서비스 제공<br>• 교회 커뮤니티 기능 운영<br>• 서비스 이용 기록 관리</p>
 <h4>개인정보 보유 및 이용 기간</h4>
@@ -3245,6 +3274,23 @@ var TERMS_CONTENT = {
 <p>이용자는 개인정보 수집·이용 동의를 거부할 권리가 있습니다. 단, 필수 항목 거부 시 서비스 이용이 제한됩니다.</p>
 <h4>개인정보 보호책임자</h4>
 <p>스마트처치 운영팀 (smartchurch.kro.kr)</p>`
+  },
+  ads: {
+    title: '광고·마케팅 정보 수신 동의',
+    body: `<h4>수신 동의 항목</h4>
+<p>스마트처치가 제공하는 이벤트·혜택·신규 기능 홍보 등 광고성 정보를 받는 데 동의하는 항목입니다.</p>
+<h4>전송 수단</h4>
+<p>• 앱 알림(푸시)<br>• 이메일<br>• 문자메시지(SMS·카카오 알림톡)</p>
+<h4>이용하는 개인정보</h4>
+<p>이름, 이메일 주소, 전화번호</p>
+<h4>서비스 알림과의 차이</h4>
+<p>가입 승인, 채팅·챌린지 알림 등 <b>서비스 운영에 필요한 안내</b>는 "서비스 알림·업데이트 수신" 항목에 해당하며, 이 광고 수신 동의와는 별개입니다.</p>
+<h4>선택 사항입니다</h4>
+<p>본 동의는 <b>선택</b> 사항이며, 동의하지 않아도 회원가입과 서비스 이용에 아무런 제한이 없습니다.</p>
+<h4>동의 철회</h4>
+<p>마이 페이지 → 앱 설정에서 언제든 수신을 거부할 수 있습니다. 철회 시 이후 광고성 정보는 발송되지 않습니다.</p>
+<h4>보유 기간</h4>
+<p>회원 탈퇴 또는 수신 동의 철회 시까지 보유합니다.</p>`
   }
 };
 
@@ -3348,17 +3394,22 @@ async function doRegister() {
   const name  = document.getElementById('r-name').value.trim();
   const birth = document.getElementById('r-birth').value;   // YYYY-MM-DD
   const email = document.getElementById('r-email').value.trim();
+  const phoneDigits = (document.getElementById('r-phone')?.value || '').replace(/[^0-9]/g, '');
+  const phone = fmtPhone(phoneDigits);
   const pw    = document.getElementById('r-pw').value;
   const pw2   = document.getElementById('r-pw2').value;
   // 유형/직분은 온보딩 ob2에서 선택 → 가입 시 기본값
   const orgType = _regOrgType || 'church';
   const role  = getDefaultRole(orgType);
 
-  clearErrors('r-name-err','r-birth-err','r-email-err','r-pw-err','r-pw2-err');
+  clearErrors('r-name-err','r-birth-err','r-phone-err','r-email-err','r-pw-err','r-pw2-err');
   let ok = true;
   if (!name)                        { showErr('r-name-err',  '이름을 입력해 주세요.'); ok = false; }
   if (!birth)                       { showErr('r-birth-err', '생년월일을 입력해 주세요.'); ok = false; }
   else if (birth > todayDateKey())  { showErr('r-birth-err', '생년월일이 올바르지 않아요.'); ok = false; }
+  if (!phoneDigits)                 { showErr('r-phone-err', '전화번호를 입력해 주세요.'); ok = false; }
+  else if (!/^01[016789][0-9]{7,8}$/.test(phoneDigits))
+                                    { showErr('r-phone-err', '올바른 휴대폰 번호를 입력해 주세요.'); ok = false; }
   if (!email || !email.includes('@')) { showErr('r-email-err', '올바른 이메일을 입력해 주세요.'); ok = false; }
   if (pw.length < 8)                { showErr('r-pw-err',   '비밀번호는 8자 이상이어야 합니다.'); ok = false; }
   if (pw !== pw2)                   { showErr('r-pw2-err',  '비밀번호가 일치하지 않습니다.'); ok = false; }
@@ -3379,6 +3430,7 @@ async function doRegister() {
   }
 
   const marketing = document.getElementById('cb-marketing')?.classList.contains('checked') || false;
+  const adsOk     = document.getElementById('cb-ads')?.classList.contains('checked') || false;
 
   // ── Firebase Auth 회원가입 시도 ──
   if (window._fbReady && window._fb) {
@@ -3388,7 +3440,7 @@ async function doRegister() {
       const uid  = cred.user.uid;
 
       const userData = {
-        id: uid, name, email, birthdate: birth,
+        id: uid, name, email, phone, birthdate: birth,
         church:      '',
         churchCode:  '',
         role:        '교인',   // 온보딩 ob2에서 선택
@@ -3399,7 +3451,8 @@ async function doRegister() {
         isAppAdmin:      false,
         isAppointedLeader: false,
         leaderPerms:     [],
-        marketingConsent: marketing,
+        marketingConsent: marketing,   // 서비스 알림·업데이트 (선택)
+        adsConsent:       adsOk,       // 광고·마케팅 정보 (선택) — 법상 알림과 분리 보관
         createdAt:       new Date().toISOString()
       };
 
