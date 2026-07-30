@@ -620,6 +620,29 @@ function renderAdminPanelHtml(allUsers) {
   });
   const churchCodes = Object.keys(churchMap);
 
+  // ── 계정 전환 (관리자 패널 전용) ──
+  // 이 기기에서 로그인한 적 있는 계정 목록. 비밀번호는 저장하지 않으므로 전환 시 한 번 입력해야 한다.
+  const recentAccts = DB.get('recentAccounts', []).filter(a => a && a.email && a.email !== me.email);
+  html += `<div class="ss-section-title" style="margin-top:14px">계정 전환</div>`;
+  if (!recentAccts.length) {
+    html += `<div class="ss-card"><div style="padding:18px 16px;text-align:center;font-size:12.5px;color:var(--muted);line-height:1.7">
+      이 기기에서 로그인한 다른 계정이 없어요.<br>한 번 로그인하면 여기에 쌓여 빠르게 전환할 수 있어요.
+    </div></div>`;
+  } else {
+    html += `<div class="ss-card">` + recentAccts.map(a => `
+      <div class="ss-card-row" onclick="switchAccount('${escHtml(a.email).replace(/'/g, "\\'")}')" style="cursor:pointer">
+        <div class="ss-card-icon">🔄</div>
+        <div class="ss-card-info">
+          <div class="ss-card-title">${escHtml(a.name || a.email)}</div>
+          <div class="ss-card-sub">${escHtml(a.email)}${a.role ? ' · ' + escHtml(a.role) : ''}</div>
+        </div>
+        <span class="sm-arrow">›</span>
+      </div>`).join('') + `</div>
+      <div style="font-size:11.5px;color:var(--muted);padding:8px 16px 0;line-height:1.6">
+        보안을 위해 비밀번호는 저장하지 않아요. 전환할 때 한 번만 입력하면 돼요.
+      </div>`;
+  }
+
   html += `<div id="admin-church-section" style="display:flex;justify-content:space-between;align-items:center;padding:0 16px;margin:16px 0 10px">
     <span style="font-size:12px;font-weight:700;color:var(--muted);letter-spacing:0.5px">교회·기관 관리 (${churchCodes.length}개)</span>
     <button onclick="openCreateChurchModal()" style="height:30px;padding:0 14px;border-radius:20px;border:none;background:var(--black);color:white;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">+ 새로 만들기</button>

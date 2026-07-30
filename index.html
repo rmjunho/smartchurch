@@ -3345,6 +3345,7 @@ async function doLogin() {
         DB.set('users', users);
         DB.setSession(uid);
         me = fbUser;
+        rememberAccount(fbUser);   // 관리자 패널 계정 전환 목록에 기록 (비밀번호 미저장)
         // 내 사진 캐시 하이드레이트 (다른 기기에서 바꾼 사진 반영)
         if (fbUser.photoURL) { _photoCache[uid] = fbUser.photoURL; DB.set('profilePhoto_' + uid, fbUser.photoURL); }
 
@@ -3478,6 +3479,7 @@ async function doRegister() {
       DB.saveUser(userData);
       DB.setSession(uid);
       me = Object.assign({}, userData, { phone });
+      rememberAccount(me);   // 관리자 패널 계정 전환 목록에 기록 (비밀번호 미저장)
 
       hideLoadingOverlay();
       if (isMinor) {
@@ -6601,6 +6603,31 @@ function closeLogoutModal(e) {
     document.getElementById('modal-logout').classList.remove('open');
   }
 }
+// ── 최근 사용 계정 (기기 단위) — 관리자 패널의 계정 전환용 ──
+// ★ 비밀번호는 저장하지 않는다. 전환 시 이메일만 채워주고 비밀번호는 직접 입력한다.
+//   (기기를 분실했을 때 저장된 비밀번호로 모든 계정이 열리는 상황을 만들지 않기 위함)
+function rememberAccount(u) {
+  if (!u || !u.email) return;
+  try {
+    const list = DB.get('recentAccounts', []).filter(a => a && a.email !== u.email);
+    list.unshift({ email: u.email, name: u.name || '', role: u.role || '', at: new Date().toISOString() });
+    DB.set('recentAccounts', list.slice(0, 8));
+  } catch (_) {}
+}
+
+function switchAccount(email) {
+  if (!email) return;
+  if (!confirm(`${email} 계정으로 전환할까요?\n\n로그아웃 후 비밀번호를 입력하면 돼요.`)) return;
+  closeSubscreen();
+  doLogout();
+  setTimeout(() => {
+    const e = document.getElementById('l-email');
+    const p = document.getElementById('l-pw');
+    if (e) e.value = email;
+    if (p) { p.value = ''; p.focus(); }
+  }, 350);
+}
+
 function doLogout() {
   if (typeof stopChurchMembersWatch === 'function') stopChurchMembersWatch();
   if (typeof stopPresenceHeartbeat === 'function') stopPresenceHeartbeat();
