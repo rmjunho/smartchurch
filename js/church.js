@@ -956,7 +956,22 @@ async function loadMembersScreenData() {
   if (typeof _cacheUserPhotos === 'function') _cacheUserPhotos(allUsers);
   if (typeof warmPhotoCache === 'function')   await warmPhotoCache();
   if (typeof ensurePhotosFor === 'function')  await ensurePhotosFor(allUsers);
+  await ensureMemberPhones(allUsers);
   body.outerHTML = renderMembersScreenHtml(allUsers);
+}
+
+// 전화번호는 userPhones 컬렉션에 분리돼 있고 규칙상 본인·같은 교회 리더·운영팀만 읽을 수 있다.
+// 권한이 없으면 조회가 거부되므로 조용히 건너뛴다(일반 교인 화면에는 아무것도 뜨지 않음).
+// ponytail: 교인 수만큼 개별 조회 — 교인 목록 규모가 커지면 한 번에 가져오는 쿼리로 바꿀 것
+async function ensureMemberPhones(users) {
+  if (!isLeader() || !window._fbReady || !window._fb || !window._fb.getUserPhone) return;
+  await Promise.all(users.map(async u => {
+    if (!u || !u.id || u.phone) return;
+    try {
+      const snap = await window._fb.getUserPhone(u.id);
+      if (snap.exists()) u.phone = snap.data().phone || '';
+    } catch (_) { /* 권한 없음 등 — 표시하지 않으면 그만 */ }
+  }));
 }
 
 function renderMembersScreenHtml(allUsers) {
@@ -1014,6 +1029,8 @@ function renderMembersScreenHtml(allUsers) {
                 ${appointed ? `<span class="appointed-badge" style="margin-left:4px">임명 리더</span>` : ''}
               </div>
               <div class="member-role">${escHtml(u.role||'성도')} · ${escHtml(u.church||'')}</div>
+              ${u.phone ? `<a href="tel:${escHtml(u.phone.replace(/[^0-9]/g,''))}" onclick="event.stopPropagation()"
+                 style="display:inline-block;font-size:11.5px;color:#2980B9;font-weight:600;margin-top:2px;text-decoration:none">📞 ${escHtml(u.phone)}</a>` : ''}
               ${u.requestedRole && u.requestedRole !== (u.role||'') ? `<div style="font-size:11px;color:#E67E22;font-weight:700;margin-top:2px">직분 신청: ${escHtml(u.requestedRole)}</div>` : ''}
               ${appointed ? `<div style="font-size:11px;color:var(--muted);margin-top:2px">${escHtml(permSummary)}</div>` : ''}
             </div>
