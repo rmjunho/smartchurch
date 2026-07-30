@@ -956,6 +956,14 @@ async function loadMembersScreenData() {
   if (typeof _cacheUserPhotos === 'function') _cacheUserPhotos(allUsers);
   if (typeof warmPhotoCache === 'function')   await warmPhotoCache();
   if (typeof ensurePhotosFor === 'function')  await ensurePhotosFor(allUsers);
+  // 로컬 캐시(users)에서 딸려온 번호는 버린다 — 화면에는 서버가 허용한 조회 결과만 쓴다.
+  // (예전 버전이 같은 기기에 남긴 번호가 다른 계정에게 보이던 유출 경로 차단)
+  allUsers.forEach(u => { delete u.phone; });
+  const _lu = DB.get('users', []);
+  let _cleaned = false;
+  _lu.forEach(x => { if (x && x.phone) { delete x.phone; _cleaned = true; } });
+  if (_cleaned) DB.set('users', _lu);
+
   await ensureMemberPhones(allUsers);
   body.outerHTML = renderMembersScreenHtml(allUsers);
 }
@@ -1029,7 +1037,7 @@ function renderMembersScreenHtml(allUsers) {
                 ${appointed ? `<span class="appointed-badge" style="margin-left:4px">임명 리더</span>` : ''}
               </div>
               <div class="member-role">${escHtml(u.role||'성도')} · ${escHtml(u.church||'')}</div>
-              ${u.phone ? `<a href="tel:${escHtml(u.phone.replace(/[^0-9]/g,''))}" onclick="event.stopPropagation()"
+              ${(u.phone && isLeader()) ? `<a href="tel:${escHtml(u.phone.replace(/[^0-9]/g,''))}" onclick="event.stopPropagation()"
                  style="display:inline-block;font-size:11.5px;color:#2980B9;font-weight:600;margin-top:2px;text-decoration:none">📞 ${escHtml(u.phone)}</a>` : ''}
               ${u.requestedRole && u.requestedRole !== (u.role||'') ? `<div style="font-size:11px;color:#E67E22;font-weight:700;margin-top:2px">직분 신청: ${escHtml(u.requestedRole)}</div>` : ''}
               ${appointed ? `<div style="font-size:11px;color:var(--muted);margin-top:2px">${escHtml(permSummary)}</div>` : ''}

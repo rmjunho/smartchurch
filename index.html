@@ -3473,10 +3473,11 @@ async function doRegister() {
       // 전화번호는 별도 컬렉션 — 본인·같은 교회 리더·운영팀만 읽도록 규칙에서 제한한다
       window._fb.setUserPhone(uid, phone)
         .catch(e => { if (window._fbErr) window._fbErr('전화번호 저장', e); });
-      // localStorage·me 에는 phone 을 포함 (내 기기에서 내 번호를 보여주기 위함)
-      me = Object.assign({}, userData, { phone });
-      DB.saveUser(me);
+      // 공유 로컬 배열(users)에는 phone 을 넣지 않는다 — 같은 기기의 다른 계정에 새어나간다.
+      // 내 번호는 me 에만 두고, 다시 필요하면 userPhones 에서 본인 권한으로 불러온다.
+      DB.saveUser(userData);
       DB.setSession(uid);
+      me = Object.assign({}, userData, { phone });
 
       hideLoadingOverlay();
       if (isMinor) {
@@ -9369,7 +9370,9 @@ function saveProfileEdit() {
     u.bio     = bio;
     u.role    = role;
     u.orgType = orgType;
-    u.phone   = phone;   // 로컬 캐시에만 — 서버는 userPhones 컬렉션에 따로 저장한다
+    // phone 은 공유 로컬 배열(users)에 넣지 않는다 — 같은 기기에서 다른 계정으로 로그인하면
+    // 교인 목록이 이 캐시를 병합해 남의 번호를 보여주게 된다(서버 규칙과 무관한 유출 경로).
+    delete u.phone;
     DB.set('users', users);
   }
   me.name    = name;
