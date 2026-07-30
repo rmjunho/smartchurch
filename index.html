@@ -2320,6 +2320,11 @@
         <input id="edit-name" type="text" class="form-input" placeholder="이름을 입력해 주세요">
       </div>
       <div class="form-group">
+        <label class="form-label">전화번호 <span style="font-weight:400;font-size:11.5px;color:var(--muted)">교회 리더에게만 보여요</span></label>
+        <input id="edit-phone" type="tel" class="form-input" placeholder="010-1234-5678"
+               inputmode="numeric" maxlength="13" autocomplete="tel" oninput="formatPhoneInput(this)">
+      </div>
+      <div class="form-group">
         <label class="form-label">한줄 소개 <span style="font-weight:400;font-size:11.5px;color:var(--muted)">선택 · 최대 50자</span></label>
         <textarea id="edit-bio" class="qt-ta" rows="2"
           placeholder="예: 믿음으로 하루하루 살아가는 중입니다 "
@@ -9203,6 +9208,18 @@ function openProfileEdit() {
   document.getElementById('bio-char-count').textContent = bio.length;
   document.getElementById('edit-church').value = me.church || '';
 
+  // 전화번호 — userPhones 에 분리 보관하므로, 다른 기기에서 가입해 로컬에 없으면 서버에서 한 번 불러온다
+  const phoneEl = document.getElementById('edit-phone');
+  if (phoneEl) {
+    phoneEl.value = me.phone || '';
+    if (!me.phone && window._fbReady && window._fb && window._fb.getUserPhone) {
+      window._fb.getUserPhone(me.id).then(s => {
+        const p = s.exists() ? (s.data().phone || '') : '';
+        if (p) { me.phone = p; phoneEl.value = p; }
+      }).catch(() => {});
+    }
+  }
+
   // 직분 드롭다운 — 현재 orgType 기준
   // personal 유형인데 교회가 있으면 church로 전환 (자동 교정)
   let orgType = me.orgType || 'church';
@@ -9320,6 +9337,12 @@ function saveProfileEdit() {
   else if (me.orgType === 'personal' || !me.role)          role = getDefaultRole(orgType);   // 신규/전환 → 기본 직분
   else                                                     role = me.role;                    // 공동체 내에서는 그대로
   if (!name) { toast('이름을 입력해 주세요'); return; }
+  // 전화번호 — 기존 가입자는 비어 있을 수 있어 선택 입력. 단, 적었다면 형식은 맞아야 한다.
+  const phoneDigits = (document.getElementById('edit-phone')?.value || '').replace(/[^0-9]/g, '');
+  if (phoneDigits && !/^01[016789][0-9]{7,8}$/.test(phoneDigits)) {
+    toast('올바른 휴대폰 번호를 입력해 주세요'); return;
+  }
+  const phone = phoneDigits ? fmtPhone(phoneDigits) : '';
 
   // 사진 저장: 로컬(원본) + Firestore(압축본 photoURL) → 전 기기·타 사용자 공유
   if (_editPhotoBase64) {
@@ -9346,12 +9369,20 @@ function saveProfileEdit() {
     u.bio     = bio;
     u.role    = role;
     u.orgType = orgType;
+    u.phone   = phone;   // 로컬 캐시에만 — 서버는 userPhones 컬렉션에 따로 저장한다
     DB.set('users', users);
   }
   me.name    = name;
   me.bio     = bio;
   me.role    = role;
   me.orgType = orgType;
+  me.phone   = phone;
+
+  // 전화번호는 users 문서가 아니라 userPhones 에 — 규칙상 본인·같은 교회 리더·운영팀만 읽는다
+  if (phone && window._fbReady && window._fb && window._fb.setUserPhone) {
+    window._fb.setUserPhone(me.id, phone)
+      .catch(e => { if (window._fbErr) window._fbErr('전화번호 저장', e); });
+  }
 
   // 개인 → 교회/기관 전환 시: 새가족 플래그 설정
   const wasPersonalBeforeEdit = (me.orgType !== orgType) || false;
