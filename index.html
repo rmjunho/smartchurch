@@ -7138,7 +7138,7 @@ async function deleteAccount() {
 // 규칙이 다른 컬렉션 삭제를 판단할 때 내 users 문서를 읽으므로(isLeader/isAdmin) 맨 마지막에 지워야 한다.
 async function _purgeUserData(uid) {
   if (!window._fbReady || !window._fb) return;
-  const { getFirestore, collection, query, where, getDocs,
+  const { getFirestore, collection, collectionGroup, query, where, getDocs,
           doc, deleteDoc, updateDoc, documentId } =
     await import('https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js');
   const db       = getFirestore();
@@ -7161,6 +7161,15 @@ async function _purgeUserData(uid) {
     delWhere('friendRequests', 'fromId'),
     delWhere('friendRequests', 'toId'),
     delWhere('binderComments', 'authorId'),
+    // 남의 글에 단 게시판 댓글은 boardPosts/{글}/comments 서브컬렉션이라 컬렉션 그룹으로 모아야 잡힌다.
+    // 삭제 권한 판단은 그 경로의 규칙(작성자 본인 또는 관리자)이 그대로 한다.
+    getDocs(query(collectionGroup(db, 'comments'), where('authorId', '==', uid)))
+      .then(delDocs)
+      .catch(e => {
+        warn('comments')(e);
+        // 색인이 없으면(failed-precondition) 전부 실패한다 — 조용히 넘어가면 댓글만 남는다.
+        if (typeof toast === 'function') toast('댓글 정리 실패 — 브라우저 콘솔(F12)의 색인 링크를 확인해 주세요');
+      }),
     delWhere('boardPosts',     'authorId'),
   ]);
 

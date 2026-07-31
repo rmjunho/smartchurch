@@ -115,6 +115,11 @@ service cloud.firestore {
         allow delete: if signedIn() && (resource.data.authorId == uid() || isAdmin());
       }
     }
+    // 탈퇴 시 남의 글에 단 내 댓글까지 지우려면 collectionGroup('comments') 조회가 필요하다.
+    // 위 중첩 규칙은 컬렉션 그룹 쿼리에 적용되지 않아 이 wildcard 매치가 따로 있어야 한다(삭제는 위 규칙이 판단).
+    match /{path=**}/comments/{commentId} {
+      allow read: if signedIn();
+    }
 
     // ── 친구 요청 (id = fr_{fromId}_{toId}, 당사자만) ──
     match /friendRequests/{id} {
