@@ -461,12 +461,11 @@ async function deleteChallenge(e, id) {
     }
   }
   saveAllCustomChallenges(list.filter(c => c.id !== id));
-  // 참여 기록은 원본과 별개 사본이라 카탈로그에서 지워도 '내가 진행하는 챌린지' 에 남아 있었다.
-  // 지운 사람 본인 것은 여기서 정리한다(다른 사람 기록은 각자 문서라 건드릴 수 없고,
-  // 대신 visibleMyChallenges 가 원본 없는 참여를 화면에서 걸러 준다).
-  const mine = myChallenges();
-  const kept = mine.filter(c => c.templateId !== id);
-  if (kept.length !== mine.length) saveMyChallenges(kept);
+  // 참여 기록(체크 날짜)은 여기서 지우지 않는다.
+  // 한때 지운 사람 본인 기록을 함께 정리했는데, 챌린지를 지웠다 다시 만들면 그 사이에
+  // 쌓인 체크가 통째로 날아갔다(서버에도 반영돼 복구 불가). 챌린지를 지우는 것과
+  // 내가 며칠 지켰는지의 기록을 지우는 것은 다른 일이다.
+  // 화면에서는 visibleMyChallenges 가 원본 없는 참여를 알아서 걸러 준다.
   renderChallenge();
   if (document.getElementById('subscreen')?.dataset?.current === 'challenge-manage')
     setTimeout(() => openSubscreen('challenge-manage'), 150);
