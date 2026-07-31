@@ -6788,6 +6788,7 @@ function _closeSubscreenUI() {
   el.classList.remove('open');
   el.dataset.current = ''; // 현재 화면 초기화
   _boardLoading = false;   // 게시판 로딩 플래그 리셋
+  _boardLoaded  = '';
 }
 
 function renderSubscreenContent(id) {
@@ -7335,6 +7336,7 @@ var BOARD_STATUS = {
 var _boardType    = 'app';
 var _viewPostId   = null;
 var _boardLoading = false;
+var _boardLoaded  = '';   // 서버에서 이미 읽어온 게시판 타입 — 화면 진입당 1회만 읽기 위한 표시
 
 
 // ── Firestore에서 게시글 로드 ──

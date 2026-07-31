@@ -10,7 +10,8 @@ function getBoardPost(id) {
 }
 
 function openBoardScreen(type) {
-  _boardType = type || 'app';
+  _boardType   = type || 'app';
+  _boardLoaded = '';   // 화면에 새로 들어올 때(탭 전환·글 등록 후)만 서버에서 다시 읽는다
   openSubscreen('board');
 }
 
@@ -38,10 +39,14 @@ function renderBoard() {
   const posts = getBoardPosts(type).filter(canViewBoardPost);   // 비공개 글 숨김
   const isApp = type === 'app';
 
-  // 비동기 Firestore 로드 후 새로고침
-  if (!_boardLoading) {
+  // 비동기 Firestore 로드 후 새로고침 — 화면 진입당 1회.
+  // 로드가 끝나면 openSubscreen('board') 이 renderBoard 를 다시 부르는데, 거기서 또 로드하면
+  // 로드 → 재렌더 → 로드 가 끝없이 돈다. 그러면 서브스크린 HTML 이 계속 통째로 교체되면서
+  // 버튼 DOM 이 갈려나가고, 클릭(mousedown·mouseup 이 같은 요소여야 성립)이 아예 먹지 않는다.
+  if (!_boardLoading && _boardLoaded !== type) {
     _boardLoading = true;
     loadBoardPosts(type).then(() => {
+      _boardLoaded  = type;
       _boardLoading = false;
       const ss  = document.getElementById('subscreen');
       const cur = ss?.dataset?.current;
