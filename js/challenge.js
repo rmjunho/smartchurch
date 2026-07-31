@@ -447,6 +447,13 @@ async function deleteChallenge(e, id) {
   if (!me.isAppAdmin && !isMine && !isChurchOwner) {
     toast('삭제 권한이 없어요'); return;
   }
+  // 챌린지를 지우면 체크 기록도 함께 지운다. 되돌릴 수 없으니 몇 일치가 사라지는지 먼저 알린다.
+  const myRec  = myChallenges().filter(c => c.templateId === id);
+  const myDays = myRec.reduce((n, c) => n + (c.checkedDates || []).length, 0);
+  if (!confirm(`"${ch.label || ch.name || ''}" 챌린지를 삭제할까요?\n\n`
+             + (myDays ? `· 내 체크 기록 ${myDays}일치가 함께 삭제돼요.\n` : '')
+             + `· 참여 중인 다른 교인의 목록에서도 사라져요.\n`
+             + `· 되돌릴 수 없어요.`)) return;
   // 서버에서 먼저 지운다. 예전엔 로컬만 지우고 서버 삭제 실패를 .catch(()=>{}) 로 삼켜서,
   // 권한 부족 등으로 서버에 남으면 다음 동기화 때 그 챌린지가 그대로 되살아났다.
   if (window._fbReady && window._fb) {
@@ -461,11 +468,10 @@ async function deleteChallenge(e, id) {
     }
   }
   saveAllCustomChallenges(list.filter(c => c.id !== id));
-  // 참여 기록(체크 날짜)은 여기서 지우지 않는다.
-  // 한때 지운 사람 본인 기록을 함께 정리했는데, 챌린지를 지웠다 다시 만들면 그 사이에
-  // 쌓인 체크가 통째로 날아갔다(서버에도 반영돼 복구 불가). 챌린지를 지우는 것과
-  // 내가 며칠 지켰는지의 기록을 지우는 것은 다른 일이다.
-  // 화면에서는 visibleMyChallenges 가 원본 없는 참여를 알아서 걸러 준다.
+  // 챌린지가 사라지면 그 체크 기록도 남기지 않는다(위 확인창에서 동의를 받았다).
+  // 다른 교인의 기록은 각자 users 문서라 규칙상 여기서 지울 수 없다 —
+  // 그쪽 화면에서는 visibleMyChallenges 가 원본 없는 참여를 걸러 준다.
+  if (myRec.length) saveMyChallenges(myChallenges().filter(c => c.templateId !== id));
   renderChallenge();
   if (document.getElementById('subscreen')?.dataset?.current === 'challenge-manage')
     setTimeout(() => openSubscreen('challenge-manage'), 150);
