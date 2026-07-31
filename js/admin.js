@@ -176,8 +176,8 @@ function adminToggleDisable(userId) {
   setTimeout(() => openSubscreen('admin-users'), 150);
 }
 
-function adminDeleteUser(userId, name) {
-  if (!confirm(`"${name}"님의 계정을 삭제할까요?\n\n· 앱 데이터(Firestore)는 바로 삭제되고, 이 사용자는 앱에서 자동 로그아웃돼요.\n· 로그인 계정(Authentication)은 보안상 앱에서 지울 수 없어, Firebase 콘솔에서 직접 삭제해야 완전히 지워져요.\n\n이 작업은 되돌릴 수 없어요.`)) return;
+async function adminDeleteUser(userId, name) {
+  if (!confirm(`"${name}"님의 계정을 삭제할까요?\n\n· 앱 데이터(Firestore)는 바로 삭제되고, 이 사용자는 앱에서 자동 로그아웃돼요.\n  프로필·사진·전화번호·바인더·챌린지·매칭·예약까지 함께 지워져요.\n· 로그인 계정(Authentication)은 보안상 앱에서 지울 수 없어, Firebase 콘솔에서 직접 삭제해야 완전히 지워져요.\n\n이 작업은 되돌릴 수 없어요.`)) return;
   // 로컬/UI 제거는 Firestore 삭제 성공 후에만 (이전: 소프트 플래그만 남겨 새로고침 시 재등장)
   const removeLocal = () => {
     DB.set('users', DB.get('users', []).filter(u => u.id !== userId));
@@ -187,9 +187,16 @@ function adminDeleteUser(userId, name) {
     setTimeout(() => openSubscreen('admin-users'), 150);
   };
   if (window._fbReady && window._fb) {
-    window._fb.deleteUserDoc(userId)
-      .then(removeLocal)
-      .catch(e => { console.error('Firestore 계정 삭제 실패:', e); toast('삭제에 실패했어요. 잠시 후 다시 시도해 주세요'); });
+    try {
+      // 본인 탈퇴와 같은 정리 — users 문서만 지우면 사진·바인더·매칭이 주인 없는 잔해로 남는다.
+      // (개별 실패는 _purgeUserData 안에서 로그만 남기고 넘어간다)
+      await _purgeUserData(userId);
+      await window._fb.deleteUserDoc(userId);
+      removeLocal();
+    } catch(e) {
+      console.error('Firestore 계정 삭제 실패:', e);
+      toast(`삭제에 실패했어요 (${e.code || e.message || e})`);
+    }
   } else {
     removeLocal();   // 오프라인(로컬 모드) — 기존 동작 유지
   }
