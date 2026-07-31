@@ -67,7 +67,8 @@
 
 - `toast(...)` — 토스트 알림, `loading(...)` / `showLoadingOverlay()` — 로딩 표시.
 - `go(screen)` — 화면 전환, `switchTab(...)` — 탭 전환.
-- `uid()` — 현재 사용자 UID, `me` — 현재 사용자 객체.
+- `uid()` — **랜덤 ID 생성기**(문서 ID 만들 때 씀). 현재 사용자 UID 가 아닙니다 — 그건 `me.id`.
+- `me` — 현재 사용자 객체. `me.id` = Firebase Auth UID.
 - 묵상 바인더는 날짜 기반 키(`dateKey`, `binderKey`)와 그리기 캔버스(손글씨) 로직이 큰 비중을 차지합니다.
 
 ## 배포·검증

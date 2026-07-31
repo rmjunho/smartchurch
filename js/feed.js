@@ -264,7 +264,7 @@ function closeBoardPostModal(e) {
     document.getElementById('modal-board-post').classList.remove('open');
 }
 
-function submitBoardPost() {
+async function submitBoardPost() {
   const title   = document.getElementById('bp-title').value.trim();
   const content = document.getElementById('bp-content').value.trim();
   const category= document.getElementById('bp-category').value;
@@ -283,12 +283,21 @@ function submitBoardPost() {
     likes: [], comments: [],
     createdAt: new Date().toISOString()
   };
+  // 서버 저장이 먼저다. 로컬에만 넣고 "등록됐어요" 라고 하면, 목록을 다시 불러오는 순간
+  // 서버 목록으로 덮여 글이 사라진다 — 사용자 눈에는 등록 자체가 안 된 것으로 보인다.
+  if (window._fbReady && window._fb) {
+    try {
+      await window._fb.setBoardPost(post.id, post);
+    } catch(e) {
+      console.error('게시글 저장 실패:', e);
+      toast(`등록 실패 (${e.code || e.message || e})`);
+      return;
+    }
+  }
+
   const list = getBoardPosts(_boardPostModalType);
   list.unshift(post);
   saveBoardPosts(_boardPostModalType, list);
-
-  if (window._fbReady && window._fb)
-    window._fb.setBoardPost(post.id, post).catch(() => {});
 
   closeBoardPostModal();
   toast(_boardPostModalType === 'app' ? '공지가 등록됐어요!' : '건의가 등록됐어요! 검토 후 상태가 업데이트돼요 ');
