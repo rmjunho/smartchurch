@@ -7095,16 +7095,14 @@ async function deleteAccount() {
       const credential = EmailAuthProvider.credential(user.email, pw);
       await reauthenticateWithCredential(user, credential);
 
-      // ② 채팅 메시지 발신자명 익명화 (선택 - 실패해도 진행)
-      try { await _anonymizeChatMessages(me.id); } catch(e) {}
+      // ② 내가 만든 Firestore 데이터 정리 (개별 실패는 로그만 — 여기서 멈추면 계정만 남아 더 지저분하다)
+      await _purgeUserData(me.id);
 
-      // ③ Firestore 사용자 문서 삭제
-      if (window._fb) {
-        const { deleteDoc, doc, getFirestore } =
-          await import('https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js');
-        const db = getFirestore();
-        await deleteDoc(doc(db, 'users', me.id)).catch(() => {});
-      }
+      // ③ 사용자 문서 삭제 — 여기는 실패를 삼키면 안 된다.
+      //    문서를 못 지운 채 Auth 계정을 지우면 본인도 관리자도 손댈 수 없는 유령 문서가 영영 남는다.
+      const { deleteDoc, doc, getFirestore } =
+        await import('https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js');
+      await deleteDoc(doc(getFirestore(), 'users', me.id));
 
       // ④ Firebase Auth 계정 삭제
       await deleteUser(user);
@@ -7124,30 +7122,81 @@ async function deleteAccount() {
       toast('비밀번호가 틀렸어요');
     } else if (e.code === 'auth/requires-recent-login') {
       toast('보안을 위해 다시 로그인 후 시도해 주세요');
+    } else if (e.code === 'permission-denied') {
+      // 보안 규칙이 콘솔에 아직 반영되지 않으면 본인 문서 삭제가 막힌다. 계정은 남겨둔 채 중단됨.
+      toast('서버 권한 문제로 데이터를 지우지 못했어요. 관리자에게 문의해 주세요');
     } else {
       toast('오류가 발생했어요. 다시 시도해 주세요');
     }
   }
 }
 
-// 채팅 메시지 발신자명 익명화
-async function _anonymizeChatMessages(userId) {
+// 탈퇴 시 Firestore 에 흩어진 내 데이터 삭제. users 문서는 여기서 지우지 않는다 —
+// 규칙이 다른 컬렉션 삭제를 판단할 때 내 users 문서를 읽으므로(isLeader/isAdmin) 맨 마지막에 지워야 한다.
+async function _purgeUserData(uid) {
   if (!window._fbReady || !window._fb) return;
-  // 참여한 채팅방 목록에서 내 메시지를 익명화 (최근 100개 기준)
-  const rooms = getChatRooms();
-  const { getDocs, collection, query, where, updateDoc, doc, getFirestore } =
+  const { getFirestore, collection, query, where, getDocs,
+          doc, deleteDoc, updateDoc, documentId } =
     await import('https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js');
-  const db = getFirestore();
-  for (const room of rooms.slice(0, 10)) { // 최대 10개 방
-    try {
-      const msgsRef = collection(db, 'chatRooms', room.id, 'messages');
-      const q       = query(msgsRef, where('senderId', '==', userId));
-      const snap    = await getDocs(q);
-      for (const d of snap.docs) {
-        await updateDoc(d.ref, { senderName: '탈퇴한 사용자', senderPhoto: null });
-      }
-    } catch(e) {}
-  }
+  const db       = getFirestore();
+  const warn     = (what) => (e) => console.warn('탈퇴 정리 실패:', what, e);
+  const delDocs  = (snap)        => Promise.all(snap.docs.map(d => deleteDoc(d.ref).catch(warn(d.ref.path))));
+  const delWhere = (col, field)  => getDocs(query(collection(db, col), where(field, '==', uid)))
+                                      .then(delDocs).catch(warn(`${col}.${field}`));
+
+  // ① 문서 ID 가 uid 인 것
+  await Promise.all([
+    deleteDoc(doc(db, 'userPhotos', uid)).catch(warn('userPhotos')),
+    deleteDoc(doc(db, 'userPhones', uid)).catch(warn('userPhones')),
+  ]);
+
+  // ② 소유자 필드로 찾는 것
+  await Promise.all([
+    delWhere('matchProfiles',  'userId'),
+    delWhere('matchRequests',  'fromId'),
+    delWhere('matchRequests',  'toId'),
+    delWhere('friendRequests', 'fromId'),
+    delWhere('friendRequests', 'toId'),
+    delWhere('binderComments', 'authorId'),
+    delWhere('boardPosts',     'authorId'),
+  ]);
+
+  // ③ 개인 챌린지 · 행사 예약
+  //    교회 챌린지·모임·행사는 내가 만들었어도 다른 교인이 참여 중이라 남긴다(내 것이 아니라 교회 것).
+  await window._fb.getPersonalChallenges(uid).then(delDocs).catch(warn('challenges'));
+  await window._fb.getMyReservations(uid).then(delDocs).catch(warn('reservations'));
+
+  // ④ 바인더 — 문서 ID 가 `uid_날짜` 라 소유자 필드가 없다.
+  //    공유본(binderEntries)은 규칙이 read: signedIn 이라 ID 범위로 훑을 수 있지만,
+  //    개인 동기화본(myBinders)은 규칙이 문서 ID 를 보므로 목록 조회가 막힌다 → 알아낸 날짜로 하나씩 지운다.
+  // ponytail: 다른 기기에서만 쓰고 공유한 적 없는 날짜는 남는다.
+  //           전부 지우려면 myBinders 에 ownerUid 필드를 넣고 규칙을 필드 기준으로 바꿔야 한다.
+  const dates = new Set();
+  try {
+    const snap = await getDocs(query(collection(db, 'binderEntries'),
+      where(documentId(), '>=', `${uid}_`), where(documentId(), '<', `${uid}_`)));
+    snap.docs.forEach(d => dates.add(d.id.slice(uid.length + 1)));
+    await delDocs(snap);
+  } catch(e) { warn('binderEntries')(e); }
+  try {
+    const prefix = `sc2_binder_${uid}_`;
+    Object.keys(localStorage).filter(k => k.startsWith(prefix))
+      .forEach(k => dates.add(k.slice(prefix.length)));
+  } catch(_) {}
+  await Promise.all([...dates].map(d =>
+    deleteDoc(doc(db, 'myBinders', `${uid}_${d}`)).catch(warn('myBinders'))));
+
+  // ⑤ 채팅 — 방 문서는 여럿이 쓰는 공유물이라 지울 수 없다. 내 메시지를 익명화하고 멤버에서 빠진다.
+  //    (로컬 목록이 아니라 서버 조회 — 다른 기기에서만 들어간 방도 잡아야 한다)
+  try {
+    const rooms = await getDocs(query(collection(db, 'chatRooms'), where('members', 'array-contains', uid)));
+    for (const r of rooms.docs) {
+      const msgs = await getDocs(query(collection(db, 'chatRooms', r.id, 'messages'), where('senderId', '==', uid)));
+      await Promise.all(msgs.docs.map(m =>
+        updateDoc(m.ref, { senderName: '탈퇴한 사용자', senderPhoto: null }).catch(warn('message'))));
+      await updateDoc(r.ref, { members: (r.data().members || []).filter(x => x !== uid) }).catch(warn('chatRoom'));
+    }
+  } catch(e) { warn('chatRooms')(e); }
 }
 
 // 로컬 데이터 전체 삭제

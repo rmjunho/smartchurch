@@ -33,7 +33,7 @@ service cloud.firestore {
 
     // ── 사용자 프로필 ──
     // 읽기: 로그인한 교인 누구나(교인 목록). 생성: 본인 가입 또는 관리자 벌크 동기화.
-    // 수정: 본인 / 관리자 / 같은 교회 리더(가입승인·직분·리더임명). 삭제: 관리자.
+    // 수정: 본인 / 관리자 / 같은 교회 리더(가입승인·직분·리더임명). 삭제: 본인(회원탈퇴) / 관리자.
     match /users/{userId} {
       allow read:   if signedIn();
       allow create: if signedIn() && (uid() == userId || isAdmin());
@@ -42,7 +42,7 @@ service cloud.firestore {
                       isAdmin() ||
                       (isLeader() && resource.data.churchCode == profile().churchCode)
                     );
-      allow delete: if isAdmin();
+      allow delete: if signedIn() && (uid() == userId || isAdmin());
     }
 
     // ── 프로필 사진 (문서 ID = uid) ──
