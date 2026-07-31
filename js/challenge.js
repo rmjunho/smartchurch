@@ -393,22 +393,48 @@ function saveMyChallenges(list) {
   }
 }
 
-// 서버 목록과 로컬 목록을 합친다. checkedDates 는 합집합이라 어느 쪽 체크도 사라지지 않는다
-// (기기 두 대에서 각각 체크한 날이 있어도 둘 다 남는다).
+// 서버 목록과 로컬 목록을 합친다.
+// ① 같은 챌린지면 한 칸으로 합친다 — 기준은 인스턴스 uid 가 아니라 templateId 다.
+//    다시 시작하면 uid 가 새로 생기므로, uid 로 합치면 같은 챌린지가 두 개로 보이고
+//    체크 기록도 옛 인스턴스와 새 인스턴스로 갈라진다.
+// ② checkedDates 는 합집합이라 어느 쪽 체크도 사라지지 않는다.
+// ③ 로컬에만 있는 게 있으면 서버로 올린다 — 받기만 하면 동기화 이전에 다른 기기에서 한
+//    체크가 그 기기에 갇힌 채 영영 올라오지 못한다.
+function _myChKey(c) { return c.templateId || ('uid:' + c.uid); }
+
+function _myChSig(list) {
+  return (list || []).map(c =>
+    _myChKey(c) + '|' + [...(c.checkedDates || [])].sort().join(',') + '|' + (c.startedAt || '')
+  ).sort().join(';');
+}
+
 function mergeMyChallenges(remote) {
-  if (!Array.isArray(remote) || !remote.length) return false;
-  const local = myChallenges();
-  const byUid = {};
-  [...local, ...remote].forEach(c => {
-    if (!c || !c.uid) return;
-    const prev = byUid[c.uid];
-    if (!prev) { byUid[c.uid] = { ...c, checkedDates: [...(c.checkedDates || [])] }; return; }
-    prev.checkedDates = [...new Set([...prev.checkedDates, ...(c.checkedDates || [])])].sort();
+  const local  = myChallenges();
+  const server = Array.isArray(remote) ? remote : [];
+  if (!local.length && !server.length) return false;
+
+  const byKey = new Map();
+  [...server, ...local].forEach(c => {
+    if (!c || (!c.templateId && !c.uid)) return;
+    const k = _myChKey(c), prev = byKey.get(k);
+    if (!prev) { byKey.set(k, { ...c, checkedDates: [...(c.checkedDates || [])] }); return; }
+    const dates = [...new Set([...prev.checkedDates, ...(c.checkedDates || [])])].sort();
+    // 기간·목표 같은 정보는 나중에 시작한 쪽을 쓰고, 체크는 양쪽을 모두 남긴다
+    const newer = (c.startedAt || '') > (prev.startedAt || '') ? c : prev;
+    byKey.set(k, { ...newer, checkedDates: dates });
   });
-  const merged = Object.values(byUid);
-  if (JSON.stringify(merged) === JSON.stringify(local)) return false;
-  DB.set('myChallenges_' + me.id, merged);   // saveMyChallenges 를 쓰면 방금 받은 걸 되쓴다
-  return true;
+  const merged = [...byKey.values()];
+  const sig = _myChSig(merged);
+
+  const changed = sig !== _myChSig(local);
+  if (changed) DB.set('myChallenges_' + me.id, merged);   // saveMyChallenges 면 방금 받은 걸 되쓴다
+
+  if (sig !== _myChSig(server) && window._fbReady && window._fb && me && me.id) {
+    me.myChallenges = merged;
+    window._fb.updateUser(me.id, { myChallenges: merged, myChallengesAt: new Date().toISOString() })
+      .catch(err => console.warn('챌린지 참여 올리기 실패:', err));
+  }
+  return changed;
 }
 
 async function deleteChallenge(e, id) {
