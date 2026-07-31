@@ -4868,11 +4868,18 @@ function startPanelDrag(e) {
   const ox   = e.clientX - rect.left;  // 포인터와 툴바 왼쪽 가장자리 사이 오프셋
   const oy   = e.clientY - rect.top;
 
+  // #app 이 contain:paint 라 fixed 기준이 뷰포트가 아니라 앱 기둥이다(넓은 화면에서 차이가 난다).
+  // 태블릿/PC 확대 배율이 걸리면 style.left 의 1px 이 화면에서는 Z px 이라 그만큼 나눠 준다.
+  // clientWidth 는 배율 이전(레이아웃) px, getBoundingClientRect 는 배율 이후 px 이라 둘의 비가 Z.
+  const host = document.getElementById('app');
+  const hb   = host.getBoundingClientRect();
+  const Z    = (host.clientWidth ? hb.width / host.clientWidth : 1) || 1;
+
   function onMove(ev) {
-    let newL = ev.clientX - ox;
-    let newT = ev.clientY - oy;
-    newL = Math.max(0, Math.min(window.innerWidth  - 30, newL));
-    newT = Math.max(0, Math.min(window.innerHeight - 72 - 60, newT)); // 72px = 하단 네비게이션 바
+    let newL = (ev.clientX - ox - hb.left) / Z;
+    let newT = (ev.clientY - oy - hb.top)  / Z;
+    newL = Math.max(0, Math.min(host.clientWidth  - 30, newL));
+    newT = Math.max(0, Math.min(host.clientHeight - 72 - 60, newT)); // 72px = 하단 네비게이션 바
     tb.style.left  = newL + 'px';
     tb.style.top   = newT + 'px';
     tb.style.right = 'auto';

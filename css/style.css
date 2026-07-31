@@ -36,17 +36,32 @@
       overflow: hidden;
       background: var(--black);
       box-shadow: 0 0 60px rgba(0,0,0,0.8);
+      /* position:fixed 자식(사이드 메뉴·FAB·펜 툴바·배너·모달)의 기준을 뷰포트가 아니라
+         이 기둥으로 바꾼다. 넓은 화면에서 사이드 메뉴가 모니터 오른쪽 끝에 따로 떨어져
+         뜨던 문제가 한 줄로 정리된다. 폰에서는 기둥 폭 = 뷰포트 폭이라 아무것도 달라지지 않는다. */
+      contain: paint;
     }
 
     /* 글자 크기 — 앱 전체를 배율로 확대/축소한다.
        CSS 대부분이 px 고정값이라 font-size 변수만으로는 반영되지 않기 때문.
        배율만큼 max-width/height 를 나눠 두어 실제 렌더 크기는 480px·100dvh 로 유지된다.
        zoom 미지원 브라우저는 @supports 로 통째로 건너뛰어 기존 레이아웃을 그대로 쓴다. */
+    /* 태블릿·PC 확대 배율(--app-scale)은 글자 크기 배율(--app-zoom)과 곱해서 쓴다.
+       화면마다 px 을 손대지 않으려고 위의 zoom 장치를 그대로 재사용한다.
+       세로 조건이 핵심 — 배율을 올리면 한 화면에 들어가는 세로 콘텐츠가 그만큼 줄어서,
+       낮은 화면(예: 1280×800 노트북)은 확대하지 않는 편이 낫다.
+       가로 600px 기준인 이유: 안드로이드 10인치 태블릿은 1200×1920 물리 화소여도 CSS 로는 600×960 이다. */
+    :root { --app-scale: 1; }
+    @media (min-width: 600px) and (min-height:  940px) { :root { --app-scale: 1.25; } }
+    @media (min-width: 720px) and (min-height: 1125px) { :root { --app-scale: 1.5;  } }
+    @media (min-width: 840px) and (min-height: 1310px) { :root { --app-scale: 1.75; } }
+
     @supports (zoom: 1) {
       #app {
-        zoom: var(--app-zoom, 1);
+        zoom: calc(var(--app-zoom, 1) * var(--app-scale, 1));
+        /* 글자 배율만 상쇄한다 — 화면 배율은 상쇄하지 않아야 실제로 커진다 */
         max-width: calc(480px / var(--app-zoom, 1));
-        height: calc(100dvh / var(--app-zoom, 1));
+        height: calc(100dvh / (var(--app-zoom, 1) * var(--app-scale, 1)));
       }
       /* .bottom-nav 는 fixed 라 zoom 배율만큼 넓어지므로 함께 보정 */
       .bottom-nav { max-width: calc(480px / var(--app-zoom, 1)); }
