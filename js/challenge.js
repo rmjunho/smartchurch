@@ -268,7 +268,9 @@ function renderMyChallenges() {
                          letter-spacing:0.5px;margin:${active.length?'20px':'0'} 0 10px">
                기간 종료 (${expired.length}개)
              </div>`;
-    expired.forEach(c => { html += buildCard(c, true); });
+    // '그만하기' 는 진행 중인 것에만 — 이미 끝난 챌린지는 그만둘 게 없고,
+    // 누르면 결과 기록만 사라진다(지난 챌린지를 돌아볼 수 있어야 한다).
+    expired.forEach(c => { html += buildCard(c, false); });
   }
 
   html += `<button onclick="switchTab('challenge','챌린지',document.querySelectorAll('.nav-btn')[1]);closeSubscreen()"
@@ -306,6 +308,15 @@ function saveAllCustomChallenges(list) { DB.set('allCustomChallenges', list); }
 
 async function syncChallengesFromFirestore() {
   if (!window._fbReady || !window._fb) return;
+  // 내 참여 목록 먼저 — 카탈로그만 맞춰봐야 "시작한 챌린지" 가 비어 있으면 소용이 없다.
+  try {
+    const snap = await window._fb.getUser(me.id);
+    if (snap.exists() && mergeMyChallenges(snap.data().myChallenges)) {
+      if (document.getElementById('subscreen')?.dataset?.current === 'my-challenges')
+        openSubscreen('my-challenges');
+    }
+  } catch (err) { console.warn('챌린지 참여 목록 불러오기 실패:', err); }
+
   try {
     const fetched = [];
     const seen = new Set();
@@ -357,9 +368,37 @@ function fullCatalog() {
 
 function myChallenges() { return DB.get('myChallenges_' + me.id, []); }
 
-function saveMyChallenges(list) { DB.set('myChallenges_' + me.id, list); }
+// 참여 목록·체크 기록은 여태 이 기기 localStorage 에만 있었다. 그래서 다른 기기·브라우저로
+// 들어오면 시작한 적 없는 것처럼 비어 보였다("빌립보서 시작했는데 안 되어 있다").
+// 내 users 문서에 함께 저장한다 — 본인이 쓰고 규칙 변경이 필요 없다.
+function saveMyChallenges(list) {
+  DB.set('myChallenges_' + me.id, list);
+  if (window._fbReady && window._fb && me && me.id) {
+    me.myChallenges = list;
+    window._fb.updateUser(me.id, { myChallenges: list, myChallengesAt: new Date().toISOString() })
+      .catch(err => console.warn('챌린지 참여 동기화 실패:', err));
+  }
+}
 
-function deleteChallenge(e, id) {
+// 서버 목록과 로컬 목록을 합친다. checkedDates 는 합집합이라 어느 쪽 체크도 사라지지 않는다
+// (기기 두 대에서 각각 체크한 날이 있어도 둘 다 남는다).
+function mergeMyChallenges(remote) {
+  if (!Array.isArray(remote) || !remote.length) return false;
+  const local = myChallenges();
+  const byUid = {};
+  [...local, ...remote].forEach(c => {
+    if (!c || !c.uid) return;
+    const prev = byUid[c.uid];
+    if (!prev) { byUid[c.uid] = { ...c, checkedDates: [...(c.checkedDates || [])] }; return; }
+    prev.checkedDates = [...new Set([...prev.checkedDates, ...(c.checkedDates || [])])].sort();
+  });
+  const merged = Object.values(byUid);
+  if (JSON.stringify(merged) === JSON.stringify(local)) return false;
+  DB.set('myChallenges_' + me.id, merged);   // saveMyChallenges 를 쓰면 방금 받은 걸 되쓴다
+  return true;
+}
+
+async function deleteChallenge(e, id) {
   if (e) e.stopPropagation();
   const list = allCustomChallenges();
   const ch   = list.find(c => c.id === id);
@@ -369,9 +408,20 @@ function deleteChallenge(e, id) {
   if (!me.isAppAdmin && !isMine && !isChurchOwner) {
     toast('삭제 권한이 없어요'); return;
   }
+  // 서버에서 먼저 지운다. 예전엔 로컬만 지우고 서버 삭제 실패를 .catch(()=>{}) 로 삼켜서,
+  // 권한 부족 등으로 서버에 남으면 다음 동기화 때 그 챌린지가 그대로 되살아났다.
+  if (window._fbReady && window._fb) {
+    try {
+      await window._fb.deleteChallenge(id);
+    } catch (err) {
+      console.error('챌린지 삭제 실패:', err);
+      toast(err && err.code === 'permission-denied'
+        ? '이 챌린지를 지울 권한이 없어요 — 만든 사람이나 리더만 지울 수 있어요'
+        : '삭제에 실패했어요. 연결을 확인하고 다시 시도해 주세요');
+      return;   // 로컬도 그대로 둔다 — 지운 것처럼 보였다가 되살아나는 게 더 나쁘다
+    }
+  }
   saveAllCustomChallenges(list.filter(c => c.id !== id));
-  if (window._fbReady && window._fb)
-    window._fb.deleteChallenge(id).catch(() => {});
   renderChallenge();
   if (document.getElementById('subscreen')?.dataset?.current === 'challenge-manage')
     setTimeout(() => openSubscreen('challenge-manage'), 150);
