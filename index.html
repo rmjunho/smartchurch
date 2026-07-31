@@ -7088,25 +7088,27 @@ async function deleteAccount() {
 
   try {
     // ① Firebase Auth 재인증
-    if (window._fbReady && window._fbAuth) {
-      const { EmailAuthProvider, reauthenticateWithCredential, deleteUser } =
-        await import('https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js');
-      const user       = window._fbAuth.currentUser;
-      const credential = EmailAuthProvider.credential(user.email, pw);
-      await reauthenticateWithCredential(user, credential);
+    // 서버에 못 붙으면 로컬만 지우고 "탈퇴 완료" 라고 말하게 된다 → 아무것도 안 지우고 성공 처리하느니 멈춘다.
+    if (!window._fbReady || !window._fbAuth) throw new Error('서버에 연결되지 않았어요');
+    const { EmailAuthProvider, reauthenticateWithCredential, deleteUser } =
+      await import('https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js');
+    // 앱 세션(localStorage)은 살아 있어도 Auth 세션은 만료돼 있을 수 있다 — 그때 currentUser 가 null.
+    const user = window._fbAuth.currentUser;
+    if (!user) { const err = new Error('Auth 세션 없음'); err.code = 'auth/no-current-user'; throw err; }
+    await reauthenticateWithCredential(user, EmailAuthProvider.credential(user.email, pw));
 
-      // ② 내가 만든 Firestore 데이터 정리 (개별 실패는 로그만 — 여기서 멈추면 계정만 남아 더 지저분하다)
-      await _purgeUserData(me.id);
+    // ② 내가 만든 Firestore 데이터 정리 (개별 실패는 로그만 — 여기서 멈추면 계정만 남아 더 지저분하다)
+    await _purgeUserData(user.uid);
 
-      // ③ 사용자 문서 삭제 — 여기는 실패를 삼키면 안 된다.
-      //    문서를 못 지운 채 Auth 계정을 지우면 본인도 관리자도 손댈 수 없는 유령 문서가 영영 남는다.
-      const { deleteDoc, doc, getFirestore } =
-        await import('https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js');
-      await deleteDoc(doc(getFirestore(), 'users', me.id));
+    // ③ 사용자 문서 삭제 — 여기는 실패를 삼키면 안 된다.
+    //    문서를 못 지운 채 Auth 계정을 지우면 본인도 관리자도 손댈 수 없는 유령 문서가 영영 남는다.
+    //    문서 ID 는 me.id 가 아니라 Auth UID — 규칙도 UID 로 판단하고, 옛 계정은 me.id 가 다를 수 있다.
+    const { deleteDoc, doc, getFirestore } =
+      await import('https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js');
+    await deleteDoc(doc(getFirestore(), 'users', user.uid));
 
-      // ④ Firebase Auth 계정 삭제
-      await deleteUser(user);
-    }
+    // ④ Firebase Auth 계정 삭제
+    await deleteUser(user);
 
     // ⑤ localStorage 전체 초기화
     _clearAllLocalData();
@@ -7120,13 +7122,14 @@ async function deleteAccount() {
     if (btn) { btn.disabled = false; btn.textContent = '탈퇴하기'; _checkDeleteReady(); }
     if (e.code === 'auth/wrong-password' || e.code === 'auth/invalid-credential') {
       toast('비밀번호가 틀렸어요');
-    } else if (e.code === 'auth/requires-recent-login') {
-      toast('보안을 위해 다시 로그인 후 시도해 주세요');
+    } else if (e.code === 'auth/requires-recent-login' || e.code === 'auth/no-current-user') {
+      toast('로그인이 만료됐어요. 로그아웃 후 다시 로그인해서 시도해 주세요');
     } else if (e.code === 'permission-denied') {
       // 보안 규칙이 콘솔에 아직 반영되지 않으면 본인 문서 삭제가 막힌다. 계정은 남겨둔 채 중단됨.
       toast('서버 권한 문제로 데이터를 지우지 못했어요. 관리자에게 문의해 주세요');
     } else {
-      toast('오류가 발생했어요. 다시 시도해 주세요');
+      // 원인을 감추면 사용자도 나도 다시 시도만 반복하게 된다 — 실제 코드를 보여준다.
+      toast(`탈퇴에 실패했어요 (${e.code || e.message || e})`);
     }
   }
 }
