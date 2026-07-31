@@ -169,7 +169,7 @@ function checkChallengeReminder() {
 }
 
 function renderMyChallenges() {
-  const myList = myChallenges();
+  const myList = visibleMyChallenges();   // 삭제된 원본의 참여 기록은 빼고 보여준다
   const today  = todayDateKey();
 
   // 진행 중 / 종료 분류
@@ -342,6 +342,7 @@ async function syncChallengesFromFirestore() {
     const fetchedIds = new Set(fetched.map(c => c.id));
     const localOnly = local.filter(c => !fetchedIds.has(c.id));
     saveAllCustomChallenges([...fetched, ...localOnly]);
+    _catalogSynced = true;   // 이제부터 삭제된 원본의 참여 기록을 가려도 안전하다
     renderChallenge();
   } catch(e) {
     console.warn('Firestore 챌린지 동기화 실패:', e);
@@ -367,6 +368,18 @@ function fullCatalog() {
 }
 
 function myChallenges() { return DB.get('myChallenges_' + me.id, []); }
+
+// 원본 챌린지가 삭제돼도 참여 기록(myChallenges)은 각자 목록에 그대로 남아 계속 보였다.
+// 서버 카탈로그를 실제로 받아온 뒤에만 걸러낸다 — 아직 못 받은 상태에서 거르면
+// 멀쩡한 챌린지가 통째로 사라져 보인다. 저장은 건드리지 않고 화면에서만 감춘다.
+var _catalogSynced = false;
+
+function visibleMyChallenges() {
+  const list = myChallenges();
+  if (!_catalogSynced) return list;
+  const ids = new Set(fullCatalog().map(c => c.id));
+  return list.filter(c => !c.templateId || ids.has(c.templateId));
+}
 
 // 참여 목록·체크 기록은 여태 이 기기 localStorage 에만 있었다. 그래서 다른 기기·브라우저로
 // 들어오면 시작한 적 없는 것처럼 비어 보였다("빌립보서 시작했는데 안 되어 있다").
@@ -422,6 +435,12 @@ async function deleteChallenge(e, id) {
     }
   }
   saveAllCustomChallenges(list.filter(c => c.id !== id));
+  // 참여 기록은 원본과 별개 사본이라 카탈로그에서 지워도 '내가 진행하는 챌린지' 에 남아 있었다.
+  // 지운 사람 본인 것은 여기서 정리한다(다른 사람 기록은 각자 문서라 건드릴 수 없고,
+  // 대신 visibleMyChallenges 가 원본 없는 참여를 화면에서 걸러 준다).
+  const mine = myChallenges();
+  const kept = mine.filter(c => c.templateId !== id);
+  if (kept.length !== mine.length) saveMyChallenges(kept);
   renderChallenge();
   if (document.getElementById('subscreen')?.dataset?.current === 'challenge-manage')
     setTimeout(() => openSubscreen('challenge-manage'), 150);
@@ -705,7 +724,7 @@ function setChallengeFilter(cat) {
 
 function renderChallenge() {
   const catalog = fullCatalog();
-  const myList = myChallenges();
+  const myList = visibleMyChallenges();   // 삭제된 원본의 참여 기록은 빼고 보여준다
   const startedIds = myList.map(c => c.templateId);
   const today = todayDateKey();
 
@@ -872,28 +891,6 @@ function closeChallengeModal(e) {
   if (!e || e.target.id === 'modal-challenge' || e.type !== 'click') {
     document.getElementById('modal-challenge').classList.remove('open');
   }
-}
-
-function confirmStartChallenge() {
-  const tpl = fullCatalog().find(c => c.id === _pendingChallengeId);
-  if (!tpl) return;
-  const list = myChallenges();
-  list.push({
-    uid: uid(),
-    templateId: tpl.id,
-    tag: tpl.tag,
-    label: tpl.label,
-    type: tpl.type,
-    target: tpl.target || null,
-    current: 0,
-    streak: 0,
-    lastCheckedDate: null,
-    startedAt: new Date().toISOString()
-  });
-  saveMyChallenges(list);
-  closeChallengeModal();
-  renderChallenge();
-  toast(`"${tpl.label}" 챌린지를 시작했어요!`);
 }
 
 function calculateStreak(checkedDates) {
