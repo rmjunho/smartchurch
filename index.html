@@ -3114,6 +3114,30 @@ function setRegOrgType(type) {
 // ── 온보딩 ob2 유형/직분 선택 ──
 var _obOrgType = 'church';
 
+// 실제로 저장될 유형 — obConnectChurch 와 같은 기준이어야 한다.
+// 유효한 코드가 있으면 그 공동체의 유형이 이기고(버튼 선택은 무시), 없으면 버튼 선택.
+function obEffectiveOrgType() {
+  if (_obOrgType === 'personal') return 'personal';
+  const code = (document.getElementById('ob-code')?.value || '').toUpperCase();
+  return getChurchName(code) ? getOrgTypeForChurch(code) : _obOrgType;
+}
+
+// 직분 목록을 '저장될 유형' 에 맞춘다. 유형이 그대로면 다시 그리지 않는다
+// — 코드 한 글자마다 다시 그리면 이미 고른 직분이 첫 항목으로 되돌아간다.
+var _obRoleListType = '';
+function obSyncRoleOptions() {
+  const type = obEffectiveOrgType();
+  // 버튼 표시는 늘 맞춘다 — 코드가 버튼 선택을 덮은 경우에도 어느 유형인지 보여야 한다
+  ['church','org','personal'].forEach(t => {
+    document.getElementById('ob-org-'+t)?.classList.toggle('on', t === type);
+  });
+  if (type === _obRoleListType) return;
+  _obRoleListType = type;
+  const sel = document.getElementById('ob-role-select');
+  if (sel) sel.innerHTML = (ORG_ROLES[type] || ORG_ROLES.church).map(r =>
+    `<option value="${r.value}">${r.label}</option>`).join('');
+}
+
 function setObOrgType(type) {
   _obOrgType = type;
   ['church','org','personal'].forEach(t => {
@@ -3137,10 +3161,10 @@ function setObOrgType(type) {
     if (personalMsg)   personalMsg.style.display   = 'none';
     if (skipBtn)       skipBtn.style.display        = '';
     if (nextBtn)       nextBtn.textContent          = '다음 →';
-    // 직분 목록 업데이트
-    const sel = document.getElementById('ob-role-select');
-    if (sel) sel.innerHTML = ORG_ROLES[type].map(r =>
-      `<option value="${r.value}">${r.label}</option>`).join('');
+    // 직분 목록 업데이트 — 입력된 코드가 유형을 정하므로 버튼 선택만 보고 채우지 않는다
+    obSyncRoleOptions();
+    const eff = obEffectiveOrgType();
+    if (eff !== type) toast(`입력한 코드는 ${eff === 'org' ? '기관·단체' : '교회'}라서 그에 맞는 직분을 보여드려요`);
     obShowPanel('main');   // 유형을 다시 고르면 항상 메인부터
   }
 }
@@ -3166,6 +3190,7 @@ function obShowPanel(which) {
 }
 
 function _initObRoleSelect() {
+  _obRoleListType = '';   // 목록이 비어 있으므로 유형이 같아도 반드시 다시 그린다
   setObOrgType('church');
 }
 
@@ -10101,6 +10126,7 @@ function obCodeInput(el) {
     result.classList.remove('show');
     obData.churchName = '';
   }
+  obSyncRoleOptions();   // 코드가 정해지면 그 공동체 유형의 직분만 고르게 한다
 }
 
 

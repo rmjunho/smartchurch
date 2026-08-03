@@ -2479,10 +2479,12 @@ function obRegisterNewChurch() {
 
 function obConnectChurch() {
   const code = document.getElementById('ob-code').value.toUpperCase();
-  const found = getChurchName(code);
+  // 개인은 코드를 무시한다 — 코드를 입력한 뒤 유형을 개인으로 바꿔도 입력칸의 값은 남아 있어,
+  // 그대로 두면 개인으로 시작한 사람이 교회 소속 + 승인 대기 상태로 저장됐다.
+  const found = _obOrgType === 'personal' ? null : getChurchName(code);
 
-  // 교회 코드가 유효하면 해당 교회의 orgType을 적용
-  const resolvedOrgType = (code && found) ? getOrgTypeForChurch(code) : _obOrgType;
+  // 교회 코드가 유효하면 해당 교회의 orgType을 적용 (obEffectiveOrgType 과 같은 기준)
+  const resolvedOrgType = found ? getOrgTypeForChurch(code) : _obOrgType;
 
   // 유형/직분 저장
   const selectedRole = resolvedOrgType === 'personal'
