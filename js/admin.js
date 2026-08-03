@@ -389,6 +389,11 @@ async function loadAdminPanelData() {
   await syncChurchesFromFirestore();
 
   _membersCache = allUsers;   // 승인/거절 핸들러 공유 캐시
+  // 패널의 액션 핸들러(일괄 승인 등)도 이 목록을 봐야 한다. 예전에는 _adminUsersData 가
+  // '전체 사용자' 화면을 열 때만 채워져서, 패널만 열고 일괄 승인을 누르면 서버 목록 대신
+  // 이 기기의 로컬 캐시를 뒤졌다 — 다른 기기에서 가입한 리더는 대상에서 통째로 빠지고
+  // 화면에는 '1명', 버튼은 '계정이 없어요' 라 서로 다른 말을 했다.
+  _adminUsersData = allUsers;
 
   // 보호자 번호는 userPhones 에 있다. 승인 판단에 필요한 건 대기 중인 미성년자뿐이라
   // 전체 사용자에게 1건씩 조회를 돌리지 않는다(사용자 수만큼 읽기가 발생한다).
