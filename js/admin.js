@@ -431,6 +431,26 @@ async function syncChurchesFromFirestore() {
   } catch(e) { console.error('Firestore 교회 목록 로드 실패:', e); }
 }
 
+// 앱에 존재하는 모든 교회/기관 — 기본 제공(OB_CHURCHES) + 등록분(customChurches) + 교인 소속.
+// 한 곳에서만 만든다. 관리자 패널이 이걸 세 군데서 제각각 계산해 서로 다른 목록을 보여줬다:
+//  - 교회·기관 관리는 OB_CHURCHES 를 안 봐서, 교인이 아직 없는 기본 교회(스마트처치)가 통째로 빠졌다.
+//  - 교인 소속에서 만든 항목은 유형을 몰라 전부 '교회' 로 표시됐다(기관인 AK 훈련센터가 교회로 나온 원인).
+function _allChurchMap(allUsers) {
+  const map = {};
+  Object.entries(typeof OB_CHURCHES === 'object' ? OB_CHURCHES : {}).forEach(([code, v]) => {
+    map[code] = typeof v === 'string' ? { name: v, code, type: 'church' } : { ...v, code };
+  });
+  Object.entries(DB.get('customChurches', {})).forEach(([code, v]) => {
+    const d = typeof v === 'string' ? { name: v } : (v || {});
+    map[code] = { ...(map[code] || {}), ...d, code };   // 등록·수정한 정보가 기본값을 덮는다
+  });
+  (allUsers || []).forEach(u => {
+    if (!u.churchCode || map[u.churchCode]) return;
+    map[u.churchCode] = { name: u.church || u.churchCode, code: u.churchCode };
+  });
+  return map;
+}
+
 function renderAdminPanelHtml(allUsers) {
   const pendingChurch = _collectPendingChurches(allUsers);
   const minorPending  = allUsers.filter(u => u.status === 'pending');
@@ -448,7 +468,8 @@ function renderAdminPanelHtml(allUsers) {
   const cntMonth = activeSince(new Date(Date.now() -  30 * 864e5).toISOString());
   const cntYear  = activeSince(new Date(Date.now() - 365 * 864e5).toISOString());
   const cntAll   = allUsers.filter(u => u.lastActiveAt).length;   // 전체 기간 — 접속 기록이 한 번이라도 있는 사용자(옛 기록 포함)
-  const churches      = [...new Set(allUsers.map(u => u.church).filter(Boolean))];
+  const churchMap     = _allChurchMap(allUsers);
+  const churchCodes   = Object.keys(churchMap);
 
   let html = `<div id="admin-panel-body">
 
@@ -507,7 +528,7 @@ function renderAdminPanelHtml(allUsers) {
       </div>
       <div class="ss-card-row" onclick="scrollToAdminSection('admin-church-section')" style="cursor:pointer">
         <div class="ss-card-icon">⛪</div>
-        <div class="ss-card-info"><div class="ss-card-title">등록된 교회/기관</div><div class="ss-card-sub">${churches.length}개</div></div>
+        <div class="ss-card-info"><div class="ss-card-title">등록된 교회/기관</div><div class="ss-card-sub">${churchCodes.length}개</div></div>
         <span class="sm-arrow">›</span>
       </div>
       <div class="ss-card-row" onclick="scrollToAdminSection('admin-church-pending-section','대기 중인 교회 등록 신청이 없어요')" style="cursor:pointer">
@@ -562,13 +583,7 @@ function renderAdminPanelHtml(allUsers) {
     </div>`;
 
   // ── 관리자 전용: 현재 소속 + 자유 이동 ──
-  const allCustom  = DB.get('customChurches', {});
-  const allCodes   = Object.keys(allCustom);
-  const ALL_CHURCHES = { ...Object.fromEntries(Object.entries(OB_CHURCHES).map(([c, v]) =>
-    [c, typeof v === 'string' ? v : v.name]
-  )), ...Object.fromEntries(allCodes.map(c => {
-    const d = allCustom[c]; return [c, typeof d === 'string' ? d : d.name];
-  })) };
+  const ALL_CHURCHES = Object.fromEntries(churchCodes.map(c => [c, churchMap[c].name || c]));
   const currentChurchName = me.church || '소속 없음';
   const currentCode       = me.churchCode || '—';
 
@@ -583,8 +598,8 @@ function renderAdminPanelHtml(allUsers) {
       <div style="display:flex;flex-direction:column;gap:6px">
         ${Object.entries(ALL_CHURCHES).map(([code, name]) => {
           const isCurrent = code === me.churchCode;
-          const data = allCustom[code];
-          const emoji = (typeof data === 'object' && data?.emoji) ? data.emoji : '⛪';
+          const data  = churchMap[code] || {};
+          const emoji = data.emoji || (CHURCH_TYPES.find(t => t.value === data.type) || CHURCH_TYPES[0]).emoji;
           return `<div onclick="${isCurrent ? '' : `adminSwitchChurch('${code}')`}"
             style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;
                    background:${isCurrent ? 'var(--black)' : 'white'};
@@ -689,18 +704,6 @@ function renderAdminPanelHtml(allUsers) {
     });
     html += `</div>`;
   }
-
-  // ── 교회/기관 관리 ──
-  // customChurches(로컬) 만 보면, churchInfo 문서에 name 이 없는 교회는 병합되지 않아
-  // 실제로 교인이 있는 교회가 목록에서 통째로 빠진다(현황 요약은 2개인데 여기만 0개였던 원인).
-  // → 사용자 소속(churchCode/church)에서도 교회를 모아 합친다.
-  const customChurches = DB.get('customChurches', {});
-  const churchMap = Object.assign({}, customChurches);
-  allUsers.forEach(u => {
-    if (!u.churchCode || churchMap[u.churchCode]) return;
-    churchMap[u.churchCode] = { name: u.church || u.churchCode, code: u.churchCode };
-  });
-  const churchCodes = Object.keys(churchMap);
 
   // ── 계정 전환 (관리자 패널 전용) ──
   // 이 기기에서 로그인한 적 있는 계정 목록. 비밀번호는 저장하지 않으므로 전환 시 한 번 입력해야 한다.
