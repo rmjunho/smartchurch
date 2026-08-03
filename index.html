@@ -3457,7 +3457,17 @@ async function doRegister() {
     return;
   }
 
+  // 생년월일과 '나이 확인' 선택이 어긋나면 막는다. 어느 쪽으로 어긋나도 그대로 두면 안 된다
+  //  - 만 14세 미만인데 '14세 이상' 을 고르면 법정대리인 동의 없이 바로 활성 계정이 된다(정보통신망법).
+  //  - 성인인데 '14세 미만' 을 고르면 관리자 승인 대기에 쌓여 본인은 대기 화면에 갇힌다.
   const isMinor = document.getElementById('cb-age-minor')?.classList.contains('checked') || false;
+  const age = typeof userAge === 'function' ? userAge(birth) : null;
+  if (age !== null && isMinor !== (age < 14)) {
+    showErr('r-birth-err', `생년월일 기준 만 ${age}세예요. 아래 '나이 확인' 에서 만 14세 ${age < 14 ? '미만' : '이상'} 을 선택해 주세요.`);
+    toast(`생년월일과 나이 확인이 달라요 — 만 ${age}세예요`);
+    return;
+  }
+
   let guardianName = '', guardianContact = '';
   if (isMinor) {
     guardianName    = document.getElementById('r-guardian-name')?.value.trim()    || '';
