@@ -878,14 +878,18 @@ function assignRole(userId, role) {
   if (!u) return;
   // 소속 유형도 함께 채워 둔다 — orgType 이 비어 있던 계정들이 스스로 정합해지도록
   const orgType = getOrgTypeForChurch(u.churchCode || me.churchCode);
+  // 리더가 교회 안에서 직분을 지정하는 건 승인된 리더의 위임이므로 그대로 권한을 붙인다.
+  // 반대로 일반 직분으로 내리면 권한도 함께 거둔다(직분만 바뀌고 권한이 남던 것 방지).
+  const leaderStatus = isLeaderRole(role) ? 'approved' : '';
   u.role = role;
   u.orgType = orgType;
+  u.leaderStatus = leaderStatus;
   delete u.requestedRole;
   DB.set('users', users);
   const cached = _membersCache.find(x => x.id === userId);
-  if (cached) { cached.role = role; cached.orgType = orgType; delete cached.requestedRole; }
+  if (cached) { cached.role = role; cached.orgType = orgType; cached.leaderStatus = leaderStatus; delete cached.requestedRole; }
   if (window._fbReady && window._fb) {
-    window._fb.updateUser(userId, { role, orgType, requestedRole: '' })
+    window._fb.updateUser(userId, { role, orgType, leaderStatus, requestedRole: '' })
       .catch(e => { if (window._fbErr) window._fbErr('직분 변경 저장', e); toast('동기화 실패 — 다시 시도해 주세요'); });
   }
   toast(`${u.name || '교인'}님을 "${role}"(으)로 지정했어요`);
@@ -2492,6 +2496,8 @@ function obConnectChurch() {
     : (document.getElementById('ob-role-select')?.value || getDefaultRole(resolvedOrgType));
   me.role    = selectedRole;
   me.orgType = resolvedOrgType;
+  // 리더 직분은 고른 즉시 권한이 붙지 않는다 — 앱 관리자 승인 대기로 신청만 걸어 둔다.
+  if (isLeaderRole(selectedRole)) me.leaderStatus = 'pending';
 
   if (code && found) {
     obData.churchName  = found;
@@ -2508,7 +2514,8 @@ function obConnectChurch() {
     window._fb.updateUser(me.id, {
       role: me.role, orgType: me.orgType,
       church: me.church || '', churchCode: me.churchCode || '',
-      churchStatus: me.churchStatus || ''
+      churchStatus: me.churchStatus || '',
+      leaderStatus: me.leaderStatus || ''
     }).catch(() => {});
   }
 

@@ -431,6 +431,55 @@ async function syncChurchesFromFirestore() {
   } catch(e) { console.error('Firestore 교회 목록 로드 실패:', e); }
 }
 
+// ── 리더 권한 승인/거절 (앱 관리자 전용) ──
+// 직분(role)은 본인이 자기 문서에 쓸 수 있으므로 권한의 근거가 될 수 없다.
+// leaderStatus 만 권한의 근거이고, 'approved' 는 여기서만 만들어진다.
+function _setLeaderStatus(userId, status, msg) {
+  if (!me || !me.isAppAdmin) { toast('권한이 없어요'); return; }
+  const users = DB.get('users', []);
+  const local = users.find(x => x.id === userId);
+  const known = local || (_adminUsersData || []).find(x => x.id === userId);
+  if (local) { local.leaderStatus = status; DB.set('users', users); }
+  if (known) known.leaderStatus = status;   // 관리자 목록 캐시도 함께 (재조회 없이 반영)
+  if (window._fbReady && window._fb) {
+    window._fb.updateUser(userId, { leaderStatus: status })
+      .catch(() => toast('서버 반영 실패 — 잠시 후 다시 시도해 주세요'));
+  }
+  toast(`${(known && known.name) || '회원'}님 ${msg}`);
+  setTimeout(() => openSubscreen('admin-panel'), 150);
+}
+
+function approveLeader(userId) { _setLeaderStatus(userId, 'approved', '에게 리더 권한을 부여했어요'); }
+
+function rejectLeader(userId) {
+  if (!confirm('리더 권한 신청을 거절할까요?\n\n계정은 그대로 두고 리더 권한만 주지 않아요. 나중에 다시 승인할 수 있어요.')) return;
+  _setLeaderStatus(userId, 'rejected', '의 리더 권한 신청을 거절했어요');
+}
+
+// 기능 도입 전부터 리더로 활동하던 계정을 한 번에 승인 처리한다.
+// 이걸 누르기 전까지는 isLeaderApproved 의 가입일 유예가 그들을 지탱하고 있고,
+// 보안 규칙에는 그 유예가 없으므로 규칙을 붙여넣기 전에 반드시 눌러야 한다.
+async function backfillExistingLeaders() {
+  if (!me || !me.isAppAdmin) { toast('권한이 없어요'); return; }
+  const targets = (_adminUsersData || DB.get('users', []))
+    .filter(u => !u.leaderStatus && isLeaderRole(u.role));
+  if (!targets.length) { toast('일괄 승인할 계정이 없어요'); return; }
+  if (!confirm(`리더 직분인데 승인 기록이 없는 계정 ${targets.length}명을 모두 승인 처리할까요?\n\n지금 활동 중인 리더들이 권한을 잃지 않게 하려면 보안 규칙을 바꾸기 전에 눌러야 해요.`)) return;
+  let done = 0, failed = 0;
+  for (const u of targets) {
+    try {
+      if (window._fbReady && window._fb) await window._fb.updateUser(u.id, { leaderStatus: 'approved' });
+      u.leaderStatus = 'approved';
+      done++;
+    } catch (e) { failed++; console.warn('리더 일괄 승인 실패:', u.id, e); }
+  }
+  const users = DB.get('users', []);
+  users.forEach(u => { if (!u.leaderStatus && isLeaderRole(u.role)) u.leaderStatus = 'approved'; });
+  DB.set('users', users);
+  toast(failed ? `${done}명 승인, ${failed}명 실패 — 다시 눌러 주세요` : `${done}명을 리더로 승인했어요`);
+  setTimeout(() => openSubscreen('admin-panel'), 300);
+}
+
 // 앱에 존재하는 모든 교회/기관 — 기본 제공(OB_CHURCHES) + 등록분(customChurches) + 교인 소속.
 // 한 곳에서만 만든다. 관리자 패널이 이걸 세 군데서 제각각 계산해 서로 다른 목록을 보여줬다:
 //  - 교회·기관 관리는 OB_CHURCHES 를 안 봐서, 교인이 아직 없는 기본 교회(스마트처치)가 통째로 빠졌다.
@@ -454,6 +503,9 @@ function _allChurchMap(allUsers) {
 function renderAdminPanelHtml(allUsers) {
   const pendingChurch = _collectPendingChurches(allUsers);
   const minorPending  = allUsers.filter(u => u.status === 'pending');
+  const leaderPending = allUsers.filter(u => u.leaderStatus === 'pending');
+  // 리더 직분인데 승인 기록이 아예 없는 계정 = 기능 도입 전부터 활동하던 리더 (일괄 승인 대상)
+  const leaderLegacy  = allUsers.filter(u => !u.leaderStatus && isLeaderRole(u.role));
   const churchJoinPen = allUsers.filter(u => u.status !== 'pending' && u.churchStatus === 'pending');
   const active        = allUsers.filter(u => u.status === 'active' || !u.status);
   // 접속 기준 3분 — 앱이 60초마다 lastActiveAt 을 갱신하므로 한 번 놓쳐도 접속 중으로 유지
@@ -540,6 +592,11 @@ function renderAdminPanelHtml(allUsers) {
         <div class="ss-card-icon">⏳</div>
         <div class="ss-card-info"><div class="ss-card-title">미성년자 승인 대기</div><div class="ss-card-sub">눌러서 승인/거절</div></div>
         <span class="ss-card-badge ${minorPending.length > 0 ? 'ss-badge-gold' : 'ss-badge-gray'}">${minorPending.length}</span><span class="sm-arrow">›</span>
+      </div>
+      <div class="ss-card-row" onclick="scrollToAdminSection('admin-leader-section','대기 중인 리더 권한 신청이 없어요')" style="cursor:pointer">
+        <div class="ss-card-icon">🔑</div>
+        <div class="ss-card-info"><div class="ss-card-title">리더 권한 대기</div><div class="ss-card-sub">눌러서 승인/거절</div></div>
+        <span class="ss-card-badge ${leaderPending.length > 0 ? 'ss-badge-gold' : 'ss-badge-gray'}">${leaderPending.length}</span><span class="sm-arrow">›</span>
       </div>
       <div class="ss-card-row">
         <div class="ss-card-icon">🤝</div>
@@ -703,6 +760,49 @@ function renderAdminPanelHtml(allUsers) {
       </div>`;
     });
     html += `</div>`;
+  }
+
+  // 리더 권한 승인 대기 — 직분만으로는 권한이 붙지 않고 여기서 승인해야 붙는다
+  if (leaderPending.length) {
+    html += `<div class="ss-section-title" id="admin-leader-section">리더 권한 승인 대기 (${leaderPending.length}명)</div><div class="ss-card">`;
+    leaderPending.forEach(u => {
+      html += `<div style="padding:14px 16px;border-bottom:1px solid var(--border)">
+        <div style="font-size:14px;font-weight:700;margin-bottom:2px">
+          ${escHtml(u.name || '이름 없음')}
+          <span style="font-size:11px;background:rgba(201,169,110,0.15);color:var(--gold);border-radius:6px;padding:1px 7px;font-weight:700;margin-left:4px">${escHtml(u.role || '—')}</span>
+        </div>
+        <div style="font-size:12.5px;color:var(--muted);margin-bottom:10px">
+          ${escHtml(u.church || '교회 미지정')}${u.churchCode ? ' · ' + escHtml(u.churchCode) : ''} · ${escHtml(u.email || '')}
+          ${u.createdAt ? ' · 가입 ' + escHtml(String(u.createdAt).split('T')[0]) : ''}
+        </div>
+        <div style="font-size:11.5px;color:var(--muted);margin-bottom:10px;line-height:1.5">
+          승인하면 교인 관리·전화번호 열람·공지 등 리더 기능이 열려요. 본인이 맞는지 확인 후 승인해 주세요.
+        </div>
+        <div style="display:flex;gap:8px">
+          <button onclick="approveLeader('${u.id}')"
+            style="flex:1;height:40px;border:none;border-radius:10px;background:var(--black);color:white;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">리더 승인</button>
+          <button onclick="rejectLeader('${u.id}')"
+            style="flex:1;height:40px;border:none;border-radius:10px;background:#FBE5E5;color:#C0392B;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">거절</button>
+        </div>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+
+  // 기존 리더 일괄 승인 — 보안 규칙을 바꾸기 전에 눌러야 지금 활동 중인 리더가 권한을 잃지 않는다
+  if (leaderLegacy.length) {
+    html += `<div class="ss-section-title" style="margin-top:14px">기존 리더 정리</div>
+      <div style="margin:0 16px;background:rgba(201,169,110,0.08);border:1.5px solid rgba(201,169,110,0.35);border-radius:14px;padding:14px">
+        <div style="font-size:13px;font-weight:700;margin-bottom:6px">승인 기록이 없는 리더 ${leaderLegacy.length}명</div>
+        <div style="font-size:12px;color:var(--muted);line-height:1.6;margin-bottom:10px">
+          리더 승인 기능이 생기기 전부터 활동하던 계정이에요. 지금은 가입일 기준으로 권한이 유지되고 있어요.
+          보안 규칙을 바꾸기 전에 한 번 눌러 정리해 주세요.
+        </div>
+        <button onclick="backfillExistingLeaders()"
+          style="width:100%;height:42px;border:none;border-radius:10px;background:var(--black);color:white;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">
+          ${leaderLegacy.length}명 일괄 승인
+        </button>
+      </div>`;
   }
 
   // ── 계정 전환 (관리자 패널 전용) ──

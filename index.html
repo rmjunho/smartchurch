@@ -3848,8 +3848,9 @@ function startSelfDocWatch() {
       let changed = false;
       // church/churchCode 가 빠져 있어, 교회 등록이 승인돼도 신청자 화면은 '소속 없음' 인 채
       // 상태 배지만 바뀌었다(교회 이름은 승인 시 서버에서 채워진다).
+      // leaderStatus 가 빠지면 관리자가 리더를 승인해도 본인 화면에는 영영 반영되지 않는다.
       ['status', 'churchStatus', 'church', 'churchCode', 'pendingChurchCode', 'pendingChurchName',
-       'role', 'orgType', 'isAppointedLeader', 'isAppAdmin', 'requestedRole'].forEach(f => {
+       'role', 'orgType', 'isAppointedLeader', 'isAppAdmin', 'requestedRole', 'leaderStatus'].forEach(f => {
         if (data[f] !== undefined && me[f] !== data[f]) { me[f] = data[f]; changed = true; }
       });
       // leaderPerms (배열) 비교
@@ -3868,6 +3869,7 @@ function startSelfDocWatch() {
         } else if (!wasActive && me.churchStatus === 'active') toast('교회 가입이 승인됐어요!');
         const nowLeader = (typeof isLeader === 'function') ? isLeader() : false;
         if (!wasLeader && nowLeader) toast('리더 권한이 부여됐어요');
+        else if (wasLeader && !nowLeader && me.leaderStatus === 'rejected') toast('리더 권한 신청이 거절됐어요');
         if (typeof updateProfileDisplay === 'function') updateProfileDisplay();  // 직분 배지·탭 라벨
         if (typeof initSideMenu === 'function') initSideMenu();                   // 리더 전용 메뉴
         // 교회/기관 탭이 열려 있으면 다시 렌더 (리더 버튼 등 반영)
@@ -7346,19 +7348,32 @@ function isLeaderRole(role) {
   return Object.keys(LEADER_ROLES).some(k => (LEADER_ROLES[k] || []).includes(role));
 }
 
+// 리더 직분을 스스로 고르는 것만으로는 권한이 붙지 않는다 — 앱 관리자 승인이 필요하다.
+// 직분은 본인이 자기 문서에 쓸 수 있어(규칙상 본인 수정 허용) 아무나 담임목사가 될 수 있었고,
+// 그 즉시 교인 관리·전화번호 열람까지 열렸다. leaderStatus 는 관리자만 'approved' 로 만든다.
+// 이 날짜 이전에 가입한 계정은 기능 도입 전의 리더 → 관리자 패널의 '기존 리더 일괄 승인' 을
+// 누르기 전까지 권한을 유지한다(누르고 나면 leaderStatus 가 채워져 이 유예는 쓰이지 않는다).
+var LEADER_APPROVAL_SINCE = '2026-08-03';
+
+function isLeaderApproved(u) {
+  if (!u) return false;
+  if (u.leaderStatus) return u.leaderStatus === 'approved';
+  return (u.createdAt || '') < LEADER_APPROVAL_SINCE;   // 도입 전 계정 유예
+}
+
 function isLeader() {
   if (!me) return false;
   if (me.isAppAdmin) return true;
-  // 임명 리더 — 권한이 하나라도 부여됐으면 리더
+  // 임명 리더 — 승인된 리더가 부여한 권한이므로 그대로 인정
   if (me.leaderPerms && me.leaderPerms.length > 0) return true;
-  return isLeaderRole(me.role);
+  return isLeaderRole(me.role) && isLeaderApproved(me);
 }
 
 function hasLeaderPerm(perm) {
   if (!me) return false;
   if (me.isAppAdmin) return true;
   // 기본 리더(직분 자체가 리더)는 모든 권한 — isLeaderRole 이 orgType 누락에도 안전하다
-  if (isLeaderRole(me.role)) return true;
+  if (isLeaderRole(me.role) && isLeaderApproved(me)) return true;
   // 임명 리더는 부여된 권한만
   return (me.leaderPerms || []).includes(perm);
 }
