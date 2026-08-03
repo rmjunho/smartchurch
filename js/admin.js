@@ -54,6 +54,20 @@ function _adminPeriodCutoff(period) {
 }
 var _ADMIN_PERIOD_LABEL = { online:'현재 접속자', today:'오늘 접속', week:'최근 7일', month:'최근 30일', year:'최근 1년', all:'전체 기간 접속' };
 
+// 리더 권한의 실제 근거는 role 이 아니라 leaderStatus 인데 목록에 안 보여서,
+// 직분은 '담임목사' 인데 왜 권한이 없는지 화면만 봐서는 알 수 없었다.
+function _leaderBadge(u) {
+  if (!u.leaderStatus && !isLeaderRole(u.role)) return '';
+  const m = {
+    approved: ['리더 승인됨',   '#27AE60', 'rgba(39,174,96,0.12)'],
+    pending:  ['리더 승인 대기', '#E67E22', 'rgba(243,156,18,0.10)'],
+    rejected: ['리더 거절됨',   '#C0392B', 'rgba(231,76,60,0.10)']
+  };
+  const b = m[u.leaderStatus] || ['리더 미승인', '#C0392B', 'rgba(231,76,60,0.10)'];
+  return `<span style="font-size:11.5px;background:${b[2]};color:${b[1]};
+                       border-radius:6px;padding:2px 8px;font-weight:700">${b[0]}</span>`;
+}
+
 function renderAdminUsersHtml(allUsers) {
   // 접속 기간 필터 (접속자 항목에서 진입한 경우) — 먼저 기간으로 거르고, 그 안에서 검색
   const period = _adminUsersPeriod;
@@ -131,6 +145,7 @@ function renderAdminUsersHtml(allUsers) {
           <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
             ${u.church?`<span style="font-size:11.5px;background:var(--cream2);border-radius:6px;padding:2px 8px;font-weight:600">${escHtml(u.church)}</span>`:''}
             ${u.role?`<span style="font-size:11.5px;background:var(--cream2);border-radius:6px;padding:2px 8px;font-weight:600">${escHtml(u.role)}</span>`:''}
+            ${_leaderBadge(u)}
             ${cs==='pending'?`<span style="font-size:11.5px;background:rgba(243,156,18,0.1);color:#E67E22;border-radius:6px;padding:2px 8px;font-weight:700">교회 가입 대기</span>`:''}
           </div>
           <!-- 액션 버튼 -->
@@ -473,8 +488,12 @@ async function backfillExistingLeaders() {
       done++;
     } catch (e) { failed++; console.warn('리더 일괄 승인 실패:', u.id, e); }
   }
+  // 실제로 서버에 써진 계정만 로컬에도 반영한다. 예전에는 조건이 맞는 계정을 전부 승인으로
+  // 표시해서, 서버 쓰기가 실패한 사람도 '기존 리더 정리' 목록에서 사라졌다 — 관리자 화면에는
+  // 아무 문제가 없어 보이는데 서버는 계속 거부하니 원인을 찾을 길이 없었다.
+  const okIds = new Set(targets.filter(u => u.leaderStatus === 'approved').map(u => u.id));
   const users = DB.get('users', []);
-  users.forEach(u => { if (!u.leaderStatus && isLeaderRole(u.role)) u.leaderStatus = 'approved'; });
+  users.forEach(u => { if (okIds.has(u.id)) u.leaderStatus = 'approved'; });
   DB.set('users', users);
   toast(failed ? `${done}명 승인, ${failed}명 실패 — 다시 눌러 주세요` : `${done}명을 리더로 승인했어요`);
   setTimeout(() => openSubscreen('admin-panel'), 300);
