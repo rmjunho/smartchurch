@@ -758,6 +758,9 @@ function renderChallenge() {
   const myList = visibleMyChallenges();   // 삭제된 원본의 참여 기록은 빼고 보여준다
   const startedIds = myList.map(c => c.templateId);
   const today = todayDateKey();
+  // 기간이 끝난 챌린지는 '내가 신청한 챌린지' 의 기간 종료 칸에만 둔다(renderMyChallenges 와 같은 기준).
+  // 여기 남겨 두면 체크할 수 없는 카드가 진행 중 목록을 계속 차지한다.
+  const activeList = myList.filter(c => !c.endDate || c.endDate >= today);
 
   renderLeaderBar();
   renderChallengeFilters();
@@ -775,8 +778,8 @@ function renderChallenge() {
     : `<div class="todo-empty">추천할 새 챌린지가 없어요. 모든 챌린지를 시작하셨네요! </div>`;
 
   // 진행 중인 챌린지
-  document.getElementById('ch-active').innerHTML = myList.length
-    ? myList.map(c => {
+  document.getElementById('ch-active').innerHTML = activeList.length
+    ? activeList.map(c => {
         const freqType   = c.freqType || (c.type === 'weekly' ? 'weekly' : 'daily');
         const freq       = c.freqTarget || c.target;
         const dates      = c.checkedDates || [];
@@ -832,7 +835,10 @@ function renderChallenge() {
           <button class="ac-check-btn ${btnClass}" ${disabled?'disabled':''} onclick="checkChallengeToday('${c.uid}')">${btnLabel}</button>
         </div>`;
       }).join('')
-    : `<div class="todo-empty">아직 시작한 챌린지가 없어요.<br>추천 챌린지를 시작해보세요! </div>`;
+    : (myList.length
+        // 끝난 챌린지만 남은 경우 — '시작한 게 없다' 고 하면 방금 끝낸 챌린지가 사라진 것처럼 보인다
+        ? `<div class="todo-empty">진행 중인 챌린지가 없어요.<br>끝난 챌린지는 메뉴의 '내가 신청한 챌린지' 에 있어요.</div>`
+        : `<div class="todo-empty">아직 시작한 챌린지가 없어요.<br>추천 챌린지를 시작해보세요! </div>`);
 
   // 모든 챌린지 (카테고리 필터 적용)
   const filtered = chFilter === '전체' ? catalog : catalog.filter(c => c.tag === chFilter);
