@@ -2501,9 +2501,12 @@ function obConnectChurch() {
 
   if (code && found) {
     obData.churchName  = found;
+    // 이미 이 코드로 활성 상태였던 사람만 그대로 둔다(교회를 직접 등록해 승인받은 개설자).
+    // me.churchCode 를 먼저 덮어쓰고 비교해서 이 조건이 늘 참이었고, 그래서 다른 교회에서
+    // 활성이던 사용자가 남의 교회 코드만 넣으면 승인 없이 바로 활성으로 들어갔다.
+    const isFounder = me.churchCode === code && me.churchStatus === 'active';
     me.church          = found;
     me.churchCode      = code;
-    const isFounder = me.churchCode === code && me.churchStatus === 'active';
     me.churchStatus = isFounder ? 'active' : 'pending';
     me.registrationType = 'regular'; // 온보딩 첫 가입
   }
@@ -2534,6 +2537,14 @@ function changeChurchCode() {
   const newDefRole = getDefaultRole(newOrgType);
   if (wasPersonal) { me.orgType = newOrgType; me.role = newDefRole; }
 
+  // 리더 권한은 그 교회에서 받은 것이다. 교회를 옮기면 내려놓고 새 교회에서 다시 받는다.
+  // 예전에는 churchStatus 만 pending 으로 돌리고 leaderStatus/leaderPerms 를 그대로 둬서,
+  // A교회에서 승인받은 리더가 B교회 코드만 넣으면 아무 승인 없이 B교회 교인 명부와 전화번호가
+  // 전부 열렸다(서버 규칙도 '리더 + 같은 churchCode' 만 보므로 그대로 통과한다).
+  // 직분(role)은 표시용이라 남긴다 — 관리자가 '기관장 · 승인 대기' 로 보고 판단할 수 있다.
+  const losesLeader = !me.isAppAdmin &&
+    (isLeaderRole(me.role) || (me.leaderPerms || []).length > 0 || me.leaderStatus === 'approved');
+
   const users = DB.get('users', []);
   const u = users.find(x => x.id === me.id);
   if (u) {
@@ -2542,16 +2553,21 @@ function changeChurchCode() {
     u.churchStatus     = me.isAppAdmin ? 'active' : 'pending';
     u.registrationType = wasPersonal ? 'newfamily' : 'regular';
     if (wasPersonal) { u.orgType = newOrgType; u.role = newDefRole; }
+    // 'pending' 으로 둔다 — 규칙이 본인 수정으로는 leaderStatus 를 'pending' 까지만 허용하고,
+    // 새 교회 관리자에게 다시 신청이 걸리는 편이 권한을 조용히 없애는 것보다 낫다.
+    if (losesLeader) { u.leaderStatus = 'pending'; u.leaderPerms = []; u.isAppointedLeader = false; }
     DB.set('users', users);
     me.church           = churchName;
     me.churchCode       = code;
     me.churchStatus     = me.isAppAdmin ? 'active' : 'pending';
     me.registrationType = wasPersonal ? 'newfamily' : 'regular';
+    if (losesLeader) { me.leaderStatus = 'pending'; me.leaderPerms = []; me.isAppointedLeader = false; }
   }
 
   if (window._fbReady && window._fb) {
     const update = { church: me.church, churchCode: me.churchCode, churchStatus: me.churchStatus, registrationType: me.registrationType };
     if (wasPersonal) { update.orgType = newOrgType; update.role = newDefRole; }
+    if (losesLeader) { update.leaderStatus = 'pending'; update.leaderPerms = []; update.isAppointedLeader = false; }
     window._fb.updateUser(me.id, update).catch(() => {});
     // 사진 문서의 churchCode 도 갱신 → 새 교회 교인 목록에 사진 노출
     if (typeof getMyPhoto === 'function' && getMyPhoto()) {

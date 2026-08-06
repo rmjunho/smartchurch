@@ -41,7 +41,8 @@ service cloud.firestore {
     // (온보딩에서 직분을 고르므로) leaderStatus 는 신청('pending')까지만 허용한다.
     function selfKeepsPrivileges() {
       return request.resource.data.get('isAppAdmin', false) == resource.data.get('isAppAdmin', false)
-          && request.resource.data.get('leaderPerms', []) == resource.data.get('leaderPerms', [])
+          && (request.resource.data.get('leaderPerms', []) == resource.data.get('leaderPerms', [])
+              || request.resource.data.get('leaderPerms', []).size() == 0)   // 내려놓는 것만 허용 (교회를 옮기면 비운다)
           && request.resource.data.get('status', '')      == resource.data.get('status', '')
           && (request.resource.data.get('leaderStatus', '') == resource.data.get('leaderStatus', '')
               || request.resource.data.get('leaderStatus', '') == 'pending');
