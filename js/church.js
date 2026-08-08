@@ -2491,10 +2491,15 @@ async function obEnterWithInviteCode() {
 }
 
 function obRegisterNewChurch() {
-  const code  = document.getElementById('ob-code').value.toUpperCase().trim();
+  // 코드는 이 화면 안의 입력칸에서 읽는다. 예전에는 메인 화면의 #ob-code 를 읽었는데
+  // 등록 화면을 열면 메인이 숨겨져, 채울 수가 없는 칸을 검사하며 늘 '4자 이상' 만 떴다.
+  const code  = (document.getElementById('ob-new-church-code')?.value || '').toUpperCase().trim();
   const name  = (document.getElementById('ob-new-church-name')?.value || '').trim();
+  // 위에서 고른 유형이 등록에도 반영된다 — 예전엔 me.orgType(예전 값)을 써서 기관을 골라도 교회로 등록됐다
+  const newType = _obOrgType === 'personal' ? 'church' : _obOrgType;
+  const noun    = newType === 'org' ? '기관·단체' : '교회';
   if (code.length < 4)   { toast('코드를 4자 이상 입력해 주세요 (예: JOYFUL)'); return; }
-  if (!name)              { toast('교회/기관 이름을 입력해 주세요'); return; }
+  if (!name)              { toast(`${noun} 이름을 입력해 주세요`); return; }
   if (OB_CHURCHES[code]) { toast(`이미 등록된 코드예요 (${getChurchName(code)})`); return; }
   const custom  = DB.get('customChurches', {});
   const existingName = getChurchName(code);
@@ -2510,7 +2515,7 @@ function obRegisterNewChurch() {
     requestedBy:     me.id,
     requestedByName: me.name,
     requestedAt:     new Date().toISOString(),
-    orgType:         me.orgType || 'church'
+    orgType:         newType
   });
   DB.set('pendingChurches', pending);
   // 신청자 정보 임시 저장 (승인 후 활성화)
@@ -2518,7 +2523,12 @@ function obRegisterNewChurch() {
   me.pendingChurchName = name;
   me.pendingChurchAt   = new Date().toISOString();
   me.churchStatus      = 'church-pending'; // 교회 자체가 미승인
-  me.role              = me.role || '목사';
+  me.orgType           = newType;
+  // 등록을 신청한 사람이 그 공동체의 개설자다. 예전에는 role 이 '목사'(직분 목록에 없는 이름)나
+  // 가입 기본값('성도')으로 남아 isLeaderRole 이 false 였고, 관리자가 승인해도
+  // approveChurchRegistration 이 개설자에게 리더 권한을 붙이지 못했다.
+  if (!isLeaderRole(me.role)) me.role = (newType === 'org' ? '기관장' : '담임목사');
+  me.leaderStatus      = 'pending';   // 권한은 앱 관리자 승인 뒤에 붙는다
   DB.saveUser(me);
   // 신청 사실을 내 users 문서에도 남긴다 — DB.saveUser 는 localStorage 뿐이라
   // 지금까지 신청은 신청한 기기 밖으로 나간 적이 없었고, 다른 기기의 앱 관리자에게는
@@ -2529,12 +2539,14 @@ function obRegisterNewChurch() {
       pendingChurchAt:   me.pendingChurchAt,
       churchStatus:      'church-pending',
       role:              me.role,
-      orgType:           me.orgType || 'church'
+      orgType:           newType,
+      leaderStatus:      'pending'
     }).catch(e => { if (window._fbErr) window._fbErr('교회 등록 신청', e); });
   }
-  // UI 표시
-  document.getElementById('ob-code-church-name').textContent = name;
-  document.getElementById('ob-code-result').classList.add('show');
+  // 결과 표시도 이 화면 안에서 — 예전 자리(ob-code-result)는 숨겨진 메인 화면이라 안 보였다
+  const nameEl = document.getElementById('ob-reg-church-name');
+  if (nameEl) nameEl.textContent = name;
+  document.getElementById('ob-reg-result')?.classList.add('show');
   toast(`"${name}" 등록 신청이 접수됐어요! 앱 관리자 승인 후 활성화돼요 `);
 }
 

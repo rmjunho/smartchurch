@@ -407,17 +407,24 @@
         <div id="ob2-panel-register" style="display:none">
           <div onclick="obShowPanel('main')" style="font-size:13px;color:var(--muted);font-weight:600;cursor:pointer;margin-bottom:12px">← 돌아가기</div>
           <div style="background:var(--white);border:1.5px solid var(--border);border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;gap:10px">
-            <div style="font-size:13px;color:var(--black);font-weight:600">목사님·전도사님이신가요?</div>
-            <div style="font-size:12.5px;color:var(--muted);line-height:1.6">
-              새 교회/기관을 등록하고 싶으시다면<br>원하는 코드(6자리)와 이름을 입력해 등록할 수 있어요
+            <div style="font-size:13px;color:var(--black);font-weight:600" id="ob-reg-title">목사님·전도사님이신가요?</div>
+            <div style="font-size:12.5px;color:var(--muted);line-height:1.6" id="ob-reg-desc">
+              새 교회를 등록하고 싶으시다면<br>원하는 코드(4~6자)와 이름을 입력해 등록할 수 있어요
             </div>
-            <input id="ob-new-church-name" class="form-input" type="text" placeholder="교회/기관 이름 (예: 기쁨의교회)"
-                   style="margin-top:4px">
+            <!-- 코드칸은 이 화면 안에 있어야 한다 — 메인의 #ob-code 는 이 화면이 열리면 숨겨진다 -->
+            <input id="ob-new-church-code" class="ob-code-input" type="text" maxlength="6"
+                   placeholder="LOVE01" oninput="this.value = this.value.toUpperCase()"
+                   autocomplete="off" autocapitalize="characters" style="margin-top:4px">
+            <input id="ob-new-church-name" class="form-input" type="text" placeholder="교회 이름 (예: 기쁨의교회)">
             <button onclick="obRegisterNewChurch()"
                     style="width:100%;height:44px;border-radius:12px;border:1.5px solid var(--gold);background:rgba(201,169,110,0.1);color:var(--gold);font-size:13.5px;font-weight:700;font-family:inherit;cursor:pointer;">
               입력한 코드로 교회/기관 등록하기
             </button>
-            <div style="font-size:11px;color:var(--muted);text-align:center">
+            <div class="ob-code-result" id="ob-reg-result">
+              <svg width="16" height="14" viewBox="0 0 16 14" fill="none"><path d="M1 7l5 5L15 1" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <span id="ob-reg-church-name"></span> 등록 신청됐어요!
+            </div>
+            <div style="font-size:11px;color:var(--muted);text-align:center" id="ob-reg-hint">
               교인은 담임 목사님께 코드를 받아 입력하면 돼요
             </div>
           </div>
@@ -3268,8 +3275,24 @@ function setObOrgType(type) {
     obSyncRoleOptions();
     const eff = obEffectiveOrgType();
     if (eff !== type) toast(`입력한 코드는 ${eff === 'org' ? '기관·단체' : '교회'}라서 그에 맞는 직분을 보여드려요`);
-    obShowPanel('main');   // 유형을 다시 고르면 항상 메인부터
+    // 등록 화면에서 유형을 바꾼 거라면 그 화면에 머문다 — 유형을 바꾸러 온 것이지 나가려는 게 아니다
+    const onRegister = document.getElementById('ob2-panel-register')?.style.display !== 'none';
+    obSyncRegisterPanel();
+    if (!onRegister) obShowPanel('main');
   }
+}
+
+// 등록 화면 문구를 위에서 고른 유형에 맞춘다 — 기관·단체를 골라도 '목사님이신가요?' 를 묻고 있었다
+function obSyncRegisterPanel() {
+  const isOrg = _obOrgType === 'org';
+  const noun  = isOrg ? '기관·단체' : '교회';
+  const set = (id, html) => { const el = document.getElementById(id); if (el) el.innerHTML = html; };
+  set('ob-reg-title', isOrg ? '기관·단체 대표자이신가요?' : '목사님·전도사님이신가요?');
+  set('ob-reg-desc',  `새 ${noun}를 등록하고 싶으시다면<br>원하는 코드(4~6자)와 이름을 입력해 등록할 수 있어요`);
+  set('ob-reg-hint',  isOrg ? '구성원은 대표자님께 코드를 받아 입력하면 돼요'
+                            : '교인은 담임 목사님께 코드를 받아 입력하면 돼요');
+  const nameEl = document.getElementById('ob-new-church-name');
+  if (nameEl) nameEl.placeholder = isOrg ? '기관·단체 이름 (예: AK 훈련센터)' : '교회 이름 (예: 기쁨의교회)';
 }
 
 // 온보딩 2단계 화면 전환 — 메인(교회 코드+직분) / 교회 등록 / 초대 코드
@@ -3285,6 +3308,7 @@ function obShowPanel(which) {
   show('ob2-links',          isMain);
   show('ob2-panel-register', which === 'register');
   show('ob2-panel-invite',   which === 'invite');
+  if (which === 'register') obSyncRegisterPanel();   // 유형에 맞는 문구로 열린다
   // 메인에서만 하단 내비(건너뛰기/다음) 노출 — 패널에서는 '돌아가기' 로 빠져나간다
   const nav = document.querySelector('#ob2 .ob-nav');
   if (nav) nav.style.display = isMain ? '' : 'none';
