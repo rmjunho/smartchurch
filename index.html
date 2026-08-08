@@ -3635,8 +3635,10 @@ async function doRegister() {
         id: uid, name, email, birthdate: birth,   // phone 은 userPhones 로 분리 저장 (아래)
         church:      '',
         churchCode:  '',
-        role:        '교인',   // 온보딩 ob2에서 선택
-        orgType:     'church', // 온보딩 ob2에서 선택
+        // 온보딩 ob2에서 고른 값으로 덮인다. 여기 값은 온보딩을 건너뛴 사람에게 그대로 남으므로
+        // 직분 목록에 실재하는 이름이어야 한다 — '교인' 은 목록에 없어 교인 관리에서 '기타' 로 빠졌다.
+        role:        role,
+        orgType:     orgType,
         status:          isMinor ? 'pending' : 'active',
         churchStatus:    '',
         isMinor, guardianName,   // 보호자 '번호' 는 userPhones 로 분리 (아래) — users 는 전 교인이 읽는다
@@ -3693,8 +3695,8 @@ async function doRegister() {
   const user = {
     id: uid(), name, email, password: pw, birthdate: birth,
     church:  '',
-    role:    '교인',   // 온보딩 ob2에서 선택
-    orgType: 'church', // 온보딩 ob2에서 선택
+    role:    role,     // 온보딩 ob2에서 선택 — 건너뛰면 이 값이 남으므로 목록에 있는 이름이어야 한다
+    orgType: orgType,  // 온보딩 ob2에서 선택
     status:          isMinor ? 'pending' : 'active',
     isMinor, guardianName,   // 로컬 모드에도 번호는 공유 배열(users)에 넣지 않는다 — 같은 기기의 다른 계정에 보인다
     isAppAdmin:      false,
