@@ -271,7 +271,8 @@ function _collectPendingChurches(allUsers) {
       requestedByName: u.name || '',
       requestedByEmail:u.email || '',
       requestedAt:     u.pendingChurchAt || u.createdAt || '',
-      orgType:         u.orgType || 'church'
+      orgType:         u.orgType || 'church',
+      role:            u.role || ''   // 승인 시 리더 권한을 함께 줄지 판단하는 근거
     };
   });
   _pendingChurchCache = Object.values(byCode);
@@ -306,18 +307,28 @@ function approveChurchRegistration(code) {
   _dropPendingChurch(code);
   const users = DB.get('users', []);
   const u = users.find(x => x.id === entry.requestedBy);
+  // 교회 등록을 승인했다는 건 이 사람을 그 교회 리더로 인정한 것이다. 예전에는 churchStatus 만
+  // active 로 바꿔서, 개설자가 리더 승인 대기에 따로 남아 관리자가 같은 사람을 두 번 승인해야 했다.
+  // 리더 직분일 때만 준다 — 성도로 신청한 사람에게 미리 붙여 두면, 직분은 본인이 바꿀 수 있으므로
+  // 나중에 스스로 담임목사로 바꿔 승인 없이 권한을 갖게 된다.
+  const foundersRole = entry.role || (u && u.role) || '';
+  const grantsLeader = isLeaderRole(foundersRole);
   if (u) {
     u.church = entry.name; u.churchCode = code; u.churchStatus = 'active';
     u.pendingChurchCode = null; u.pendingChurchName = null; u.pendingChurchAt = null;
+    if (grantsLeader) u.leaderStatus = 'approved';
     DB.set('users', users);
   }
   // Firestore 동기화: 교회 정보 + 신청자 상태(다른 기기에도 반영)
   if (window._fbReady && window._fb) {
     window._fb.setChurchInfo(code, custom[code]).catch(() => {});
-    window._fb.updateUser(entry.requestedBy, {
+    const update = {
       church: entry.name, churchCode: code, churchStatus: 'active',
       pendingChurchCode: null, pendingChurchName: null, pendingChurchAt: null
-    }).catch(() => toast('서버 반영 실패 — 신청자 화면에 승인이 안 보일 수 있어요'));
+    };
+    if (grantsLeader) update.leaderStatus = 'approved';
+    window._fb.updateUser(entry.requestedBy, update)
+      .catch(() => toast('서버 반영 실패 — 신청자 화면에 승인이 안 보일 수 있어요'));
   }
   toast(`"${entry.name}" [${code}] 교회 등록을 승인했어요!`);
   setTimeout(() => openSubscreen('admin-panel'), 150);
