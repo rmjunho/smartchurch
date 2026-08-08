@@ -144,7 +144,7 @@
           </div>
           <div class="form-group">
             <label class="form-label">생년월일</label>
-            <input id="r-birth" type="date" class="form-input" max="2100-12-31" oninput="onBirthInput(this)">
+            <input id="r-birth" type="date" class="form-input" max="2100-12-31" oninput="onBirthInput()" onchange="onBirthInput()">
             <div class="form-error" id="r-birth-err">생년월일을 입력해 주세요.</div>
           </div>
           <div class="form-group">
@@ -210,16 +210,16 @@
             <div style="background:var(--cream2);border-radius:10px;padding:10px 12px;margin-bottom:8px">
               <div class="terms-label-main" style="margin-bottom:8px">
                 나이 확인<span class="terms-required">필수</span>
-                <span style="font-size:11px;color:var(--muted);font-weight:400;margin-left:4px">— 하나를 선택해 주세요</span>
+                <span id="age-hint" style="font-size:11px;color:var(--muted);font-weight:400;margin-left:4px">— 하나를 선택해 주세요</span>
               </div>
               <!-- 14세 이상 -->
-              <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)"
+              <div id="age-row-adult" style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)"
                    onclick="selectAge('adult')">
                 <div class="terms-cb" id="cb-age-adult"></div>
                 <span style="font-size:13px;color:var(--black)">만 14세 이상입니다</span>
               </div>
               <!-- 14세 미만 + 보호자 동의 -->
-              <div style="display:flex;align-items:center;gap:10px;padding:8px 0"
+              <div id="age-row-minor" style="display:flex;align-items:center;gap:10px;padding:8px 0"
                    onclick="selectAge('minor')">
                 <div class="terms-cb" id="cb-age-minor"></div>
                 <span style="font-size:13px;color:var(--black)">만 14세 미만이며,<br>보호자(법정대리인)의 동의를 받았습니다</span>
@@ -3229,12 +3229,24 @@ function toggleTermsCb(id) {
   syncAllTermsCb();
 }
 
-// 나이 확인 — 둘 중 하나 선택 (라디오 방식)
-function selectAge(type) {
+// 나이 확인 — 둘 중 하나 선택 (라디오 방식).
+// auto=true 는 생년월일이 부른 경우로, 아래 잠금 검사를 건너뛴다.
+function selectAge(type, auto) {
   const adult   = document.getElementById('cb-age-adult');
   const minor   = document.getElementById('cb-age-minor');
   const gFields = document.getElementById('guardian-fields');
   if (!adult || !minor) return;
+  // 생년월일이 들어와 있으면 그쪽이 정답이다 — 손으로 반대쪽을 눌러도 되돌린다
+  if (!auto) {
+    const age = birthAge();
+    if (age !== null) {
+      const forced = age < 14 ? 'minor' : 'adult';
+      if (type !== forced) {
+        toast(`생년월일 기준 만 ${age}세라 '만 14세 ${age < 14 ? '미만' : '이상'}' 으로 고정돼요`);
+        type = forced;
+      }
+    }
+  }
   if (type === 'adult') {
     adult.classList.add('checked');
     minor.classList.remove('checked');
@@ -3247,13 +3259,33 @@ function selectAge(type) {
   syncAllTermsCb();
 }
 
-// 생년월일을 넣으면 나이 확인을 대신 골라 준다. doRegister 가 어차피 둘을 대조해 막으므로,
+// #r-birth 에 적힌 나이. 비었거나 말이 안 되는 날짜면 null — 그럴 땐 잠그지 않는다.
+function birthAge() {
+  const v = document.getElementById('r-birth')?.value;
+  if (!v) return null;   // 빈 값을 넘기면 userAge 가 로그인한 사람의 생일로 폴백한다
+  const age = typeof userAge === 'function' ? userAge(v) : null;
+  return (age === null || age < 0) ? null : age;   // 미래 날짜 등 — 제출 때 기존 검증이 걸러낸다
+}
+
+// 생년월일을 넣으면 나이 확인을 대신 골라 잠근다. doRegister 가 어차피 둘을 대조해 막으므로,
 // 직접 맞추게 두면 틀렸을 때만 알려 주는 꼴이 된다.
-function onBirthInput(el) {
-  if (!el.value) return;   // 빈 값을 넘기면 userAge 가 로그인한 사람의 생일로 폴백한다
-  const age = typeof userAge === 'function' ? userAge(el.value) : null;
-  if (age === null || age < 0) return;   // 미래 날짜 등 — 제출 때 기존 검증이 걸러낸다
-  selectAge(age < 14 ? 'minor' : 'adult');
+function onBirthInput() {
+  const age = birthAge();
+  if (age !== null) selectAge(age < 14 ? 'minor' : 'adult', true);
+  syncAgeLock();
+}
+
+// 생년월일로 정해진 쪽만 고를 수 있다는 걸 눈에 보이게 — 반대쪽을 흐리고 안내문을 바꾼다
+function syncAgeLock() {
+  const age  = birthAge();
+  const hint = document.getElementById('age-hint');
+  ['adult', 'minor'].forEach(t => {
+    const row = document.getElementById('age-row-' + t);
+    if (row) row.style.opacity = (age !== null && t !== (age < 14 ? 'minor' : 'adult')) ? '0.4' : '';
+  });
+  if (hint) hint.textContent = age !== null
+    ? `— 생년월일 기준 만 ${age}세라 자동으로 선택돼요`
+    : '— 하나를 선택해 주세요';
 }
 
 function isAgeChecked() {
@@ -3272,9 +3304,11 @@ function toggleAllTerms() {
     const el = document.getElementById('cb-' + id);
     if (el) allChecked ? el.classList.remove('checked') : el.classList.add('checked');
   });
-  // 나이는 14세 이상으로 일괄 선택
-  if (!allChecked) selectAge('adult');
-  else {
+  // 나이는 생년월일이 있으면 그쪽, 없으면 14세 이상으로 일괄 선택
+  if (!allChecked) {
+    const age = birthAge();
+    selectAge(age !== null && age < 14 ? 'minor' : 'adult', true);
+  } else {
     document.getElementById('cb-age-adult')?.classList.remove('checked');
     document.getElementById('cb-age-minor')?.classList.remove('checked');
   }
