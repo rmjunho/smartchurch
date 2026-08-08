@@ -751,6 +751,51 @@ function applyChurchInfoLabels() {
   // 기관·단체는 주제 말씀 대신 소개글만 사용 → 입력칸 숨김
   const themeRow = document.getElementById('ci-theme-verse')?.closest('.form-group');
   if (themeRow) themeRow.style.display = isOrg ? 'none' : '';
+  // 직분 설정은 기관·단체만 — 교회는 ORG_ROLES.church 로 공통이다
+  ['ci-roles-group','ci-default-role-group'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = isOrg ? '' : 'none';
+  });
+}
+
+// 텍스트 한 줄 = 직분 하나. 끝의 * 는 리더 직분 표시. 같은 이름은 앞의 것만 남긴다.
+function _parseRoleLines(text) {
+  const seen = {};
+  return String(text || '').split('\n')
+    .map(l => l.trim()).filter(Boolean)
+    .map(l => {
+      const leader = l.endsWith('*');
+      return { value: (leader ? l.slice(0, -1) : l).trim(), leader };
+    })
+    .filter(r => r.value && !seen[r.value] && (seen[r.value] = true));
+}
+
+// 적는 대로 바로 보여 준다 — * 하나로 리더 여부가 갈리므로 눈으로 확인할 수 있어야 한다
+function ciSyncRolePreview() {
+  const roles = _parseRoleLines(document.getElementById('ci-roles')?.value);
+  const prev  = document.getElementById('ci-roles-preview');
+  if (prev) prev.innerHTML = roles.length
+    ? roles.map(r => escHtml(r.value) + (r.leader ? ' 👑' : '')).join(' · ')
+    : '직분을 한 줄에 하나씩 적어주세요';
+  const sel = document.getElementById('ci-default-role');
+  if (sel) {
+    const keep = sel.value;
+    sel.innerHTML = roles.map(r =>
+      `<option value="${escHtml(r.value)}">${escHtml(r.value)}</option>`).join('');
+    const pick = pickDefaultRole(roles, keep);   // 고르던 값이 남아 있으면 유지
+    if (pick) sel.value = pick;
+  }
+}
+
+// 저장된 직분이 없으면 ORG_ROLES.org 를 본보기로 채워 준다 — 빈칸부터 시작하면 형식을 알기 어렵다
+function _ciFillRoles(d) {
+  const ta = document.getElementById('ci-roles');
+  if (!ta) return;
+  const roles = (Array.isArray(d.roles) && d.roles.length) ? d.roles : ORG_ROLES.org;
+  ta.value = roles.map(r => r.value + (r.leader ? '*' : '')).join('\n');
+  ciSyncRolePreview();
+  const sel = document.getElementById('ci-default-role');
+  if (sel && d.defaultRole && roles.some(r => r.value === d.defaultRole)) sel.value = d.defaultRole;
 }
 
 function openChurchInfoEdit() {
@@ -766,8 +811,10 @@ function openChurchInfoEdit() {
       document.getElementById('ci-theme-verse').value = d.themeVerse  || '';
       document.getElementById('ci-pastor-name').value = d.pastorName  || '';
       document.getElementById('ci-pastor-bio').value  = d.pastorBio   || '';
+      _ciFillRoles(d);
     }).catch(() => {});
   }
+  _ciFillRoles({});   // 응답 오기 전/실패해도 형식은 보이게 — 위 then 이 실제 값으로 덮는다
   applyChurchInfoLabels();
   modal.classList.add('open');
 }
@@ -788,6 +835,14 @@ function saveChurchInfoEdit() {
     updatedBy:   me.name,
     updatedAt:   new Date().toISOString()
   };
+  // 기관·단체 직분 — 이 기관의 직분 목록과 기본값은 여기서만 정해진다
+  if (getOrgTypeForChurch(me.churchCode) === 'org') {
+    const roles = _parseRoleLines(document.getElementById('ci-roles')?.value);
+    if (!roles.length) { toast('직분을 한 개 이상 적어주세요'); return; }
+    data.roles = roles;
+    data.defaultRole = pickDefaultRole(roles, document.getElementById('ci-default-role')?.value);
+    setOrgRoleConfig(me.churchCode, { roles: data.roles, defaultRole: data.defaultRole });
+  }
   if (window._fbReady && window._fb) {
     window._fb.setChurchInfo(me.churchCode, data)
       .then(() => {
@@ -1005,7 +1060,9 @@ function renderMembersScreenHtml(allUsers) {
   const active        = allUsers.filter(u =>
     u.status !== 'pending' && u.status !== 'rejected' && u.churchStatus !== 'pending');
   const orgType = getOrgTypeForChurch(me.churchCode);
-  const roles = (ORG_ROLES[orgType] || ORG_ROLES.church).map(r => r.value);
+  const roleDefs    = getRolesFor(me.churchCode, orgType);   // 기관은 그 기관이 정한 직분
+  const roles       = roleDefs.map(r => r.value);
+  const leaderNames = roleDefs.filter(r => r.leader).map(r => r.value);
 
   // 탭 헤더
   let html = `
@@ -1029,7 +1086,7 @@ function renderMembersScreenHtml(allUsers) {
     html += `<div class="ss-empty"><div class="ss-empty-icon">👥</div><div class="ss-empty-title">등록된 교인이 없어요</div></div>`;
   } else {
     roles.concat(['기타']).forEach(role => {
-      const defRole = getDefaultRole(orgType);
+      const defRole = getDefaultRoleFor(me.churchCode, orgType);
       const group = active.filter(u => (u.role||defRole) === role || (role==='기타' && !roles.includes(u.role||defRole)));
       if (!group.length) return;
     html += `<div class="ss-section-title">${role} (${group.length}명)</div>
@@ -1037,7 +1094,7 @@ function renderMembersScreenHtml(allUsers) {
         const isMe = u.id === me.id;
         const appointed = u.isAppointedLeader && (u.leaderPerms||[]).length > 0;
         // 직분 자체가 리더 — u.orgType 폴백(church) 버그 수정: 교회의 orgType 기준으로 비교 (기관장 등 인식)
-        const roleLeader = (LEADER_ROLES[orgType]||[]).includes(u.role||'');
+        const roleLeader = leaderNames.includes(u.role||'');
         const permSummary = appointed
           ? (u.leaderPerms||[]).map(p => PERM_LABELS[p]).join(', ')
           : '';
@@ -2493,7 +2550,7 @@ function obConnectChurch() {
   // 유형/직분 저장
   const selectedRole = resolvedOrgType === 'personal'
     ? '개인'
-    : (document.getElementById('ob-role-select')?.value || getDefaultRole(resolvedOrgType));
+    : (document.getElementById('ob-role-select')?.value || getDefaultRoleFor(code, resolvedOrgType));
   me.role    = selectedRole;
   me.orgType = resolvedOrgType;
   // 리더 직분은 고른 즉시 권한이 붙지 않는다 — 앱 관리자 승인 대기로 신청만 걸어 둔다.
@@ -2534,7 +2591,7 @@ function changeChurchCode() {
 
   const wasPersonal = me.orgType === 'personal';
   const newOrgType = getOrgTypeForChurch(code);
-  const newDefRole = getDefaultRole(newOrgType);
+  const newDefRole = getDefaultRoleFor(code, newOrgType);
   if (wasPersonal) { me.orgType = newOrgType; me.role = newDefRole; }
 
   // 리더 권한은 그 교회에서 받은 것이다. 교회를 옮기면 내려놓고 새 교회에서 다시 받는다.

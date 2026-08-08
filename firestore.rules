@@ -19,21 +19,23 @@ service cloud.firestore {
     // 직분(role)은 본인이 자기 문서에 쓸 수 있으므로 권한의 근거가 될 수 없다.
     // 아무나 role 을 '담임목사' 로 바꾸면 교인 관리·전화번호 열람까지 열렸다.
     // → 리더 직분은 leaderStatus == 'approved' (앱 관리자만 부여) 를 함께 요구한다.
+    // 직분 이름은 더 이상 여기서 검사하지 않는다. 기관·단체는 직분을 스스로 정하므로
+    // ('센터장' 처럼) 목록에 없는 이름이 얼마든지 나오고, 그러면 앱 관리자가 승인해 준 리더가
+    // 서버에서만 막혀 "화면엔 보이는데 저장이 안 되는" 상태가 된다.
+    // leaderStatus 는 selfKeepsPrivileges 가 본인 수정으로는 'pending' 까지만 허용하므로
+    // 'approved' 는 앱 관리자(또는 이미 승인된 리더)가 써 준 값뿐이다 — 그 자체로 충분한 근거다.
     function leaderApproved() { return profile().get('leaderStatus', '') == 'approved'; }
-    function leaderRole() {
-      return profile().get('role', '') in ['담임목사','부목사','전도사','기관장','원장','부원장','관리자'];
-    }
     function isLeader() {
       return signedIn() && hasProfile() && (
         profile().isAppAdmin == true ||
         (profile().leaderPerms is list && profile().leaderPerms.size() > 0) ||
-        (leaderRole() && leaderApproved())
+        leaderApproved()
       );
     }
     function hasPerm(p) {
       return signedIn() && hasProfile() && (
         profile().isAppAdmin == true ||
-        (leaderRole() && leaderApproved()) ||
+        leaderApproved() ||
         (profile().leaderPerms is list && p in profile().leaderPerms)
       );
     }

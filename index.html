@@ -2624,6 +2624,22 @@
           placeholder="목사님 약력, 메시지 등을 입력해보세요"
           style="resize:none"></textarea>
       </div>
+      <!-- 기관·단체 전용: 직분이 곳마다 달라 고정 목록으로는 못 맞춘다 → 그 기관 리더가 직접 적는다 -->
+      <div class="form-group" id="ci-roles-group" style="display:none">
+        <label class="form-label">직분 목록
+          <span style="font-weight:400;font-size:11.5px;color:var(--muted)">한 줄에 하나씩 · 리더 직분은 끝에 * 를 붙여주세요</span>
+        </label>
+        <textarea id="ci-roles" class="qt-ta" rows="5" oninput="ciSyncRolePreview()"
+          placeholder="기관장*&#10;관리자*&#10;회원" style="resize:none"></textarea>
+        <div id="ci-roles-preview" style="font-size:12px;color:var(--muted);margin-top:6px"></div>
+      </div>
+      <div class="form-group" id="ci-default-role-group" style="display:none">
+        <label class="form-label">기본 직분
+          <span style="font-weight:400;font-size:11.5px;color:var(--muted)">코드를 입력한 사람에게 먼저 보여요</span>
+        </label>
+        <select id="ci-default-role" class="form-select"></select>
+      </div>
+
       <div class="modal-actions">
         <button class="btn-cancel" onclick="closeChurchInfoEdit()">취소</button>
         <button class="btn-confirm" onclick="saveChurchInfoEdit()">저장하기</button>
@@ -3036,9 +3052,7 @@ function showAuthTab(tab) {
     ['church','org','personal'].forEach(t => {
       document.getElementById('reg-org-'+t)?.classList.toggle('on', t === 'church');
     });
-    const sel = document.getElementById('r-role');
-    if (sel) sel.innerHTML = ORG_ROLES['church'].map(r =>
-      `<option value="${r.value}">${r.label}</option>`).join('');
+    fillRoleSelect(document.getElementById('r-role'), '', 'church');
   }
 
   if (btnLogin) Object.assign(btnLogin.style, {
@@ -3113,6 +3127,74 @@ function getOrgTypeForChurch(code) {
   return 'church';
 }
 
+// ── 기관·단체 직분은 그 기관 리더가 직접 정한다 (churchInfo/{code}.roles) ──
+// 교회는 직분 체계가 어디나 비슷해 ORG_ROLES.church 로 충분하지만, 기관·단체는 곳마다 달라
+// 고정 목록으로는 맞출 수가 없다. 로컬 캐시를 두는 건 직분 목록을 그리는 곳이 전부 동기 코드라
+// 매번 Firestore 응답을 기다릴 수 없기 때문 — 원본은 churchInfo, 캐시는 그 사본이다.
+function getOrgRoleConfig(code) {
+  if (!code) return null;
+  const c = (DB.get('orgRoles', {}) || {})[String(code).toUpperCase()];
+  return (c && Array.isArray(c.roles) && c.roles.length) ? c : null;
+}
+
+function setOrgRoleConfig(code, cfg) {
+  if (!code) return;
+  const all = DB.get('orgRoles', {}) || {};
+  all[String(code).toUpperCase()] = cfg;
+  DB.set('orgRoles', all);
+}
+
+// 코드까지 아는 자리에서 쓰는 직분 목록. 기관이 정해 둔 게 있으면 그것, 없으면 기본 목록.
+function getRolesFor(code, orgType) {
+  if (orgType === 'org') {
+    const cfg = getOrgRoleConfig(code);
+    if (cfg) return cfg.roles;
+  }
+  return ORG_ROLES[orgType] || ORG_ROLES.church;
+}
+
+// 목록에서 기본 직분을 고르는 단 하나의 규칙 — 편집 화면과 온보딩이 어긋나지 않도록 여기서만 정한다.
+// 순서: 정해 둔 값 → '회원' → 리더가 아닌 첫 직분 → 마지막 직분.
+function pickDefaultRole(roles, stored) {
+  if (!roles || !roles.length) return '';
+  if (stored && roles.some(r => r.value === stored)) return stored;
+  const plainName = getDefaultRole('org');            // '회원'
+  if (roles.some(r => r.value === plainName)) return plainName;
+  return (roles.filter(r => !r.leader)[0] || roles[roles.length - 1]).value;
+}
+
+// 처음에 선택돼 보일 직분. 담임목사처럼 권한이 큰 직분이 맨 위에 있으면 그대로 넘기는 사람이 생겨
+// 승인 대기만 쌓인다 → 가장 일반적인 직분(성도·회원)을 기본값으로 둔다.
+function getDefaultRoleFor(code, orgType) {
+  if (orgType === 'org') {
+    const cfg = getOrgRoleConfig(code);
+    if (cfg) return pickDefaultRole(cfg.roles, cfg.defaultRole);
+  }
+  return getDefaultRole(orgType);
+}
+
+// 직분 <select> 를 채우고 기본값을 골라 둔다
+function fillRoleSelect(sel, code, orgType) {
+  if (!sel) return;
+  const roles = getRolesFor(code, orgType);
+  sel.innerHTML = roles.map(r =>
+    `<option value="${escHtml(r.value)}">${escHtml(r.label || r.value)}</option>`).join('');
+  const def = getDefaultRoleFor(code, orgType);
+  if (roles.some(r => r.value === def)) sel.value = def;
+}
+
+// 기관 직분은 Firestore 에만 있으니 코드가 확정되면 한 번 받아 캐시에 넣는다
+function fetchOrgRoles(code) {
+  if (!code || !window._fbReady || !window._fb) return Promise.resolve(null);
+  return window._fb.getChurchInfo(code).then(snap => {
+    const d = snap.exists() ? snap.data() : null;
+    if (!d || !Array.isArray(d.roles) || !d.roles.length) return null;
+    const cfg = { roles: d.roles, defaultRole: d.defaultRole || '' };
+    setOrgRoleConfig(code, cfg);
+    return cfg;
+  }).catch(() => null);
+}
+
 var _regOrgType = 'church';
 
 function setRegOrgType(type) {
@@ -3120,9 +3202,7 @@ function setRegOrgType(type) {
   ['church','org','personal'].forEach(t => {
     document.getElementById('reg-org-'+t)?.classList.toggle('on', t === type);
   });
-  const sel = document.getElementById('r-role');
-  if (sel) sel.innerHTML = ORG_ROLES[type].map(r =>
-    `<option value="${r.value}">${r.label}</option>`).join('');
+  fillRoleSelect(document.getElementById('r-role'), '', type);
 }
 
 // ── 온보딩 ob2 유형/직분 선택 ──
@@ -3136,20 +3216,29 @@ function obEffectiveOrgType() {
   return getChurchName(code) ? getOrgTypeForChurch(code) : _obOrgType;
 }
 
-// 직분 목록을 '저장될 유형' 에 맞춘다. 유형이 그대로면 다시 그리지 않는다
-// — 코드 한 글자마다 다시 그리면 이미 고른 직분이 첫 항목으로 되돌아간다.
-var _obRoleListType = '';
+// 직분 목록을 '저장될 유형' 에 맞춘다. 기관은 코드마다 직분이 달라 코드도 함께 열쇠로 삼는다.
+// 열쇠가 그대로면 다시 그리지 않는다 — 코드 한 글자마다 다시 그리면 이미 고른 직분이 첫 항목으로
+// 되돌아간다. 아직 실재하지 않는 코드는 열쇠에서 빼(''), 타이핑 중에는 열쇠가 흔들리지 않는다.
+var _obRoleListKey = '';
 function obSyncRoleOptions() {
   const type = obEffectiveOrgType();
+  const code = (document.getElementById('ob-code')?.value || '').toUpperCase();
+  const known = (type !== 'personal' && getChurchName(code)) ? code : '';
   // 버튼 표시는 늘 맞춘다 — 코드가 버튼 선택을 덮은 경우에도 어느 유형인지 보여야 한다
   ['church','org','personal'].forEach(t => {
     document.getElementById('ob-org-'+t)?.classList.toggle('on', t === type);
   });
-  if (type === _obRoleListType) return;
-  _obRoleListType = type;
-  const sel = document.getElementById('ob-role-select');
-  if (sel) sel.innerHTML = (ORG_ROLES[type] || ORG_ROLES.church).map(r =>
-    `<option value="${r.value}">${r.label}</option>`).join('');
+  const key = type + '|' + known;
+  if (key === _obRoleListKey) return;
+  _obRoleListKey = key;
+  fillRoleSelect(document.getElementById('ob-role-select'), known, type);
+  // 기관 직분은 그 기관이 Firestore 에 저장해 둔 것 — 캐시에 없으면 받아 와서 다시 그린다
+  if (type === 'org' && known && !getOrgRoleConfig(known)) {
+    fetchOrgRoles(known).then(cfg => {
+      if (cfg && _obRoleListKey === key)
+        fillRoleSelect(document.getElementById('ob-role-select'), known, type);
+    });
+  }
 }
 
 function setObOrgType(type) {
@@ -3204,7 +3293,7 @@ function obShowPanel(which) {
 }
 
 function _initObRoleSelect() {
-  _obRoleListType = '';   // 목록이 비어 있으므로 유형이 같아도 반드시 다시 그린다
+  _obRoleListKey = '';   // 목록이 비어 있으므로 유형이 같아도 반드시 다시 그린다
   setObOrgType('church');
 }
 
@@ -7393,7 +7482,11 @@ var LEADER_ROLES = {
 // localStorage 캐시(customChurches) 유무에 영향받지 않아 어느 기기에서나 동일하게 동작한다.
 function isLeaderRole(role) {
   if (!role) return false;
-  return Object.keys(LEADER_ROLES).some(k => (LEADER_ROLES[k] || []).includes(role));
+  if (Object.keys(LEADER_ROLES).some(k => (LEADER_ROLES[k] || []).includes(role))) return true;
+  // 기관이 직접 만든 직분 중 '리더' 로 표시해 둔 이름. 이것만으로 권한이 열리지는 않는다 —
+  // 실제 권한은 leaderStatus == 'approved'(앱 관리자) 뿐이고, 여기서는 승인 신청이 접수되게 할 뿐이다.
+  return Object.values(DB.get('orgRoles', {}) || {})
+    .some(cfg => (cfg.roles || []).some(r => r.value === role && r.leader));
 }
 
 // 리더 직분을 스스로 고르는 것만으로는 권한이 붙지 않는다 — 앱 관리자 승인이 필요하다.
@@ -9418,13 +9511,13 @@ function setEditOrgType(type) {
   if (churchWrap) churchWrap.style.display = type === 'personal' ? 'none' : 'block';
   // 직분 표시 (사용자는 직접 변경 불가 — 신청/리더 부여만)
   const disp = document.getElementById('edit-role-display');
-  if (disp) disp.textContent = type === 'personal' ? '개인' : (me.role || getDefaultRole(type));
+  if (disp) disp.textContent = type === 'personal' ? '개인' : (me.role || getDefaultRoleFor(me.churchCode, type));
 }
 
 // ── 직분 선택 시트 (사용자 신청 / 리더 부여 공용) ──
 var _rolePickCb = null;
 function _openRoleSheet(title, orgType, onPick) {
-  const roles = ORG_ROLES[orgType] || ORG_ROLES.church;
+  const roles = getRolesFor(me && me.churchCode, orgType);
   _rolePickCb = onPick;
   let sheet = document.getElementById('role-sheet');
   if (!sheet) {
@@ -9506,7 +9599,7 @@ function openProfileEdit() {
   if (churchWrap) churchWrap.style.display = orgType === 'personal' ? 'none' : 'block';
   // 직분 표시 (읽기 전용) + 신청 중 표시
   const disp = document.getElementById('edit-role-display');
-  if (disp) disp.textContent = orgType === 'personal' ? '개인' : (me.role || getDefaultRole(orgType));
+  if (disp) disp.textContent = orgType === 'personal' ? '개인' : (me.role || getDefaultRoleFor(me.churchCode, orgType));
   const note = document.getElementById('edit-role-req-note');
   if (note) {
     if (me.requestedRole && me.requestedRole !== me.role) {
