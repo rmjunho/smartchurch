@@ -50,12 +50,21 @@ service cloud.firestore {
               || request.resource.data.get('leaderStatus', '') == 'pending');
     }
 
+    // 가입은 update 를 거치지 않으므로 selfKeepsPrivileges 가 닿지 않는다.
+    // 앱은 늘 권한 없는 문서를 만들지만, 웹 API 키가 공개돼 있어 SDK 로 직접 가입하면서
+    // 처음부터 leaderStatus:'approved' 를 써 넣으면 그대로 리더가 됐다.
+    function selfCreateIsPlain() {
+      return request.resource.data.get('isAppAdmin', false) == false
+          && request.resource.data.get('leaderPerms', []).size() == 0
+          && request.resource.data.get('leaderStatus', '') in ['', 'pending'];
+    }
+
     // ── 사용자 프로필 ──
     // 읽기: 로그인한 교인 누구나(교인 목록). 생성: 본인 가입 또는 관리자 벌크 동기화.
     // 수정: 본인 / 관리자 / 같은 교회 리더(가입승인·직분·리더임명). 삭제: 본인(회원탈퇴) / 관리자.
     match /users/{userId} {
       allow read:   if signedIn();
-      allow create: if signedIn() && (uid() == userId || isAdmin());
+      allow create: if signedIn() && ((uid() == userId && selfCreateIsPlain()) || isAdmin());
       allow update: if signedIn() && (
                       (uid() == userId && selfKeepsPrivileges()) ||
                       isAdmin() ||
