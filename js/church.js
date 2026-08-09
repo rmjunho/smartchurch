@@ -586,7 +586,9 @@ function submitCreateChurch() {
   const desc    = document.getElementById('nc-desc').value.trim();
 
   if (!name) { toast('교회·기관명을 입력해 주세요'); return; }
-  if (!code || code.length < 4) { toast('코드는 4자 이상 영문+숫자로 입력해 주세요'); return; }
+  if (!code) { toast('접속 코드를 입력해 주세요'); return; }
+  // 새로 만들 때만 6자를 요구한다 — 옛 4자 코드(RM01 등)도 수정은 돼야 한다
+  if (!_ncEditMode && code.length !== 6) { toast('코드는 영문+숫자 6자로 입력해 주세요'); return; }
 
   const custom = DB.get('customChurches', {});
   if (!_ncEditMode && (custom[code] || OB_CHURCHES[code])) {
@@ -600,9 +602,11 @@ function submitCreateChurch() {
     desc,
     createdBy:  _ncEditMode ? (custom[code]?.createdBy || me.name) : me.name,
     createdAt:  _ncEditMode ? (custom[code]?.createdAt || new Date().toISOString()) : new Date().toISOString(),
-    updatedAt:  _ncEditMode ? new Date().toISOString() : undefined,
     active: true
   };
+  // undefined 를 넣으면 setDoc 이 인자 검사에서 '동기적으로' 던져 아래 .catch 를 그냥 지나친다
+  // — 만들기를 누르면 에러 오버레이가 뜨고 저장이 통째로 실패했다.
+  if (_ncEditMode) data.updatedAt = new Date().toISOString();
   custom[code] = data;
   DB.set('customChurches', custom);
 

@@ -2553,12 +2553,12 @@
       <!-- 코드 + 자동생성 -->
       <div class="form-group">
         <label class="form-label">접속 코드 <span style="color:#E74C3C">*</span>
-          <span style="font-weight:400;font-size:11.5px;color:var(--muted)"> 영문+숫자 4~8자</span>
+          <span style="font-weight:400;font-size:11.5px;color:var(--muted)"> 영문+숫자 6자</span>
         </label>
         <div style="display:flex;gap:8px">
           <input id="nc-code" type="text" class="form-input" style="flex:1;text-transform:uppercase"
-            placeholder="예: ANSEONG1"
-            oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')">
+            maxlength="6" placeholder="예: ANSEON"
+            oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,6)">
           <button onclick="autoGenChurchCode()"
             style="height:48px;padding:0 14px;border-radius:10px;border:1.5px solid var(--border);background:white;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap">자동생성</button>
         </div>
