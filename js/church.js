@@ -2498,7 +2498,7 @@ function obRegisterNewChurch() {
   // 위에서 고른 유형이 등록에도 반영된다 — 예전엔 me.orgType(예전 값)을 써서 기관을 골라도 교회로 등록됐다
   const newType = _obOrgType === 'personal' ? 'church' : _obOrgType;
   const noun    = newType === 'org' ? '기관·단체' : '교회';
-  if (code.length < 4)   { toast('코드를 4자 이상 입력해 주세요 (예: JOYFUL)'); return; }
+  if (code.length !== 6) { toast('코드를 6자로 입력해 주세요 (예: JOYFUL)'); return; }
   if (!name)              { toast(`${noun} 이름을 입력해 주세요`); return; }
   if (OB_CHURCHES[code]) { toast(`이미 등록된 코드예요 (${getChurchName(code)})`); return; }
   const custom  = DB.get('customChurches', {});

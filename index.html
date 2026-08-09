@@ -409,11 +409,11 @@
           <div style="background:var(--white);border:1.5px solid var(--border);border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;gap:10px">
             <div style="font-size:13px;color:var(--black);font-weight:600" id="ob-reg-title">목사님·전도사님이신가요?</div>
             <div style="font-size:12.5px;color:var(--muted);line-height:1.6" id="ob-reg-desc">
-              새 교회를 등록하고 싶으시다면<br>원하는 코드(4~6자)와 이름을 입력해 등록할 수 있어요
+              새 교회를 등록하고 싶으시다면<br>원하는 코드(6자)와 이름을 입력해 등록할 수 있어요
             </div>
             <!-- 코드칸은 이 화면 안에 있어야 한다 — 메인의 #ob-code 는 이 화면이 열리면 숨겨진다 -->
             <input id="ob-new-church-code" class="ob-code-input" type="text" maxlength="6"
-                   placeholder="LOVE01" oninput="this.value = this.value.toUpperCase()"
+                   placeholder="LOVE01" oninput="this.value = this.value.toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,6)"
                    autocomplete="off" autocapitalize="characters" style="margin-top:4px">
             <input id="ob-new-church-name" class="form-input" type="text" placeholder="교회 이름 (예: 기쁨의교회)">
             <button onclick="obRegisterNewChurch()"
@@ -3288,7 +3288,7 @@ function obSyncRegisterPanel() {
   const noun  = isOrg ? '기관·단체' : '교회';
   const set = (id, html) => { const el = document.getElementById(id); if (el) el.innerHTML = html; };
   set('ob-reg-title', isOrg ? '기관·단체 대표자이신가요?' : '목사님·전도사님이신가요?');
-  set('ob-reg-desc',  `새 ${noun}를 등록하고 싶으시다면<br>원하는 코드(4~6자)와 이름을 입력해 등록할 수 있어요`);
+  set('ob-reg-desc',  `새 ${noun}를 등록하고 싶으시다면<br>원하는 코드(6자)와 이름을 입력해 등록할 수 있어요`);
   set('ob-reg-hint',  isOrg ? '구성원은 대표자님께 코드를 받아 입력하면 돼요'
                             : '교인은 담임 목사님께 코드를 받아 입력하면 돼요');
   const nameEl = document.getElementById('ob-new-church-name');
@@ -3319,6 +3319,8 @@ function obShowPanel(which) {
 function _initObRoleSelect() {
   _obRoleListKey = '';   // 목록이 비어 있으므로 유형이 같아도 반드시 다시 그린다
   setObOrgType('church');
+  // 온보딩은 bootApp 전에 뜬다 — 여기서도 교회 목록을 받아야 남이 등록한 코드를 알아본다
+  if (typeof syncChurchesFromFirestore === 'function') syncChurchesFromFirestore().catch(() => {});
 }
 
 // showAuthTab 열릴 때 드롭다운 초기화
@@ -3903,6 +3905,9 @@ function ensureFriendCode() {
 
 var _selfDocUnsub = null;   // 내 사용자 문서 실시간 감시 (삭제 시 자동 로그아웃)
 function bootApp() {
+  // 승인된 교회 목록을 받아 둔다. 예전엔 앱 관리자가 패널을 열 때만 받아서, 새로 등록된 교회는
+  // 등록한 본인 기기 말고는 아무도 몰랐다 — 코드를 정확히 넣어도 '유효하지 않은 코드' 가 떴다.
+  if (typeof syncChurchesFromFirestore === 'function') syncChurchesFromFirestore().catch(() => {});
   // 저장된 글자 크기 적용
   applyFontSize(DB.get('fontSize_' + me.id, 'md'));
   // 구 기본 카테고리(신앙/생활/학습)만 저장된 사용자 → 새 기본값으로 자동 업그레이드
