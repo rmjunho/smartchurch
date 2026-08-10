@@ -163,6 +163,19 @@ function renderAdminUsersHtml(allUsers) {
                 style="flex:1;height:32px;border-radius:8px;border:none;background:var(--black);
                        color:white;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">교회 승인</button>
             `:''}
+            <!-- 리더 승인 대기·기존 리더 목록은 leaderStatus 나 리더 직분이 있어야 잡힌다.
+                 둘 다 없는 사람(직분이 성도인 개설자 등)은 어느 목록에도 안 떠서 관리자가
+                 리더 권한을 줄 방법이 아예 없었다 → 모든 사용자 줄에서 직접 줄 수 있게 한다. -->
+            ${u.leaderStatus === 'approved' ? `
+              <button onclick="_setLeaderStatus('${u.id}','rejected','의 리더 권한을 해제했어요')"
+                style="height:32px;padding:0 12px;border-radius:8px;border:1.5px solid var(--border);
+                       background:white;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">리더 해제</button>
+            ` : `
+              <button onclick="approveLeader('${u.id}')"
+                style="height:32px;padding:0 12px;border-radius:8px;border:1.5px solid rgba(201,169,110,0.5);
+                       background:rgba(201,169,110,0.12);color:#8A6D3B;font-size:12px;font-weight:700;
+                       cursor:pointer;font-family:inherit">리더 승인</button>
+            `}
             <button onclick="adminToggleDisable('${u.id}')"
               style="height:32px;padding:0 12px;border-radius:8px;border:1.5px solid var(--border);
                      background:white;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">
