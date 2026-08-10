@@ -382,8 +382,8 @@
       <div class="ob-card">
 
         <!-- ① 유형 선택 (항상 표시) -->
-        <div class="form-label" style="margin-bottom:10px;font-size:14px;font-weight:800">① 소속 유형 선택</div>
-        <div class="org-type-row" style="margin-bottom:20px">
+        <div class="form-label" id="ob2-type-label" style="margin-bottom:10px;font-size:14px;font-weight:800">① 소속 유형 선택</div>
+        <div class="org-type-row" id="ob2-type-row" style="margin-bottom:20px">
           <button class="org-type-btn on" id="ob-org-church"   onclick="setObOrgType('church')">교회</button>
           <button class="org-type-btn"    id="ob-org-org"      onclick="setObOrgType('org')">기관·단체</button>
           <button class="org-type-btn"    id="ob-org-personal" onclick="setObOrgType('personal')">개인</button>
@@ -3308,6 +3308,12 @@ function obShowPanel(which) {
   show('ob2-links',          isMain);
   show('ob2-panel-register', which === 'register');
   show('ob2-panel-invite',   which === 'invite');
+  // 초대 코드는 코드가 공동체를 정하므로 유형 선택 자체가 필요 없고,
+  // 등록 화면에서는 '개인' 이 고를 수 없는 선택지다 — 개인 공동체는 만들 수 없다.
+  show('ob2-type-label', which !== 'invite');
+  show('ob2-type-row',   which !== 'invite');
+  const personalBtn = document.getElementById('ob-org-personal');
+  if (personalBtn) personalBtn.style.display = which === 'register' ? 'none' : '';
   if (which === 'register') obSyncRegisterPanel();   // 유형에 맞는 문구로 열린다
   // 메인에서만 하단 내비(건너뛰기/다음) 노출 — 패널에서는 '돌아가기' 로 빠져나간다
   const nav = document.querySelector('#ob2 .ob-nav');
