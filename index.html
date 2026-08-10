@@ -4030,14 +4030,22 @@ function startSelfDocWatch() {
         DB.saveUser(me);
         _userInfoCache[me.id] = { name: me.name || '', role: me.role || '' };   // 내 이름/직분 캐시 갱신
         // 교회 등록 신청은 승인되면 pendingChurchCode 가 지워지고 church 가 채워진다.
+        // 토스트만으로는 앱을 보고 있어야 알 수 있다 — 알림함에 남기고, 앱이 뒤에 있으면 폰 알림까지.
+        // dedupeId 는 코드별로 — onSnapshot 은 같은 문서로 여러 번 깨어난다.
+        const ncode  = me.churchCode || me.pendingChurchCode || '';
+        const notify = (icon, title, body, id) => { toast(body); pushNotif({ icon, title, body, dedupeId: id }); };
         if (wasChurchReq && !me.pendingChurchCode) {
-          toast(me.churchStatus === 'active' && me.church
-            ? `"${me.church}" 등록이 승인됐어요!`
-            : '교회 등록 신청이 거절됐어요. 다시 신청할 수 있어요');
-        } else if (!wasActive && me.churchStatus === 'active') toast('교회 가입이 승인됐어요!');
+          if (me.churchStatus === 'active' && me.church)
+            notify('⛪', '교회 등록 승인', `"${me.church}" 등록이 승인됐어요!`, 'church-reg-ok-' + ncode);
+          else
+            notify('⛪', '교회 등록 거절', '교회 등록 신청이 거절됐어요. 다시 신청할 수 있어요', 'church-reg-no-' + ncode);
+        } else if (!wasActive && me.churchStatus === 'active') {
+          notify('⛪', '교회 가입 승인', '교회 가입이 승인됐어요!', 'church-join-' + ncode);
+        }
         const nowLeader = (typeof isLeader === 'function') ? isLeader() : false;
-        if (!wasLeader && nowLeader) toast('리더 권한이 부여됐어요');
-        else if (wasLeader && !nowLeader && me.leaderStatus === 'rejected') toast('리더 권한 신청이 거절됐어요');
+        if (!wasLeader && nowLeader) notify('👑', '리더 권한', '리더 권한이 부여됐어요', 'leader-ok-' + ncode);
+        else if (wasLeader && !nowLeader && me.leaderStatus === 'rejected')
+          notify('👑', '리더 권한', '리더 권한 신청이 거절됐어요', 'leader-no-' + ncode);
         if (typeof updateProfileDisplay === 'function') updateProfileDisplay();  // 직분 배지·탭 라벨
         if (typeof initSideMenu === 'function') initSideMenu();                   // 리더 전용 메뉴
         // 교회/기관 탭이 열려 있으면 다시 렌더 (리더 버튼 등 반영)
