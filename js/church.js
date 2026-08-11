@@ -444,6 +444,33 @@ function renderChurchInfo() {
           교회에서 받은 코드를 입력하세요<br>처음 가는 곳은 리더 승인을 받아야 정식 교인이 돼요<br>전에 승인받았던 곳은 바로 들어가요
         </div>
       </div>
+    </div>
+
+    <div class="ss-section-title">새 교회·기관 등록 신청</div>
+    <div class="ss-card">
+      <div style="padding:16px">
+        <div class="form-group">
+          <label class="form-label">유형</label>
+          <select id="nc2-type" class="form-select">
+            <option value="church">교회</option>
+            <option value="org">기관·단체</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">원하는 코드 <span style="font-weight:400;font-size:11.5px;color:var(--muted)">영문+숫자 6자</span></label>
+          <input id="nc2-code" type="text" class="form-input" maxlength="6" placeholder="LOVE01"
+                 style="text-transform:uppercase"
+                 oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,6)">
+        </div>
+        <div class="form-group">
+          <label class="form-label">이름</label>
+          <input id="nc2-name" type="text" class="form-input" placeholder="예: 기쁨의교회">
+        </div>
+        <button class="btn-confirm" style="width:100%" onclick="submitNewChurchRequest()">등록 신청하기</button>
+        <div style="font-size:12px;color:var(--muted);margin-top:10px;text-align:center;line-height:1.6">
+          앱 관리자 승인 후 만들어져요<br>승인되면 신청한 분이 그 공동체의 리더가 돼요<br>승인 전까지 지금 소속은 그대로예요
+        </div>
+      </div>
     </div>`;
 
   // 비동기로 교회 상세 정보 로드
@@ -2502,18 +2529,25 @@ function obRegisterNewChurch() {
   // 위에서 고른 유형이 등록에도 반영된다 — 예전엔 me.orgType(예전 값)을 써서 기관을 골라도 교회로 등록됐다
   const newType = _obOrgType === 'personal' ? 'church' : _obOrgType;
   const noun    = newType === 'org' ? '기관·단체' : '교회';
-  if (code.length !== 6) { toast('코드를 6자로 입력해 주세요 (예: JOYFUL)'); return; }
-  if (!name)              { toast(`${noun} 이름을 입력해 주세요`); return; }
-  if (OB_CHURCHES[code]) { toast(`이미 등록된 코드예요 (${getChurchName(code)})`); return; }
-  const custom  = DB.get('customChurches', {});
-  const existingName = getChurchName(code);
-  if (existingName) { toast(`이미 ${existingName}이(가) 사용 중인 코드예요`); return; }
-  // 이미 신청 중인지 확인
+  if (!requestNewChurch(code, name, newType)) return;
+  // 결과 표시도 이 화면 안에서 — 예전 자리(ob-code-result)는 숨겨진 메인 화면이라 안 보였다
+  const nameEl = document.getElementById('ob-reg-church-name');
+  if (nameEl) nameEl.textContent = name;
+  document.getElementById('ob-reg-result')?.classList.add('show');
+}
+
+// 공동체 등록 신청. 온보딩과 교회 탭 두 곳에서 부른다 — 화면마다 따로 구현하면 한쪽만 고쳐진다.
+// 성공하면 true, 검사에 걸리면 토스트를 띄우고 false.
+function requestNewChurch(code, name, newType) {
+  const noun = newType === 'org' ? '기관·단체' : '교회';
+  if (!me)               { toast('로그인이 필요해요'); return false; }
+  if (code.length !== 6) { toast('코드를 6자로 입력해 주세요 (예: JOYFUL)'); return false; }
+  if (!name)             { toast(`${noun} 이름을 입력해 주세요`); return false; }
+  const existingName = getChurchName(code);   // OB_CHURCHES + customChurches 를 함께 본다
+  if (existingName)      { toast(`이미 ${existingName}이(가) 사용 중인 코드예요`); return false; }
   const pending = DB.get('pendingChurches', []);
-  if (pending.find(c => c.code === code)) {
-    toast(`[${code}] 코드는 이미 승인 대기 중이에요`); return;
-  }
-  // 승인 대기 목록에 추가 (바로 활성화 X)
+  if (pending.find(c => c.code === code)) { toast(`[${code}] 코드는 이미 승인 대기 중이에요`); return false; }
+
   pending.push({
     code, name,
     requestedBy:     me.id,
@@ -2522,36 +2556,48 @@ function obRegisterNewChurch() {
     orgType:         newType
   });
   DB.set('pendingChurches', pending);
-  // 신청자 정보 임시 저장 (승인 후 활성화)
+
   me.pendingChurchCode = code;
   me.pendingChurchName = name;
   me.pendingChurchAt   = new Date().toISOString();
-  me.churchStatus      = 'church-pending'; // 교회 자체가 미승인
-  me.orgType           = newType;
-  // 등록을 신청한 사람이 그 공동체의 개설자다. 예전에는 role 이 '목사'(직분 목록에 없는 이름)나
-  // 가입 기본값('성도')으로 남아 isLeaderRole 이 false 였고, 관리자가 승인해도
-  // approveChurchRegistration 이 개설자에게 리더 권한을 붙이지 못했다.
-  if (!isLeaderRole(me.role)) me.role = (newType === 'org' ? '기관장' : '담임목사');
-  me.leaderStatus      = 'pending';   // 권한은 앱 관리자 승인 뒤에 붙는다
+  // 개설자가 될 직분은 따로 담는다. 지금 직분을 덮어쓰면, 승인도 나기 전에 지금 다니는
+  // 교회에서 갑자기 담임목사로 보인다. 승인 시 approveChurchRegistration 이 이 값을 쓴다.
+  me.pendingChurchRole = (newType === 'org' ? '기관장' : '담임목사');
+  // 신청한 유형도 따로 담는다 — 지금 소속을 건드리지 않으니 me.orgType 으로는 알 수 없다
+  me.pendingChurchOrgType = newType;
+  // 이미 어느 공동체의 정식 교인이면 승인 전까지 그 소속을 유지한다 — 온보딩은 소속이 없어
+  // 상관없었지만, 앱 안에서 신청하면 다니던 교회에서 그대로 튕겨 나간다.
+  const wasActive = me.churchStatus === 'active';
+  if (!wasActive) { me.churchStatus = 'church-pending'; me.orgType = newType; }
   DB.saveUser(me);
+
   // 신청 사실을 내 users 문서에도 남긴다 — DB.saveUser 는 localStorage 뿐이라
   // 지금까지 신청은 신청한 기기 밖으로 나간 적이 없었고, 다른 기기의 앱 관리자에게는
   // 목록이 늘 비어 있었다. users 는 본인이 쓰고 로그인한 사람이 읽으므로 규칙 변경이 필요 없다.
   if (window._fbReady && window._fb) {
-    window._fb.updateUser(me.id, {
+    const update = {
       pendingChurchCode: code, pendingChurchName: name,
       pendingChurchAt:   me.pendingChurchAt,
-      churchStatus:      'church-pending',
-      role:              me.role,
-      orgType:           newType,
-      leaderStatus:      'pending'
-    }).catch(e => { if (window._fbErr) window._fbErr('교회 등록 신청', e); });
+      pendingChurchRole: me.pendingChurchRole,
+      pendingChurchOrgType: newType
+    };
+    if (!wasActive) { update.churchStatus = 'church-pending'; update.orgType = newType; }
+    window._fb.updateUser(me.id, update)
+      .catch(e => { if (window._fbErr) window._fbErr('교회 등록 신청', e); });
   }
-  // 결과 표시도 이 화면 안에서 — 예전 자리(ob-code-result)는 숨겨진 메인 화면이라 안 보였다
-  const nameEl = document.getElementById('ob-reg-church-name');
-  if (nameEl) nameEl.textContent = name;
-  document.getElementById('ob-reg-result')?.classList.add('show');
   toast(`"${name}" 등록 신청이 접수됐어요! 앱 관리자 승인 후 활성화돼요 `);
+  return true;
+}
+
+// 교회 탭에서 새 공동체 등록 신청
+function submitNewChurchRequest() {
+  const type = document.getElementById('nc2-type')?.value || 'church';
+  const code = (document.getElementById('nc2-code')?.value || '').toUpperCase().trim();
+  const name = (document.getElementById('nc2-name')?.value || '').trim();
+  if (!requestNewChurch(code, name, type)) return;
+  document.getElementById('nc2-code').value = '';
+  document.getElementById('nc2-name').value = '';
+  openSubscreen('church-info');   // 신청 배지 반영
 }
 
 function obConnectChurch() {

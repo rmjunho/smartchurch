@@ -284,8 +284,10 @@ function _collectPendingChurches(allUsers) {
       requestedByName: u.name || '',
       requestedByEmail:u.email || '',
       requestedAt:     u.pendingChurchAt || u.createdAt || '',
-      orgType:         u.orgType || 'church',
-      role:            u.role || ''   // 승인 시 리더 권한을 함께 줄지 판단하는 근거
+      orgType:         u.pendingChurchOrgType || u.orgType || 'church',
+      // 개설자가 될 직분. pendingChurchRole 은 신청 때만 담기고 지금 직분을 덮지 않는다
+      // — 이미 다른 교회 교인인 사람이 신청해도 그 교회에서의 직분은 그대로 둬야 한다.
+      role:            u.pendingChurchRole || u.role || ''
     };
   });
   _pendingChurchCache = Object.values(byCode);
@@ -329,7 +331,10 @@ function approveChurchRegistration(code) {
   if (u) {
     u.church = entry.name; u.churchCode = code; u.churchStatus = 'active';
     u.pendingChurchCode = null; u.pendingChurchName = null; u.pendingChurchAt = null;
-    if (grantsLeader) u.leaderStatus = 'approved';
+    u.pendingChurchRole = null; u.pendingChurchOrgType = null;
+    u.orgType = entry.orgType || 'church';
+    // 승인된 지금에서야 개설자 직분을 붙인다 (신청 때 붙이면 원래 교회에서 담임목사로 보인다)
+    if (grantsLeader) { u.leaderStatus = 'approved'; u.role = foundersRole; }
     DB.set('users', users);
   }
   // Firestore 동기화: 교회 정보 + 신청자 상태(다른 기기에도 반영)
@@ -337,9 +342,10 @@ function approveChurchRegistration(code) {
     window._fb.setChurchInfo(code, custom[code]).catch(() => {});
     const update = {
       church: entry.name, churchCode: code, churchStatus: 'active',
-      pendingChurchCode: null, pendingChurchName: null, pendingChurchAt: null
+      pendingChurchCode: null, pendingChurchName: null, pendingChurchAt: null,
+      pendingChurchRole: null, pendingChurchOrgType: null, orgType: entry.orgType || 'church'
     };
-    if (grantsLeader) update.leaderStatus = 'approved';
+    if (grantsLeader) { update.leaderStatus = 'approved'; update.role = foundersRole; }
     window._fb.updateUser(entry.requestedBy, update)
       .catch(() => toast('서버 반영 실패 — 신청자 화면에 승인이 안 보일 수 있어요'));
   }
