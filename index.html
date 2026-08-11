@@ -3914,6 +3914,8 @@ function bootApp() {
   // 승인된 교회 목록을 받아 둔다. 예전엔 앱 관리자가 패널을 열 때만 받아서, 새로 등록된 교회는
   // 등록한 본인 기기 말고는 아무도 몰랐다 — 코드를 정확히 넣어도 '유효하지 않은 코드' 가 떴다.
   if (typeof syncChurchesFromFirestore === 'function') syncChurchesFromFirestore().catch(() => {});
+  // 이미 활성 교인이면 그 공동체를 '승인받은 곳' 으로 남긴다 (기존 교인 소급 적용)
+  if (typeof rememberApprovedChurch === 'function') rememberApprovedChurch();
   // 저장된 글자 크기 적용
   applyFontSize(DB.get('fontSize_' + me.id, 'md'));
   // 구 기본 카테고리(신앙/생활/학습)만 저장된 사용자 → 새 기본값으로 자동 업그레이드
@@ -4048,6 +4050,8 @@ function startSelfDocWatch() {
         } else if (!wasActive && me.churchStatus === 'active') {
           notify('⛪', '교회 가입 승인', '교회 가입이 승인됐어요!', 'church-join-' + ncode);
         }
+        // 승인이 도착한 순간을 잡는다 — 다음부터는 이 공동체로 승인 없이 오갈 수 있다
+        if (typeof rememberApprovedChurch === 'function') rememberApprovedChurch();
         const nowLeader = (typeof isLeader === 'function') ? isLeader() : false;
         if (!wasLeader && nowLeader) notify('👑', '리더 권한', '리더 권한이 부여됐어요', 'leader-ok-' + ncode);
         else if (wasLeader && !nowLeader && me.leaderStatus === 'rejected')

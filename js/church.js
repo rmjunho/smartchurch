@@ -441,7 +441,7 @@ function renderChurchInfo() {
         </div>
         <button class="btn-confirm" style="width:100%" onclick="changeChurchCode()">교회 변경하기</button>
         <div style="font-size:12px;color:var(--muted);margin-top:10px;text-align:center;line-height:1.6">
-          교회에서 받은 코드를 입력하세요<br>변경 후 리더 승인을 받아야 정식 교인이 돼요
+          교회에서 받은 코드를 입력하세요<br>처음 가는 곳은 리더 승인을 받아야 정식 교인이 돼요<br>전에 승인받았던 곳은 바로 들어가요
         </div>
       </div>
     </div>`;
@@ -2578,9 +2578,11 @@ function obConnectChurch() {
     // me.churchCode 를 먼저 덮어쓰고 비교해서 이 조건이 늘 참이었고, 그래서 다른 교회에서
     // 활성이던 사용자가 남의 교회 코드만 넣으면 승인 없이 바로 활성으로 들어갔다.
     const isFounder = me.churchCode === code && me.churchStatus === 'active';
+    // 전에 승인받았던 공동체로 돌아오는 경우도 승인 없이 바로 들어간다
+    const known = isFounder || isPreApprovedChurch(code);
     me.church          = found;
     me.churchCode      = code;
-    me.churchStatus = isFounder ? 'active' : 'pending';
+    me.churchStatus = known ? 'active' : 'pending';
     me.registrationType = 'regular'; // 온보딩 첫 가입
   }
   DB.saveUser(me);
@@ -2596,6 +2598,25 @@ function obConnectChurch() {
   }
 
   obGoNextAfterChurch();
+}
+
+// 한 번 승인받은 공동체는 다시 들어갈 때 승인이 필요 없다 — 승인받은 코드를 본인 문서에 남긴다.
+// churchStatus 가 'active' 가 되는 경로가 여럿(리더 승인·개설자 승인·관리자 이동)이라
+// 각 경로에 심는 대신, 활성 상태를 보는 자리에서 한 번에 기록한다.
+function rememberApprovedChurch() {
+  if (!me || !me.churchCode || me.churchStatus !== 'active') return;
+  const list = me.approvedChurches || [];
+  if (list.includes(me.churchCode)) return;
+  me.approvedChurches = list.concat(me.churchCode);
+  DB.saveUser(me);
+  if (window._fbReady && window._fb)
+    window._fb.updateUser(me.id, { approvedChurches: me.approvedChurches }).catch(() => {});
+}
+
+// 전에 승인받은 곳이면 리더 수락 없이 바로 들어간다. 앱 관리자는 어디든 자유.
+function isPreApprovedChurch(code) {
+  if (!me || !code) return false;
+  return !!me.isAppAdmin || (me.approvedChurches || []).includes(code);
 }
 
 function changeChurchCode() {
@@ -2623,7 +2644,7 @@ function changeChurchCode() {
   if (u) {
     u.church           = churchName;
     u.churchCode       = code;
-    u.churchStatus     = me.isAppAdmin ? 'active' : 'pending';
+    u.churchStatus     = isPreApprovedChurch(code) ? 'active' : 'pending';
     u.registrationType = wasPersonal ? 'newfamily' : 'regular';
     if (wasPersonal) { u.orgType = newOrgType; u.role = newDefRole; }
     // 'pending' 으로 둔다 — 규칙이 본인 수정으로는 leaderStatus 를 'pending' 까지만 허용하고,
@@ -2632,7 +2653,7 @@ function changeChurchCode() {
     DB.set('users', users);
     me.church           = churchName;
     me.churchCode       = code;
-    me.churchStatus     = me.isAppAdmin ? 'active' : 'pending';
+    me.churchStatus     = isPreApprovedChurch(code) ? 'active' : 'pending';
     me.registrationType = wasPersonal ? 'newfamily' : 'regular';
     if (losesLeader) { me.leaderStatus = 'pending'; me.leaderPerms = []; me.isAppointedLeader = false; }
   }
@@ -2656,7 +2677,7 @@ function changeChurchCode() {
   initSideMenu();
   closeSubscreen();
 
-  const msg = me.isAppAdmin
+  const msg = me.churchStatus === 'active'
     ? `${churchName}으로 이동했어요!`
     : wasPersonal
       ? `${churchName} 새가족으로 등록됐어요! 리더 승인 후 정식 성도가 돼요 `
