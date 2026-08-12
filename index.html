@@ -4266,6 +4266,9 @@ function loadBinder() {
   // 미완료 할 일 이월 (텍스트형 + 드로잉형)
   carryOverTodosIfNeeded();
   carryOverDrawTodosIfNeeded();
+  // 날짜가 바뀌면 할 일 목록도 다시 그린다. 이게 없어서 앞 날짜 목록이 화면에 그대로 남았고,
+  // 그 상태에서 체크·삭제하면 보이는 것과 다른 날짜 기록에 저장됐다.
+  renderTodos();
   const data = DB.get(binderKey(), {});
   // QT
   document.getElementById('qt-verse').value       = data.verse       || '';
