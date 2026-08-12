@@ -437,14 +437,23 @@ function mergeMyChallenges(remote) {
   return changed;
 }
 
+// 챌린지를 고칠 수 있는지 판단하는 단 하나의 기준.
+// 교회·전체 챌린지는 만든 사람이라도 리더가 아니면 못 고친다 — 여럿이 함께 쓰는 챌린지라,
+// 만든 사람이 리더에서 내려온 뒤에도 계속 손댈 수 있으면 곤란하다. 개인 챌린지는 본인 것.
+function canEditChallenge(ch) {
+  if (!ch || !me) return false;
+  if (me.isAppAdmin) return true;
+  const isPersonal = ch.scope === 'personal' || !ch.createdByChurch;
+  if (isPersonal) return ch.createdByUid === me.id;
+  return ch.createdByChurch === (me.church || '') && (isLeader() || hasLeaderPerm('challenge-manage'));
+}
+
 async function deleteChallenge(e, id) {
   if (e) e.stopPropagation();
   const list = allCustomChallenges();
   const ch   = list.find(c => c.id === id);
   if (!ch) return;
-  const isMine = ch.createdByUid === me.id;
-  const isChurchOwner = ch.createdByChurch === (me.church || '') && (isLeader() || hasLeaderPerm('challenge-manage'));
-  if (!me.isAppAdmin && !isMine && !isChurchOwner) {
+  if (!canEditChallenge(ch)) {
     toast('삭제 권한이 없어요'); return;
   }
   // 챌린지를 지우면 체크 기록도 함께 지운다. 되돌릴 수 없으니 몇 일치가 사라지는지 먼저 알린다.
@@ -496,9 +505,7 @@ function openEditChallengeModal(id) {
   const ch = allCustomChallenges().find(c => c.id === id);
   if (!ch) return;
 
-  const isMine = ch.createdByUid === me.id;
-  const isChurchOwner = ch.createdByChurch === (me.church || '') && (isLeader() || hasLeaderPerm('challenge-manage'));
-  if (!me.isAppAdmin && !isMine && !isChurchOwner) {
+  if (!canEditChallenge(ch)) {
     toast('수정 권한이 없어요 '); return;
   }
 
@@ -531,9 +538,7 @@ function submitEditChallenge() {
   if (idx < 0) return;
 
   const ch = list[idx];
-  const isMine = ch.createdByUid === me.id;
-  const isChurchOwner = ch.createdByChurch === (me.church || '') && (isLeader() || hasLeaderPerm('challenge-manage'));
-  if (!me.isAppAdmin && !isMine && !isChurchOwner) {
+  if (!canEditChallenge(ch)) {
     toast('수정 권한이 없어요 '); return;
   }
 
@@ -725,7 +730,7 @@ function renderChallengeManage() {
         <div class="ss-empty-title">아직 만든 챌린지가 없어요</div>
         <div class="ss-empty-sub">+ 만들기 버튼으로 첫 챌린지를 시작해보세요!</div></div>`;
     } else {
-      chList.forEach(ch => { html += _cmChCard(ch, ch.createdByUid === me.id || me.isAppAdmin || isLeader() || hasLeaderPerm('challenge-manage')); });
+      chList.forEach(ch => { html += _cmChCard(ch, canEditChallenge(ch)); });
     }
   } else {
     if (!pubAll.length) {
@@ -855,10 +860,11 @@ function renderChallenge() {
                ${scopeIcon} ${escHtml(scopeText)}
              </span>`
           : '';
-        const editBtn = isMine
+        // 교회 챌린지는 만든 사람이라도 리더가 아니면 수정 버튼이 보이지 않는다
+        const editBtn = canEditChallenge(c)
           ? `<button class="c-delete-btn" onclick="openEditChallengeModal('${c.id}');event.stopPropagation()" title="수정" style="font-size:13px">✏️</button>`
           : '';
-        const deleteBtn = (isMine || me.isAppAdmin) && isCustom
+        const deleteBtn = canEditChallenge(c) && isCustom
           ? `<button class="c-delete-btn" onclick="deleteChallenge(event,'${c.id}')" title="삭제">🗑</button>`
           : '';
         return `

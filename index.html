@@ -6091,19 +6091,20 @@ function applyProgressStyle(el, p) {
   el.style.borderColor  = 'rgba(180,120,0,0.3)';
 }
 
-function progressStyleStr(p) {
-  p = Math.max(0, Math.min(100, p || 0));
-  return `background:${progressBg(p)};color:${progressTextColor()};border-color:rgba(180,120,0,0.3);`;
-}
-
-function liveProgressStyle(e) {
-  applyProgressStyle(e.target, parseInt(e.target.value) || 0);
+// 목록의 진행률 슬라이더 — 채워진 정도는 CSS 그라디언트(--p)가 그리므로
+// 모달 숫자칸이 쓰는 applyProgressStyle(배경색 직접 지정)과 길이 다르다.
+function liveProgressRange(e) {
+  const el = e.target;
+  const v  = Math.max(0, Math.min(100, parseInt(el.value) || 0));
+  el.style.setProperty('--p', v + '%');
+  const lbl = el.parentElement && el.parentElement.querySelector('.todo-progress-val');
+  if (lbl) lbl.textContent = v + '%';
 }
 
 function commitProgress(e, id) {
   let v = Math.max(0, Math.min(100, parseInt(e.target.value) || 0));
   e.target.value = v;
-  applyProgressStyle(e.target, v);
+  liveProgressRange(e);
   const todos = getDayTodos();
   const t = todos.find(x => x.id === id);
   if (!t) return;
@@ -6178,11 +6179,14 @@ function renderTodos() {
       let rightHtml = '';
       if (mode === 'progress') {
         const p = t.progress || 0;
-        rightHtml = `<input type="number" inputmode="numeric" class="todo-progress" min="0" max="100"
-                      value="${p}" style="${progressStyleStr(p)}"
-                      oninput="liveProgressStyle(event)"
-                      onchange="commitProgress(event,'${t.id}')"
-                      onclick="event.stopPropagation()">`;
+        rightHtml = `<div class="todo-progress-wrap" onclick="event.stopPropagation()">
+          <input type="range" class="todo-progress-range" min="0" max="100" step="5"
+                 value="${p}" style="--p:${p}%"
+                 oninput="liveProgressRange(event)"
+                 onchange="commitProgress(event,'${t.id}')"
+                 onclick="event.stopPropagation()">
+          <span class="todo-progress-val">${p}%</span>
+        </div>`;
       } else if (mode === 'subcheck') {
         const subs = t.subChecks || [];
         rightHtml = `<div class="todo-sub-wrap" onclick="event.stopPropagation()">
