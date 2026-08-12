@@ -113,6 +113,12 @@ service cloud.firestore {
       allow write: if signedIn() && (key.split('_')[0] == uid() || isAdmin());
     }
 
+    // ── 투두 기기 동기화 (key = uid_date, 본인만 — 비공개) ──
+    match /myTodos/{key} {
+      allow read:  if signedIn() && key.split('_')[0] == uid();
+      allow write: if signedIn() && (key.split('_')[0] == uid() || isAdmin());
+    }
+
     // ── 공유 바인더 코멘트 (소유자 필드 authorId) ──
     // 생성: 작성자 본인. 수정/삭제: 작성자 또는 바인더 권한 리더(모더레이션).
     match /binderComments/{id} {

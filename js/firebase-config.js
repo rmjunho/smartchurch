@@ -83,6 +83,10 @@ window._fb = {
       // 개인 바인더 기기 간 동기화 (비공개 — 본인만 read/write). key = `${uid}_${date}`
       setMyBinder: (key, data) => setDoc(doc(fbDb, 'myBinders', key), data, { merge: true }),
       getMyBinder: (key)       => getDoc(doc(fbDb, 'myBinders', key)),
+      // 투두 기기 간 동기화. 바인더와 문서를 나눈다 — 같은 문서에 있던 시절엔 한 기기가
+      // 바인더를 저장하면 다른 기기에서 추가한 투두까지 통째로 덮여 사라졌다. key = `${uid}_${date}`
+      setMyTodos:    (key, data) => setDoc(doc(fbDb, 'myTodos', key), data, { merge: true }),
+      listenMyTodos: (key, cb)   => onSnapshot(doc(fbDb, 'myTodos', key), cb, () => {}),
       // 공유 바인더 코멘트 — entryKey = `${바인더주인id}_${date}` 로 묶음
       addBinderComment:  (data)     => addDoc(collection(fbDb, 'binderComments'),
                                         { ...data, createdAt: serverTimestamp() }),

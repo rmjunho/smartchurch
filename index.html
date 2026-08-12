@@ -4300,6 +4300,7 @@ function loadBinder() {
   }, 30);
   // 다른 기기에서 저장한 최신본 있으면 가져와 반영
   pullBinderFromServer();
+  startTodosWatch();     // 그날 투두는 실시간 감시 (날짜 바뀌면 재구독)
 }
 
 // 시간표: 행 편집형 (시간/계획 직접 입력, 행 추가/삭제). data.schRows = [{time, plan}]
@@ -4534,7 +4535,10 @@ function syncBinderToServer() {
   _binderSyncTimer = setTimeout(() => {
     const data = DB.get(`binder_${me.id}_${dk}`, null);
     if (!data) return;
-    const payload = { ...data, uid: me.id, date: dk, syncedAt: new Date().toISOString() };
+    // 투두는 myTodos 로 따로 나간다. 여기 실으면 바인더를 저장할 때마다 투두까지
+    // 통째로 올라가, 다른 기기가 그 사이 추가한 항목을 덮어버린다.
+    const { todos, ...rest } = data;
+    const payload = { ...rest, uid: me.id, date: dk, syncedAt: new Date().toISOString() };
     // Firestore 문서 1MB 제한 — 드로잉이 많으면 초과 가능. 초과분은 이 날짜만 기기 동기화 건너뜀.
     // ponytail: 단일 문서. 상시 초과하면 드로잉을 항목별 문서로 쪼개는 게 업그레이드 경로.
     const size = JSON.stringify(payload).length;
@@ -4562,6 +4566,7 @@ async function pullBinderFromServer() {
     if ((server.updatedAt || '') <= (local.updatedAt || '')) return;
     const merged = { ...server };
     delete merged.uid; delete merged.date; delete merged.syncedAt;
+    if (local.todos !== undefined) merged.todos = local.todos;   // 투두는 myTodos 가 관리
     DB.set(localKey, merged);
     loadBinder();          // 텍스트 필드 재적용 (merged.updatedAt == local 이 되어 재-pull 없음)
     if (canvasReady) DRAW_KEYS.forEach(loadDrawingForKey);   // 드로잉 캔버스도 서버본으로 갱신
@@ -5561,15 +5566,84 @@ function setMemoDrawDefault() {
 function getDayTodos() {
   if (!me) return [];
   const data = DB.get(binderKey(), {});
-  if (data.todos !== undefined) return data.todos;
+  if (data.todos !== undefined) return data.todos.filter(t => t && !t.deleted);   // 묘비 제외
   // 구 전역 todos에서 마이그레이션
   return DB.get('todos_' + me.id, []);
 }
+// 항목마다 updatedAt 을 찍어 둔다 — 기기 간 병합에서 어느 쪽이 최신인지 이걸로 가린다.
+// 지운 항목은 목록에서 빼지 않고 묘비(deleted)로 남긴다. 그냥 빼면 다른 기기가
+// "여긴 없네" 하고 자기 사본을 다시 올려 삭제가 되살아난다.
+function _todoFp(t) { const c = Object.assign({}, t); delete c.updatedAt; return JSON.stringify(c); }
 function saveDayTodos(todos) {
   if (!me) return;
   const data = DB.get(binderKey(), {});
-  data.todos = todos;
+  const prev = data.todos || [];
+  const now  = new Date().toISOString();
+  const fp = {}, keep = {};
+  prev.forEach(t => { if (t && t.id) fp[t.id] = _todoFp(t); });
+  todos.forEach(t => {
+    keep[t.id] = true;
+    if (!t.updatedAt || fp[t.id] !== _todoFp(t)) t.updatedAt = now;
+  });
+  const out = todos.slice();
+  prev.forEach(t => {
+    if (!t || !t.id || keep[t.id]) return;
+    out.push(t.deleted ? t : { id: t.id, deleted: true, updatedAt: now });
+  });
+  // 묘비는 30일 뒤 정리 — 그때쯤이면 모든 기기가 삭제를 봤다
+  const cut = new Date(Date.parse(now) - 30 * 86400000).toISOString();
+  data.todos = out.filter(t => !t.deleted || (t.updatedAt || '') > cut);
   DB.set(binderKey(), data);
+  syncTodosToServer();
+}
+
+// ── 투두 기기 간 동기화 (myTodos/${uid}_${date}, 비공개) ──
+var _todoSyncTimer = null;
+var _todosUnsub    = null;
+function syncTodosToServer() {
+  if (!me || !window._fbReady || !window._fb || !window._fb.setMyTodos) return;
+  clearTimeout(_todoSyncTimer);
+  const dk = dateKey();
+  _todoSyncTimer = setTimeout(() => {
+    const data = DB.get(`binder_${me.id}_${dk}`, {}) || {};
+    window._fb.setMyTodos(`${me.id}_${dk}`, {
+      uid: me.id, date: dk,
+      todos: data.todos || [],
+      updatedAt: new Date().toISOString()
+    }).catch(e => { if (window._fbErr) window._fbErr('투두 기기 동기화', e); });
+  }, 400);
+}
+// 항목 단위 병합 — 같은 id 는 updatedAt 이 늦은 쪽, 한쪽에만 있으면 그대로 살린다.
+// ponytail: 순서는 로컬 기준. 다른 기기에서 바꾼 순서는 따라오지 않는다.
+function _mergeTodoLists(local, server) {
+  const byId = {}, order = [];
+  (local || []).concat(server || []).forEach(t => {
+    if (!t || !t.id) return;
+    if (!byId[t.id]) { byId[t.id] = t; order.push(t.id); return; }
+    if ((t.updatedAt || '') > (byId[t.id].updatedAt || '')) byId[t.id] = t;
+  });
+  return order.map(id => byId[id]);
+}
+// 그날 문서를 실시간 감시. 양쪽 앱이 열려 있으면 서로 바로 반영된다
+// (한쪽이 못 본 채로 올려서 상대 것을 덮는 상황 자체가 안 생긴다).
+function startTodosWatch() {
+  if (_todosUnsub) { _todosUnsub(); _todosUnsub = null; }
+  if (!me || !window._fbReady || !window._fb || !window._fb.listenMyTodos) return;
+  const dk = dateKey();
+  _todosUnsub = window._fb.listenMyTodos(`${me.id}_${dk}`, snap => {
+    if (!snap.exists() || dateKey() !== dk) return;
+    const localKey = `binder_${me.id}_${dk}`;
+    const local  = DB.get(localKey, {}) || {};
+    const server = snap.data().todos || [];
+    const merged = _mergeTodoLists(local.todos, server);
+    if (JSON.stringify(merged) !== JSON.stringify(local.todos || [])) {
+      local.todos = merged;
+      DB.set(localKey, local);
+      try { renderTodos(); renderDrawTodoSection(); } catch (e) {}
+    }
+    // 서버가 모르는 항목이 내게 있으면(오프라인 중 추가 등) 올려서 양쪽을 맞춘다
+    if (JSON.stringify(merged) !== JSON.stringify(server)) syncTodosToServer();
+  });
 }
 function carryOverTodosIfNeeded() {
   if (!me) return;
@@ -5579,11 +5653,11 @@ function carryOverTodosIfNeeded() {
   prev.setDate(prev.getDate() - 1);
   const pKey = `binder_${me.id}_${prev.getFullYear()}-${String(prev.getMonth()+1).padStart(2,'0')}-${String(prev.getDate()).padStart(2,'0')}`;
   const prevData = DB.get(pKey, {});
-  const prevTodos = prevData.todos || DB.get('todos_' + me.id, []);
+  const prevTodos = (prevData.todos || DB.get('todos_' + me.id, [])).filter(t => t && !t.deleted);
   const keepDone = getTodoKeepDone();
   const source = keepDone ? prevTodos : prevTodos.filter(t => !t.done);
   if (!source.length) return;
-  todayData.todos = source.map(t => ({
+  const carried = source.map(t => ({
     id: uid(), text: t.text, cat: t.cat,
     inputMode: t.inputMode || 'none',
     done: keepDone ? !!t.done : false,
@@ -5592,8 +5666,8 @@ function carryOverTodosIfNeeded() {
     at: new Date().toISOString(),
     linkedChallengeUid: t.linkedChallengeUid || undefined
   }));
-  DB.set(binderKey(), todayData);
-  toast(`할 일 ${todayData.todos.length}개를 오늘로 이월했어요`);
+  saveDayTodos(carried);        // 시각 도장 + 기기 동기화까지 태운다
+  toast(`할 일 ${carried.length}개를 오늘로 이월했어요`);
 }
 
 // 드로잉 Todo 카드 이월 — 체크 안 된 카드 + 칸 높이 그대로
@@ -7481,7 +7555,9 @@ async function _purgeUserData(uid) {
       const d = new Date(from.getTime() + i * 864e5);
       const key = `${uid}_${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
       batch.delete(doc(db, 'myBinders', key));
-      if (++n === 450) { await batch.commit(); batch = writeBatch(db); n = 0; }   // 배치 상한 500
+      batch.delete(doc(db, 'myTodos', key));
+      n += 2;
+      if (n >= 450) { await batch.commit(); batch = writeBatch(db); n = 0; }   // 배치 상한 500
     }
     if (n) await batch.commit();
   } catch(e) { warn('myBinders')(e); }
