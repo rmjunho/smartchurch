@@ -1535,6 +1535,11 @@
         </div>
       </div>
       <div class="default-check-box">
+        <input type="checkbox" id="todo-keep-done" class="default-checkbox">
+        <label for="todo-keep-done" class="default-checkbox-label">완료해도 이월</label>
+        <span class="default-checkbox-desc">이 할 일은 완료해도 다음 날로 넘어와요</span>
+      </div>
+      <div class="default-check-box">
         <input type="checkbox" id="todo-set-default" class="default-checkbox">
         <label for="todo-set-default" class="default-checkbox-label">기본값 설정</label>
         <span class="default-checkbox-desc">다음 추가 시 이 진행률 방식이 기본으로 선택돼요</span>
@@ -1583,6 +1588,11 @@
         </div>
       </div>
       <div class="default-check-box">
+        <input type="checkbox" id="todo-edit-keep-done" class="default-checkbox">
+        <label for="todo-edit-keep-done" class="default-checkbox-label">완료해도 이월</label>
+        <span class="default-checkbox-desc">이 할 일은 완료해도 다음 날로 넘어와요</span>
+      </div>
+      <div class="default-check-box">
         <input type="checkbox" id="todo-edit-set-default" class="default-checkbox">
         <label for="todo-edit-set-default" class="default-checkbox-label">기본값 설정</label>
         <span class="default-checkbox-desc">다음 추가 시 이 진행률 방식이 기본으로 선택돼요</span>
@@ -1604,9 +1614,9 @@
 
       <!-- 할 일 지속 활성화 -->
       <div class="settings-section-label">할 일 지속 활성화</div>
-      <div class="settings-section-desc">켜면 완료된 할 일도 다음 날로 이월돼요</div>
+      <div class="settings-section-desc">새로 추가하는 할 일의 기본값이에요. 할 일마다 따로 켤 수 있어요</div>
       <label class="ts-toggle-row" style="margin-bottom:16px">
-        <span style="font-size:13.5px;font-weight:600;color:var(--black)">완료 항목 이월</span>
+        <span style="font-size:13.5px;font-weight:600;color:var(--black)">완료 항목 이월 기본값</span>
         <input type="checkbox" id="ts-keep-done" class="ts-toggle-cb" onchange="setTodoKeepDone(this.checked)">
         <span class="ts-toggle-slider"></span>
       </label>
@@ -4037,6 +4047,7 @@ function startSelfDocWatch() {
         me.leaderPerms = data.leaderPerms; changed = true;
       }
       _syncTodoCats(data);
+      _syncTodoPrefs(data);
       if (changed) {
         DB.saveUser(me);
         _userInfoCache[me.id] = { name: me.name || '', role: me.role || '' };   // 내 이름/직분 캐시 갱신
@@ -5663,18 +5674,24 @@ function carryOverTodosIfNeeded() {
   const pKey = `binder_${me.id}_${prev.getFullYear()}-${String(prev.getMonth()+1).padStart(2,'0')}-${String(prev.getDate()).padStart(2,'0')}`;
   const prevData = DB.get(pKey, {});
   const prevTodos = (prevData.todos || DB.get('todos_' + me.id, [])).filter(t => t && !t.deleted);
-  const keepDone = getTodoKeepDone();
-  const source = keepDone ? prevTodos : prevTodos.filter(t => !t.done);
+  // 이월 여부는 할 일마다 따로 정한다. keepDone 이 없는 옛 항목만 설정의 기본값을 따른다.
+  const keepDefault = getTodoKeepDone();
+  const keeps = t => (t.keepDone !== undefined ? !!t.keepDone : keepDefault);
+  const source = prevTodos.filter(t => !t.done || keeps(t));
   if (!source.length) return;
-  const carried = source.map(t => ({
-    id: uid(), text: t.text, cat: t.cat,
-    inputMode: t.inputMode || 'none',
-    done: keepDone ? !!t.done : false,
-    progress: keepDone && t.done ? (t.progress || 0) : 0,
-    subChecks: (t.subChecks || []).map(s => ({ label: s.label, done: keepDone ? !!s.done : false })),
-    at: new Date().toISOString(),
-    linkedChallengeUid: t.linkedChallengeUid || undefined
-  }));
+  const carried = source.map(t => {
+    const c = {
+      id: uid(), text: t.text, cat: t.cat,
+      inputMode: t.inputMode || 'none',
+      done: !!t.done,                                   // 완료본이 넘어왔다면 완료 상태 그대로
+      progress: t.done ? (t.progress || 0) : 0,
+      subChecks: (t.subChecks || []).map(s => ({ label: s.label, done: !!t.done && !!s.done })),
+      at: new Date().toISOString(),
+      linkedChallengeUid: t.linkedChallengeUid || undefined
+    };
+    if (t.keepDone !== undefined) c.keepDone = !!t.keepDone;   // 안 정한 항목은 계속 기본값을 따르게 둔다
+    return c;
+  });
   saveDayTodos(carried);        // 시각 도장 + 기기 동기화까지 태운다
   toast(`할 일 ${carried.length}개를 오늘로 이월했어요`);
 }
@@ -6106,6 +6123,22 @@ function saveCategories(c) {
   if (window._fbReady && window._fb) window._fb.setUser(me.id, { todoCats: c }).catch(() => {});
 }
 
+// 할 일 설정(정렬·이월 기본값)을 이 기기에 반영한다. setTodoCatAlign/setTodoKeepDone 은
+// 서버로 올리기만 했지 되받는 쪽이 없어서, 한 기기에서 바꿔도 다른 기기는 몰랐다.
+function _syncTodoPrefs(data) {
+  if (!me) return;
+  let hit = false;
+  const pull = (field, key, fb, type) => {
+    if (typeof data[field] !== type) return;
+    if (data[field] === DB.get(key + me.id, fb)) return;
+    DB.set(key + me.id, data[field]); hit = true;
+  };
+  pull('todoCatAlign', 'todoCatAlign_', 'right', 'string');
+  pull('todoKeepDone', 'todoKeepDone_', false,   'boolean');
+  if (!hit) return;
+  try { renderTodos(); renderDrawTodoSection(); refreshTodoSettingsUI(); } catch (e) {}
+}
+
 // 서버 스냅샷의 카테고리를 이 기기에 반영한다 (startSelfDocWatch 에서 호출).
 function _syncTodoCats(data) {
   if (!me) return;
@@ -6414,6 +6447,7 @@ function openTodoModal() {
   renderSubCheckInputs('add');
   document.getElementById('todo-input').value = '';
   document.getElementById('todo-set-default').checked = false;
+  document.getElementById('todo-keep-done').checked = getTodoKeepDone();   // 설정의 기본값으로 시작
   const pInp = document.getElementById('todo-progress');
   if (pInp) { pInp.value = 0; applyProgressStyle(pInp, 0); }
   document.getElementById('modal-todo').classList.add('open');
@@ -6449,7 +6483,9 @@ function saveTodo() {
   }
 
   const todos = getDayTodos();
-  todos.push({ id: uid(), text, cat, done, inputMode: _addTodoMode, progress, subChecks, at: new Date().toISOString() });
+  todos.push({ id: uid(), text, cat, done, inputMode: _addTodoMode, progress, subChecks,
+               keepDone: document.getElementById('todo-keep-done').checked,
+               at: new Date().toISOString() });
   saveDayTodos(todos);
   renderTodos();
   closeTodoModal();
@@ -6475,6 +6511,9 @@ function openTodoEditModal(e, id) {
   setTodoInputMode('edit', _editTodoMode);
   renderSubCheckInputs('edit');
   document.getElementById('todo-edit-set-default').checked = false;
+  // 예전 항목엔 keepDone 이 없다 → 설정의 기본값을 보여준다
+  document.getElementById('todo-edit-keep-done').checked =
+    (t.keepDone !== undefined) ? !!t.keepDone : getTodoKeepDone();
   document.getElementById('modal-todo-edit').classList.add('open');
 }
 
@@ -6510,7 +6549,8 @@ function saveTodoEdit() {
   const todos = getDayTodos();
   const t = todos.find(x => x.id === _editingTodoId);
   if (!t) return;
-  Object.assign(t, { text, cat, inputMode: _editTodoMode, progress, subChecks, done });
+  Object.assign(t, { text, cat, inputMode: _editTodoMode, progress, subChecks, done,
+                     keepDone: document.getElementById('todo-edit-keep-done').checked });
   if (document.getElementById('todo-edit-set-default').checked) {
     saveTodoDefaultInputMode(_editTodoMode);
   }
