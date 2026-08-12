@@ -4036,6 +4036,7 @@ function startSelfDocWatch() {
           JSON.stringify(data.leaderPerms) !== JSON.stringify(me.leaderPerms || [])) {
         me.leaderPerms = data.leaderPerms; changed = true;
       }
+      _syncTodoCats(data);
       if (changed) {
         DB.saveUser(me);
         _userInfoCache[me.id] = { name: me.name || '', role: me.role || '' };   // 내 이름/직분 캐시 갱신
@@ -6010,8 +6011,39 @@ function setTodoCatAlign(v) {
 }
 
 // ── 카테고리 ──
-function getCategories() { return DB.get('todoCats_' + me.id, ['신앙/말씀&기도','전도','생활/건강','학습','직무/사무']); }
-function saveCategories(c) { DB.set('todoCats_' + me.id, c); }
+// 카테고리는 users.todoCats 에 둔다. 예전엔 localStorage 에만 있어서 폰에서 만든 카테고리가
+// PC 목록엔 아예 없었다 — 기기마다 서로 다른 목록을 들고 있었다. 로컬은 읽기 캐시로 남긴다.
+const DEFAULT_TODO_CATS = ['신앙/말씀&기도', '전도', '생활/건강', '학습', '직무/사무'];
+function getCategories() { return DB.get('todoCats_' + me.id, DEFAULT_TODO_CATS.slice()); }
+function saveCategories(c) {
+  DB.set('todoCats_' + me.id, c);
+  if (!me) return;
+  me.todoCats = c;
+  // updateDoc 은 문서가 없으면 던진다 — setUser(merge) 로 쓴다
+  if (window._fbReady && window._fb) window._fb.setUser(me.id, { todoCats: c }).catch(() => {});
+}
+
+// 서버 스냅샷의 카테고리를 이 기기에 반영한다 (startSelfDocWatch 에서 호출).
+function _syncTodoCats(data) {
+  if (!me) return;
+  const localKey = 'todoCats_' + me.id;
+  const local = DB.get(localKey, null);
+  // 서버에 아직 없다 → 이 기기 목록을 올려서 기준을 만든다
+  if (!Array.isArray(data.todoCats)) { if (local) saveCategories(local); return; }
+  let next = data.todoCats;
+  // 이 기기에 localStorage 시절 목록이 남아 있으면 딱 한 번만 합친다.
+  // 그냥 서버 것으로 덮으면 폰에서만 만든 카테고리가 그 자리에서 사라진다.
+  const mergedKey = 'todoCatsSynced_' + me.id;
+  if (local && !DB.get(mergedKey, false)) {
+    DB.set(mergedKey, true);
+    const extra = local.filter(c => !next.includes(c));
+    if (extra.length) { saveCategories(next.concat(extra)); return; }   // 올리면 스냅샷이 다시 돈다
+  }
+  if (JSON.stringify(next) === JSON.stringify(local)) return;
+  DB.set(localKey, next);
+  me.todoCats = next;
+  if (document.getElementById('settings-cat-list')) { try { renderCategoryManager(); } catch (e) {} }
+}
 
 function populateCatSelect(id) {
   const el = document.getElementById(id);
