@@ -6789,7 +6789,8 @@ function initSideMenu() {
   if (!me) return;
   document.getElementById('sm-name').textContent       = me.name + (me.role ? ' ' + me.role : '');
   document.getElementById('sm-church-lbl').textContent = me.church || '교회 없음';
-  const isLeaderUser = isLeader();
+  // 임명 리더도 메뉴는 보여야 자기가 받은 권한을 쓸 수 있다 (안의 항목은 각자 권한으로 걸러진다)
+  const isLeaderUser = isLeader() || (me.leaderPerms || []).length > 0;
   document.getElementById('sm-leader-section').style.display = isLeaderUser ? 'block' : 'none';
   // 앱 관리자 섹션
   const adminSec = document.getElementById('sm-admin-section');
@@ -7554,8 +7555,9 @@ function isLeaderApproved(u) {
 function isLeader() {
   if (!me) return false;
   if (me.isAppAdmin) return true;
-  // 임명 리더 — 승인된 리더가 부여한 권한이므로 그대로 인정
-  if (me.leaderPerms && me.leaderPerms.length > 0) return true;
+  // 임명 리더는 여기서 true 가 아니다. 예전에는 권한이 하나라도 있으면 리더로 쳐서,
+  // '게시판' 하나만 임명받은 사람도 교인 전화번호·교회 정보 편집까지 열렸다.
+  // 임명받은 일은 각자 hasLeaderPerm(권한) 으로 확인한다.
   // 승인 기록이 있으면 그게 전부다. 직분까지 함께 요구하면, 관리자가 승인해 줘도 직분이
   // '성도' 인 사람은 서버는 통과시키는데 화면에서만 리더가 아닌 상태가 된다(서버 규칙은
   // leaderStatus 만 본다). 직분 이름은 표시용이고 권한의 근거가 아니다.
@@ -10031,7 +10033,7 @@ function toggleBinderShare() {
 // ── 리더: 교인 묵상 나눔 (커뮤니티 바인더) ──
 function showShareModeIfLeader() {
   const btn = document.getElementById('mode-share');
-  if (btn) btn.style.display = (typeof isLeader === 'function' && isLeader()) ? '' : 'none';
+  if (btn) btn.style.display = hasLeaderPerm('binder') ? '' : 'none';
 }
 
 var _communityCache = {};

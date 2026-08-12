@@ -1668,7 +1668,7 @@ async function loadMyChurchData() {
   html += `
     <div class="ss-section-title" style="display:flex;justify-content:space-between;align-items:center">
       <span>우리 교회 챌린지</span>
-      ${isLeader() ? `<span style="font-size:12px;color:var(--muted);cursor:pointer;font-weight:600"
+      ${(isLeader() || hasLeaderPerm('challenge-manage')) ? `<span style="font-size:12px;color:var(--muted);cursor:pointer;font-weight:600"
         onclick="openCreateChallengeModal()">+ 만들기</span>` : ''}
     </div>`;
   if (!myChals.length) {
@@ -1735,7 +1735,7 @@ async function loadMyChurchData() {
   html += `
     <div class="ss-section-title" style="display:flex;justify-content:space-between;align-items:center">
       <span>교인 현황</span>
-      ${isLeader() ? `<span style="font-size:12px;color:var(--muted);cursor:pointer;font-weight:600"
+      ${(isLeader() || hasLeaderPerm('challenge-manage')) ? `<span style="font-size:12px;color:var(--muted);cursor:pointer;font-weight:600"
         onclick="openSubscreen('members');closeSideMenu()">관리 ›</span>` : ''}
     </div>
     <div class="ss-card" style="margin:0 16px 24px">`;

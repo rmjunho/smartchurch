@@ -443,7 +443,7 @@ async function deleteChallenge(e, id) {
   const ch   = list.find(c => c.id === id);
   if (!ch) return;
   const isMine = ch.createdByUid === me.id;
-  const isChurchOwner = ch.createdByChurch === (me.church || '') && (isLeader() || hasLeaderPerm('challenge'));
+  const isChurchOwner = ch.createdByChurch === (me.church || '') && (isLeader() || hasLeaderPerm('challenge-manage'));
   if (!me.isAppAdmin && !isMine && !isChurchOwner) {
     toast('삭제 권한이 없어요'); return;
   }
@@ -497,7 +497,7 @@ function openEditChallengeModal(id) {
   if (!ch) return;
 
   const isMine = ch.createdByUid === me.id;
-  const isChurchOwner = ch.createdByChurch === (me.church || '') && (isLeader() || hasLeaderPerm('challenge'));
+  const isChurchOwner = ch.createdByChurch === (me.church || '') && (isLeader() || hasLeaderPerm('challenge-manage'));
   if (!me.isAppAdmin && !isMine && !isChurchOwner) {
     toast('수정 권한이 없어요 '); return;
   }
@@ -532,7 +532,7 @@ function submitEditChallenge() {
 
   const ch = list[idx];
   const isMine = ch.createdByUid === me.id;
-  const isChurchOwner = ch.createdByChurch === (me.church || '') && (isLeader() || hasLeaderPerm('challenge'));
+  const isChurchOwner = ch.createdByChurch === (me.church || '') && (isLeader() || hasLeaderPerm('challenge-manage'));
   if (!me.isAppAdmin && !isMine && !isChurchOwner) {
     toast('수정 권한이 없어요 '); return;
   }
@@ -725,7 +725,7 @@ function renderChallengeManage() {
         <div class="ss-empty-title">아직 만든 챌린지가 없어요</div>
         <div class="ss-empty-sub">+ 만들기 버튼으로 첫 챌린지를 시작해보세요!</div></div>`;
     } else {
-      chList.forEach(ch => { html += _cmChCard(ch, ch.createdByUid === me.id || me.isAppAdmin || isLeader()); });
+      chList.forEach(ch => { html += _cmChCard(ch, ch.createdByUid === me.id || me.isAppAdmin || isLeader() || hasLeaderPerm('challenge-manage')); });
     }
   } else {
     if (!pubAll.length) {

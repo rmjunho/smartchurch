@@ -25,10 +25,12 @@ service cloud.firestore {
     // leaderStatus 는 selfKeepsPrivileges 가 본인 수정으로는 'pending' 까지만 허용하므로
     // 'approved' 는 앱 관리자(또는 이미 승인된 리더)가 써 준 값뿐이다 — 그 자체로 충분한 근거다.
     function leaderApproved() { return profile().get('leaderStatus', '') == 'approved'; }
+    // 임명 리더(leaderPerms)는 여기 들어오지 않는다. 권한이 하나라도 있으면 리더로 쳤더니
+    // '게시판' 하나만 임명받은 사람에게도 교인 전화번호와 교회 정보 수정이 열렸다.
+    // 임명받은 일은 hasPerm(권한) 으로 각자 확인한다.
     function isLeader() {
       return signedIn() && hasProfile() && (
         profile().isAppAdmin == true ||
-        (profile().leaderPerms is list && profile().leaderPerms.size() > 0) ||
         leaderApproved()
       );
     }
@@ -68,7 +70,9 @@ service cloud.firestore {
       allow update: if signedIn() && (
                       (uid() == userId && selfKeepsPrivileges()) ||
                       isAdmin() ||
-                      (isLeader() && resource.data.churchCode == profile().churchCode)
+                      // 가입 승인·새가족 등록을 임명받은 사람도 같은 교회 교인 문서를 고쳐야 한다
+                      ((isLeader() || hasPerm('approve') || hasPerm('newfamily'))
+                       && resource.data.churchCode == profile().churchCode)
                     );
       allow delete: if signedIn() && (uid() == userId || isAdmin());
     }
@@ -124,7 +128,7 @@ service cloud.firestore {
       allow read:   if signedIn();
       allow create: if signedIn();
       allow update, delete: if signedIn() && (
-                      resource.data.createdByUid == uid() || isLeader()
+                      resource.data.createdByUid == uid() || isLeader() || hasPerm('challenge-manage')
                     );
     }
 
