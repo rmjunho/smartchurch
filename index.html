@@ -4566,7 +4566,10 @@ async function pullBinderFromServer() {
     if ((server.updatedAt || '') <= (local.updatedAt || '')) return;
     const merged = { ...server };
     delete merged.uid; delete merged.date; delete merged.syncedAt;
-    if (local.todos !== undefined) merged.todos = local.todos;   // 투두는 myTodos 가 관리
+    // 투두는 myTodos 가 관리한다. 분리 전에 올라간 바인더 문서에는 옛 todos 필드가 그대로
+    // 남아 있어(merge 는 필드를 지우지 않는다), 그냥 두면 그 잔재가 최신 목록을 덮는다.
+    delete merged.todos;
+    if (local.todos !== undefined) merged.todos = local.todos;
     DB.set(localKey, merged);
     loadBinder();          // 텍스트 필드 재적용 (merged.updatedAt == local 이 되어 재-pull 없음)
     if (canvasReady) DRAW_KEYS.forEach(loadDrawingForKey);   // 드로잉 캔버스도 서버본으로 갱신
@@ -5631,9 +5634,12 @@ function startTodosWatch() {
   if (!me || !window._fbReady || !window._fb || !window._fb.listenMyTodos) return;
   const dk = dateKey();
   _todosUnsub = window._fb.listenMyTodos(`${me.id}_${dk}`, snap => {
-    if (!snap.exists() || dateKey() !== dk) return;
+    if (dateKey() !== dk) return;
     const localKey = `binder_${me.id}_${dk}`;
     const local  = DB.get(localKey, {}) || {};
+    // 서버에 그날 문서가 아직 없다 → 이 기기 것을 올려 기준을 만든다.
+    // 이게 없으면 그 날짜를 열어봐도 아무 일이 안 일어나 다른 기기가 영영 못 받는다.
+    if (!snap.exists()) { if ((local.todos || []).length) syncTodosToServer(); return; }
     const server = snap.data().todos || [];
     const merged = _mergeTodoLists(local.todos, server);
     if (JSON.stringify(merged) !== JSON.stringify(local.todos || [])) {
