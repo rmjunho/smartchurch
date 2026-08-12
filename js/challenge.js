@@ -367,7 +367,22 @@ function fullCatalog() {
   return [...CHALLENGE_CATALOG, ...personalChallenges(), ...customChallenges(), ...publicChallenges()];
 }
 
-function myChallenges() { return DB.get('myChallenges_' + me.id, []); }
+// 참여 기록에는 '참여 상태'(체크한 날짜·연속일)만 있으면 된다. 기간·주기 같은 '정의'는
+// 카탈로그가 원본이다. 예전엔 참여하는 순간 정의까지 복사해 둬서, 만든 리더가 시작·종료일을
+// 고쳐도 이미 참여한 사람 화면엔 옛 값(대개 빈 값)이 그대로 남았다.
+var _CH_DEF_FIELDS = ['tag', 'label', 'desc', 'freqType', 'freqTarget', 'startDate', 'endDate', 'type', 'target'];
+function myChallenges() {
+  const list = DB.get('myChallenges_' + me.id, []);
+  const byId = {};
+  fullCatalog().forEach(t => { byId[t.id] = t; });
+  return list.map(c => {
+    const t = c.templateId && byId[c.templateId];
+    if (!t) return c;                       // 카탈로그를 아직 못 받았거나 원본이 삭제됨 → 저장본 그대로
+    const out = Object.assign({}, c);
+    _CH_DEF_FIELDS.forEach(f => { if (t[f] !== undefined) out[f] = t[f]; });
+    return out;
+  });
+}
 
 // 원본 챌린지가 삭제돼도 참여 기록(myChallenges)은 각자 목록에 그대로 남아 계속 보였다.
 // 서버 카탈로그를 실제로 받아온 뒤에만 걸러낸다 — 아직 못 받은 상태에서 거르면
