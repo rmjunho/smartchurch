@@ -2664,8 +2664,10 @@
 
       <!-- 챌린지 -->
       <div class="perm-category">챌린지</div>
-      <div class="perm-item" onclick="togglePermCb('challenge')">
-        <div class="perm-cb" id="perm-challenge"></div>
+      <!-- 키 이름은 'challenge-manage' 하나로 통일 — 예전엔 여기서 'challenge' 로 저장하고
+           확인은 'challenge-manage' 로 물어서, 임명해도 아무 효과가 없었다 -->
+      <div class="perm-item" onclick="togglePermCb('challenge-manage')">
+        <div class="perm-cb" id="perm-challenge-manage"></div>
         <div class="perm-info">
           <div class="perm-label">챌린지 만들기</div>
           <div class="perm-sub">커스텀 챌린지를 만들 수 있어요</div>
@@ -6680,7 +6682,8 @@ function _handlePendingStatusChange(data) {
 }
 
 // ── 리더 임명 시스템 ──
-var ALL_PERMS = ['challenge','approve','newfamily','invite','binder','ticketing'];
+// PERM_LABELS 의 키와 같은 이름이어야 한다 — 저장하는 쪽과 확인하는 쪽이 갈리면 조용히 안 먹는다
+var ALL_PERMS = ['challenge-manage','approve','newfamily','invite','binder','ticketing'];
 var PERM_LABELS = {
   'board'       : '게시판',
   'board-post'  : '게시글',
@@ -6695,8 +6698,12 @@ var PERM_LABELS = {
 var _appointingUserId = null;
 
 function openAppointModal(userId) {
-  const u = DB.get('users', []).find(x => x.id === userId);
-  if (!u) return;
+  // 교인 목록은 Firestore(_membersCache)에서 오므로 localStorage 의 users 에는 없을 수 있다.
+  // 예전에는 못 찾으면 조용히 return 해서, 버튼을 눌러도 아무 일도 안 일어났다.
+  const users = DB.get('users', []);
+  const u = _resolveMemberForAction(users, userId);
+  if (!u) { toast('교인 정보를 찾을 수 없어요. 목록을 새로고침해 주세요'); return; }
+  DB.set('users', users);   // 찾아온 교인을 로컬에도 남겨 저장 때 다시 찾게 한다
   _appointingUserId = userId;
   document.getElementById('appoint-user-name').textContent = u.name;
 
@@ -6738,8 +6745,8 @@ function togglePermCb(perm) {
 
 function saveAppointLeader() {
   const users = DB.get('users', []);
-  const u = users.find(x => x.id === _appointingUserId);
-  if (!u) return;
+  const u = _resolveMemberForAction(users, _appointingUserId);
+  if (!u) { toast('교인 정보를 찾을 수 없어요. 다시 시도해 주세요'); return; }
 
   const revoked = document.getElementById('perm-revoke')?.classList.contains('checked');
   const perms   = revoked ? [] : ALL_PERMS.filter(p =>
