@@ -49,7 +49,16 @@ service cloud.firestore {
               || request.resource.data.get('leaderPerms', []).size() == 0)   // 내려놓는 것만 허용 (교회를 옮기면 비운다)
           && request.resource.data.get('status', '')      == resource.data.get('status', '')
           && (request.resource.data.get('leaderStatus', '') == resource.data.get('leaderStatus', '')
-              || request.resource.data.get('leaderStatus', '') == 'pending');
+              || request.resource.data.get('leaderStatus', '') == 'pending')
+          // 승인 없이 교인이 되는 것을 막는다. churchStatus 가 막혀 있지 않아서, SDK 로 자기
+          // 문서에 churchStatus:'active' 와 남의 churchCode 를 써 넣으면 그대로 교인이 됐다
+          // (교인 명단·교회 채팅방이 보인다). 'active' 로 올리는 건 리더/관리자만 한다.
+          // 본인은 '' · 'pending' · 'church-pending' 등 무엇이든 쓸 수 있고, 이미 'active'
+          // 였다면 그대로 두는 것만 허용한다 — 이름을 고치는 평범한 수정이 막히면 안 된다.
+          // 교회를 옮기면서 'active' 를 들고 가는 것도 막는다(다른 교회로 무단 이동).
+          && (request.resource.data.get('churchStatus', '') != 'active'
+              || (resource.data.get('churchStatus', '') == 'active'
+                  && request.resource.data.get('churchCode', '') == resource.data.get('churchCode', '')));
     }
 
     // 가입은 update 를 거치지 않으므로 selfKeepsPrivileges 가 닿지 않는다.
@@ -220,10 +229,19 @@ service cloud.firestore {
 
     // ── 초대 코드 (코드 = 문서 ID) ──
     // 읽기 공개(온보딩 코드 확인). 생성: invite 권한 리더. 사용(usedBy arrayUnion): 로그인 누구나. 삭제: 리더.
+    // ── 초대 코드 ──
+    // 예전에는 read: if true 였다. 로그인조차 없이 컬렉션을 통째로 훑어 유효한 코드를
+    // 골라낼 수 있었고, 그러면 위에서 막은 무단 가입을 '정식 경로'로 그냥 해버린다.
+    // 코드를 '아는' 사람만 쓰라는 것이 초대 코드의 뜻이므로, 문서 하나를 콕 집어 읽는
+    // get 만 열고 목록 조회(list)는 막는다. 앱은 getDoc(code) 로만 읽어서 영향이 없다.
     match /inviteCodes/{code} {
-      allow read:   if true;
+      allow get:    if signedIn();
+      allow list:   if false;
       allow create: if hasPerm('invite');
-      allow update: if signedIn();
+      // 사용 기록(usedBy)만 남길 수 있다. 예전에는 signedIn 이면 무엇이든 고칠 수 있어
+      // 만료일을 늘리거나 다른 교회 코드로 바꿔치기할 수 있었다.
+      allow update: if signedIn()
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['usedBy']);
       allow delete: if isLeader();
     }
 
