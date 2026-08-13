@@ -4554,7 +4554,7 @@ function syncBinderToServer() {
 // 반영되지 않던 문제도 같이 사라진다).
 var BINDER_VER_FIELDS = ['verse','meditation','application','prayer','schRows',
                          'diary','memoText','memoUpload','photo',
-                         'schSettings','drawSizes','drawTodoCards','drawInv','drawCatH'];
+                         'schSettings','drawSizes','drawTodoCards'];
 
 function binderFieldKeys(d) {
   const keys = BINDER_VER_FIELDS.slice();
@@ -4611,11 +4611,6 @@ function saveBinderData(data, key) {
   bumpBinderVers(DB.get(k, {}) || {}, data);
   data.updatedAt = new Date().toISOString();
   DB.set(k, data);
-  // 저장 = 서버 전송. 예전에는 경로마다 syncBinderToServer() 를 따로 불렀고, 안 부르는 경로는
-  // 로컬에만 남아 다른 기기로 영영 가지 않았다(드로잉 카드 체크가 그랬다). 버전 증가와 같은
-  // 자리에서 처리해야 빠뜨릴 수 없다. 1.2초 디바운스라 연타해도 전송은 한 번이다.
-  // 오늘이 아닌 날짜를 명시 저장할 때는 부르지 않는다 — 전송 대상은 항상 오늘 문서다.
-  if (!key || k === binderKey()) syncBinderToServer();
 }
 // 필드별로 버전이 높은 쪽을 채택. 양쪽 중 하나라도 버전이 없으면(옛 문서) 예전 방식대로
 // 문서 단위로 비교한다 — 새 코드가 한 번 저장하면 버전이 생겨 자동으로 넘어간다.
@@ -4678,8 +4673,7 @@ function applyBinderFields(changed) {
   });
   if (hit('schRows'))       buildScheduleRows(data);
   if (hit('photo'))         loadPhotoForDate(data);
-  // 체크상태·칸 높이도 카드 렌더에서 함께 읽으므로 같은 경로로 다시 그린다
-  if (hit('drawTodoCards') || hit('drawInv') || hit('drawCatH')) { try { renderDrawTodoSection(); } catch (e) {} }
+  if (hit('drawTodoCards')) { try { renderDrawTodoSection(); } catch (e) {} }
   if (all || changed.some(k => k.indexOf('drawings.') === 0)) {
     if (canvasReady) DRAW_KEYS.forEach(loadDrawingForKey);
   }
@@ -5412,7 +5406,7 @@ function renderDrawTodoSection() {
     return;
   }
 
-  const invStates = getDrawInv();
+  const invStates = DB.get('drawInv_' + me.id, {});
   const ckPath = `<path d="M1 4L3.5 7L9 1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`;
 
   const align = getTodoCatAlign();
@@ -5474,7 +5468,7 @@ function initDrawCard(id) {
   const wrap   = document.getElementById('dtcw-' + id);
   if (!canvas || !wrap) return;
   const key   = 'tdraw_' + id;
-  const heights = getDrawCatH();
+  const heights = DB.get('drawCatH_' + me.id, {});
   const dispH   = heights[id] || 60;
   wrap.style.height = dispH + 'px';
   const cssW = Math.max(wrap.offsetWidth || 360, 100);
@@ -5504,31 +5498,10 @@ function initDrawCard(id) {
   pushHistory(key);
 }
 
-// ── 드로잉 카드 체크상태(drawInv)·칸 높이(drawCatH) ──
-// 예전에는 기기 전역 키(drawInv_{uid}·drawCatH_{uid})에 있어 기기를 바꾸면 따라오지 않았다.
-// 카드 id 가 날짜별로 결정적이라 그날 바인더 문서로 옮겨도 섞이지 않고, 옮기면 필드 단위
-// 병합과 실시간 감시를 그대로 탄다. 옛 전역 키는 아직 안 옮긴 날에만 읽는다(1회 흡수).
-// 그날 카드에 해당하는 id 만 가져온다 — 안 그러면 옛 맵 전체가 날마다 복사돼 쌓인다.
-function _drawMapFor(bkey, field, legacyPrefix, cards) {
-  const b = DB.get(bkey, {}) || {};
-  if (b[field]) return Object.assign({}, b[field]);
-  const legacy = DB.get(legacyPrefix + me.id, {}) || {};
-  const out = {};
-  (cards || []).forEach(c => { if (legacy[c.id] !== undefined) out[c.id] = legacy[c.id]; });
-  return out;
-}
-function getDrawInv()  { return _drawMapFor(binderKey(), 'drawInv',  'drawInv_',  getDrawTodoCards()); }
-function getDrawCatH() { return _drawMapFor(binderKey(), 'drawCatH', 'drawCatH_', getDrawTodoCards()); }
-function setDrawMap(field, map) {
-  const b = DB.get(binderKey(), {}) || {};
-  b[field] = map;
-  saveBinderData(b);          // 버전 증가 + 서버 반영까지 여기서 탄다
-}
-
 function toggleDrawCardInvert(id) {
-  const inv = getDrawInv();
+  const inv = DB.get('drawInv_' + me.id, {});
   inv[id] = !inv[id];
-  setDrawMap('drawInv', inv);
+  DB.set('drawInv_' + me.id, inv);
   // 연동된 챌린지 자동 체크/해제 (반전=완료 상태를 텍스트 할 일과 동일하게 처리)
   const cardData = getDrawTodoCards().find(x => x.id === id);
   if (cardData && cardData.linkedChallengeUid && typeof syncTodoLinkedChallenge === 'function') {
@@ -5573,9 +5546,9 @@ function startDrawCardResize(e, id) {
   function onUp() {
     document.removeEventListener('pointermove', onMove);
     document.removeEventListener('pointerup', onUp);
-    const h = getDrawCatH();
+    const h = DB.get('drawCatH_' + me.id, {});
     h[id] = wrap.offsetHeight;
-    setDrawMap('drawCatH', h);
+    DB.set('drawCatH_' + me.id, h);
     saveDrawingFor(key);
   }
   document.addEventListener('pointermove', onMove);
@@ -5855,31 +5828,29 @@ function carryOverDrawTodosIfNeeded() {
   const prevCards = (DB.get(pKey, {})).drawTodoCards;
   if (!prevCards || !prevCards.length) return;
 
-  // 체크상태·칸 높이는 '전날 문서' 기준이다. 오늘 것을 읽으면 아직 비어 있어 완료 카드를 못 거른다.
-  const invStates = _drawMapFor(pKey, 'drawInv',  'drawInv_',  prevCards);
-  const heights   = _drawMapFor(pKey, 'drawCatH', 'drawCatH_', prevCards);
+  const invStates = DB.get('drawInv_' + me.id, {});
+  const heights   = DB.get('drawCatH_' + me.id, {});
   const keepDone  = getTodoKeepDone();
   const source    = keepDone ? prevCards : prevCards.filter(c => !invStates[c.id]);
   if (!source.length) return;
 
-  // 새 ID로 카드 생성 + 칸 높이도 이전. 오늘 맵은 새로 만든다 — 전날 맵을 그대로 들고 오면
-  // 어제 id 가 오늘 문서에 그대로 쌓여 날마다 불어난다.
-  const newInv = {};
-  const newH   = {};
+  // 새 ID로 카드 생성 + 칸 높이도 이전
+  const newInv = DB.get('drawInv_' + me.id, {});
   const dk = dateKey();
   const carried = source.map(c => {
-    // 텍스트형 이월과 같은 이유로 결정적 id — 칸 높이·체크상태도 id 로 묶여 있어
+    // 텍스트형 이월과 같은 이유로 결정적 id — 칸 높이(drawCatH_)·체크상태(drawInv_)도 id 로 묶여 있어
     // 기기마다 id 가 다르면 그 설정까지 따로 놀았다.
     const root  = c.rootId || c.id;
     const newId = `c_${root}_${dk}`;
-    if (heights[c.id]) newH[newId] = heights[c.id];
+    const oldH  = heights[c.id];
+    if (oldH) heights[newId] = oldH;
     if (keepDone && invStates[c.id]) newInv[newId] = true;
     return { id: newId, rootId: root, cat: c.cat, linkedChallengeUid: c.linkedChallengeUid || undefined, createdAt: new Date().toISOString() };
   });
 
+  DB.set('drawCatH_' + me.id, heights);
+  if (keepDone) DB.set('drawInv_' + me.id, newInv);
   todayData.drawTodoCards = carried;
-  todayData.drawCatH      = newH;
-  todayData.drawInv       = newInv;   // 빈 맵이라도 넣는다 — 이 날은 옮김 완료라는 표시가 된다
   saveBinderData(todayData);
   toast(`드로잉 할 일 ${carried.length}칸을 오늘로 이월했어요`);
 }
