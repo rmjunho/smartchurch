@@ -779,6 +779,13 @@
     /* 길게 누르면 OS 의 선택·복사 메뉴 대신 우리 메뉴가 뜨게 한다(복사는 메뉴에서 제공).
        이게 없으면 길게 누를 때 텍스트 선택이 먼저 잡혀 메뉴가 안 뜬다. */
     .chat-bubble { -webkit-touch-callout: none; user-select: none; }
+    /* 지운 메시지 — 자리는 남기고 내용만 비운다 */
+    .chat-bubble.deleted {
+      background: transparent !important;
+      border: 1px dashed var(--border);
+      color: var(--muted) !important;
+      font-style: italic; font-size: 13px;
+    }
     /* 같은 사람이 이어 보낸 말풍선 — 프로필 자리는 비우되 폭은 유지해 줄이 맞게 한다 */
     .chat-avatar.spacer { background: none; }
     .chat-bubble-wrap.grouped { margin-top: -4px; }

@@ -8906,17 +8906,22 @@ function _chatMsgsHtml(msgs, opts) {
     const avatarHtml = photo
       ? `<img src="${photo}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`
       : '👤';
-    const isImg = msg.type === 'image' && msg.imageUrl;
-    const bubbleInner = isImg
-      ? `<img class="chat-img" src="${msg.imageUrl}" alt="사진" loading="lazy" onclick="openImageLightbox(this.src)">`
-      : escHtml(msg.text);
+    // 지운 메시지는 자리를 남긴다 — 없애면 앞뒤 대화가 어긋난다(카카오톡과 같은 방식).
+    const isDeleted = !!msg.deleted;
+    const isImg = !isDeleted && msg.type === 'image' && msg.imageUrl;
+    const bubbleInner = isDeleted
+      ? '삭제된 메시지입니다'
+      : (isImg
+          ? `<img class="chat-img" src="${msg.imageUrl}" alt="사진" loading="lazy" onclick="openImageLightbox(this.src)">`
+          : escHtml(msg.text));
     const name = showRole
       ? `${escHtml(getUserName(msg.senderId, msg.senderName))} · ${escHtml(getUserRole(msg.senderId, msg.senderRole || '성도'))}`
       : escHtml(getUserName(msg.senderId, msg.senderName));
 
     if (msg.id) {
       _chatMsgIndex[msg.id] = {
-        text: msg.text || '', isImg: !!isImg,
+        text: msg.text || '', isImg: !!isImg, deleted: isDeleted,
+        roomId: (opts && opts.roomId) || '',
         senderId: msg.senderId, senderName: getUserName(msg.senderId, msg.senderName)
       };
     }
@@ -8927,7 +8932,7 @@ function _chatMsgsHtml(msgs, opts) {
                            : `<div class="chat-avatar">${avatarHtml}</div>`) : ''}
       <div class="chat-bubble-col">
         ${(!isMine && !grouped) ? `<div class="chat-sender">${name}</div>` : ''}
-        <div class="chat-bubble${isImg ? ' img' : ''}">${bubbleInner}</div>
+        <div class="chat-bubble${isImg ? ' img' : ''}${isDeleted ? ' deleted' : ''}">${bubbleInner}</div>
         ${lastOfGroup ? `<div class="chat-time">${timeStr}</div>` : ''}
       </div>
     </div>`;
@@ -9003,10 +9008,14 @@ function openMsgMenu(mid) {
     menu.onclick = e => { if (e.target.id === 'msg-action-menu') closeMsgMenu(); };
     document.body.appendChild(menu);
   }
+  if (m.deleted) return;                       // 이미 지운 메시지엔 할 수 있는 게 없다
   const preview = m.isImg ? '사진' : (m.text || '').replace(/\s+/g, ' ').slice(0, 40);
+  // 본인 메시지는 언제나, 리더는 남의 것도 지울 수 있다(서버 규칙이 같은 기준으로 이중 확인).
+  const canDelete = m.senderId === me.id || (typeof isLeader === 'function' && isLeader());
   menu.innerHTML = `<div class="ram-sheet">
     <div class="ram-title">${escHtml(preview)}</div>
     ${m.isImg ? '' : `<button class="ram-item" onclick="copyChatMsg('${mid}')">복사</button>`}
+    ${canDelete ? `<button class="ram-item danger" onclick="deleteChatMsg('${mid}')">삭제</button>` : ''}
     <button class="ram-item" onclick="closeMsgMenu()">취소</button>
   </div>`;
   menu.style.display = 'flex';
@@ -9028,6 +9037,25 @@ function copyChatMsg(mid) {
     return;
   } catch (e) {
     _copyFallback(m.text, done);
+  }
+}
+
+async function deleteChatMsg(mid) {
+  const m = _chatMsgIndex[mid];
+  closeMsgMenu();
+  if (!m || m.deleted) return;
+  if (!m.roomId) { toast('방 정보를 찾지 못했어요'); return; }
+  const mine = m.senderId === me.id;
+  if (!confirm(mine ? '이 메시지를 삭제할까요?\n"삭제된 메시지입니다"로 남아요.'
+                    : `${m.senderName}님의 메시지를 삭제할까요?\n"삭제된 메시지입니다"로 남아요.`)) return;
+  if (!window._fbReady || !window._fb?.deleteChatMsg) { toast('연결 중입니다'); return; }
+  try {
+    await window._fb.deleteChatMsg(m.roomId, mid, me.id);
+    m.deleted = true;      // 실시간 구독이 곧 다시 그리지만, 눈에 바로 반영되게
+    toast('삭제했어요');
+  } catch (e) {
+    console.error('메시지 삭제 실패:', e);
+    toast(e?.code === 'permission-denied' ? '삭제 권한이 없어요' : '삭제에 실패했어요');
   }
 }
 
@@ -9081,7 +9109,7 @@ async function _renderRoomMsgs(msgs) {
   const grew = msgs.length > (Number(el.dataset.msgCount) || 0);
   el.dataset.msgCount = msgs.length;
 
-  el.innerHTML = _chatMsgsHtml(msgs, { showRole: false })
+  el.innerHTML = _chatMsgsHtml(msgs, { showRole: false, roomId: _currentRoomId })
     + `<div class="chat-newmsg" id="room-panel-msgs-newbtn"
             onclick="_chatScrollBottom('room-panel-msgs')">새 메시지 ↓</div>`;
   _chatAfterRender('room-panel-msgs', wasNearBottom, grew);
@@ -10156,7 +10184,7 @@ async function _renderOpenChatMsgs(msgs) {
   const grew = msgs.length > (Number(el.dataset.msgCount) || 0);
   el.dataset.msgCount = msgs.length;
 
-  el.innerHTML = _chatMsgsHtml(msgs, { showRole: true })
+  el.innerHTML = _chatMsgsHtml(msgs, { showRole: true, roomId: _currentOpenChannelId })
     + `<div class="chat-newmsg" id="openchat-msgs-newbtn"
             onclick="_chatScrollBottom('openchat-msgs')">새 메시지 ↓</div>`;
   _chatAfterRender('openchat-msgs', wasNearBottom, grew);

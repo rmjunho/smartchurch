@@ -150,6 +150,10 @@ window._fb = {
       sendChatMsg: (roomId, msg) =>
         addDoc(collection(fbDb, 'chatRooms', roomId, 'messages'),
           { ...msg, createdAt: serverTimestamp() }),
+      // 메시지 삭제 = '삭제 표시'. 문서를 없애지 않는다(규칙이 delete 를 막아 둔다).
+      deleteChatMsg: (roomId, msgId, byUid) =>
+        updateDoc(doc(fbDb, 'chatRooms', roomId, 'messages', msgId),
+          { deleted: true, deletedBy: byUid, deletedAt: new Date().toISOString() }),
       listenChatMsgs: (roomId, n, cb) =>
         onSnapshot(
           query(collection(fbDb, 'chatRooms', roomId, 'messages'),
