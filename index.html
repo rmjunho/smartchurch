@@ -4839,19 +4839,35 @@ function initCanvas() {
 function getDrawSizesForDate() {
   return DB.get(binderKey(), {}).drawSizes || null; // null = 기본값 사용
 }
+// 칸 높이는 px 로 저장하는데 화면 너비는 기기마다 다르다(PC 프레임 480, 폰 355 같은 식).
+// 높이만 절대값으로 맞추면 같은 그림이 넓은 기기에서 가로로 늘어나고 세로로 눌린다.
+// 저장할 때 그때의 너비를 함께 남기고, 읽을 때 지금 너비 비율로 환산한다.
+// 숫자만 있는 옛 값은 절대 px 로 그대로 쓴다.
+function _drawWrapW(key) {
+  const wrap = document.getElementById('dcell-' + key + '-wrap');
+  return (wrap && wrap.offsetWidth) || 360;
+}
+function _drawSizeVal(h, key) { return { h: h, w: _drawWrapW(key) }; }
+function _scaleDrawH(v, key) {
+  if (v === undefined || v === null) return null;
+  if (typeof v === 'number') return v;              // 옛 값 — 그대로
+  if (!v.h) return null;
+  if (!v.w) return v.h;
+  return Math.round(v.h * (_drawWrapW(key) / v.w));
+}
 function saveDrawSizeForDate(key, h) {
   const data = DB.get(binderKey(), {});
   if (!data.drawSizes) data.drawSizes = {};
-  data.drawSizes[key] = h;
+  data.drawSizes[key] = _drawSizeVal(h, key);
   saveBinderData(data);
 }
 // 기본값 (사용자가 "기본값으로 저장" 클릭 시 저장됨)
 function getDrawSizeDefault(key) {
-  return (DB.get('drawSizeDefault_' + me.id, {}))[key] || DEFAULT_DRAW_HEIGHTS[key];
+  return _scaleDrawH((DB.get('drawSizeDefault_' + me.id, {}))[key], key) || DEFAULT_DRAW_HEIGHTS[key];
 }
 function saveDrawSizeDefault(key, h) {
   const d = DB.get('drawSizeDefault_' + me.id, {});
-  d[key] = h;
+  d[key] = _drawSizeVal(h, key);
   DB.set('drawSizeDefault_' + me.id, d);
   // 기기별 로컬로만 두면 다른 기기는 영영 옛 기본값을 쓴다. 그 날짜에 드래그한 적 없는 칸은
   // drawSizes 가 아니라 이 기본값을 쓰므로, 기기마다 칸 높이가 다르게 보이던 원인이었다.
@@ -4862,7 +4878,10 @@ function saveDrawSizeDefault(key, h) {
 function getEffectiveDrawH(key) {
   if (!me) return DEFAULT_DRAW_HEIGHTS[key];
   const perDate = getDrawSizesForDate();
-  if (perDate && perDate[key] !== undefined) return perDate[key];
+  if (perDate) {
+    const h = _scaleDrawH(perDate[key], key);
+    if (h) return h;
+  }
   return getDrawSizeDefault(key);
 }
 
