@@ -2298,6 +2298,10 @@ function createInviteCode(expiryDays) {
   codes[code] = {
     code,
     church:      me.church || '',
+    // 코드에 churchCode 가 없어서 초대로 들어온 사람은 churchCode 가 빈 값이 됐다.
+    // 교인 목록·채팅방·일정·게시판이 전부 churchCode 로 조회되므로, 교회에 속했는데
+    // 아무것도 안 보이고 명단에도 안 뜨는 상태가 된다. 서버 규칙도 이 값으로 초대를 확인한다.
+    churchCode:  me.churchCode || '',
     orgType:     me.orgType || 'church',
     createdBy:   me.name,
     createdById: me.id,
@@ -2503,12 +2507,31 @@ async function obEnterWithInviteCode() {
   if (!entry) { toast('유효하지 않거나 만료된 초대 코드예요'); return; }
 
   // 교회 연결 (승인 없이 바로)
+  // 옛 코드에는 churchCode 가 없다. 그런 코드로는 서버가 초대를 확인할 수 없으므로
+  // 바로 활성으로 넣지 않고 승인 대기로 둔다 — 조용히 실패해 소속이 풀리는 것보다 낫다.
+  const invCode = (code || '').toUpperCase().trim();
+  const invChurchCode = entry.churchCode || '';
   obData.churchName  = entry.church;
   me.church          = entry.church;
-  me.churchCode      = entry.churchCode || '';
-  me.churchStatus    = 'active';
-  me.orgType         = me.orgType || entry.orgType || getOrgTypeForChurch(entry.churchCode) || 'church';
+  me.churchCode      = invChurchCode;
+  me.churchStatus    = invChurchCode ? 'active' : 'pending';
+  me.joinedViaCode   = invCode;   // 서버 규칙이 이 코드로 초대를 확인한다
+  me.orgType         = me.orgType || entry.orgType || getOrgTypeForChurch(invChurchCode) || 'church';
   DB.saveUser(me);
+
+  // 서버에도 올린다. 예전에는 DB.saveUser(localStorage 전용)만 불러서, 초대로 들어온 소속이
+  // 그 기기 밖으로 나간 적이 없었다 — 다른 기기에서 로그인하면 소속이 없고, 다음 로그인 때
+  // 서버 프로필이 로컬을 덮어써 소속이 통째로 풀렸다. 일반 경로(obConnectChurch)는 올리고
+  // 있었는데 이 경로만 빠져 있었다.
+  if (window._fbReady && window._fb) {
+    window._fb.updateUser(me.id, {
+      church:       me.church || '',
+      churchCode:   me.churchCode || '',
+      churchStatus: me.churchStatus || '',
+      orgType:      me.orgType || '',
+      joinedViaCode: invCode
+    }).catch(e => { if (window._fbErr) window._fbErr('초대 코드 입장', e); });
+  }
 
   // 사용 기록
   markInviteCodeUsed(code, me.id);
@@ -2516,7 +2539,9 @@ async function obEnterWithInviteCode() {
     window._fb.useInviteCode(code, me.id).catch(() => {});
   }
 
-  toast(`"${entry.church}"에 바로 입장했어요!`);
+  toast(invChurchCode
+    ? `"${entry.church}"에 바로 입장했어요!`
+    : `"${entry.church}" 가입 신청이 접수됐어요! 리더 승인 후 이용할 수 있어요`);   // 옛 코드
   obGoNextAfterChurch();
 }
 

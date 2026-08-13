@@ -57,8 +57,31 @@ service cloud.firestore {
           // 였다면 그대로 두는 것만 허용한다 — 이름을 고치는 평범한 수정이 막히면 안 된다.
           // 교회를 옮기면서 'active' 를 들고 가는 것도 막는다(다른 교회로 무단 이동).
           && (request.resource.data.get('churchStatus', '') != 'active'
+              // 이미 그 교회에서 활성이던 사람이 이름 등 다른 것을 고치는 평범한 수정.
+              // 부분 수정도 규칙에는 병합된 최종 문서가 오므로, 이게 없으면 전부 거부된다.
               || (resource.data.get('churchStatus', '') == 'active'
-                  && request.resource.data.get('churchCode', '') == resource.data.get('churchCode', '')));
+                  && request.resource.data.get('churchCode', '') == resource.data.get('churchCode', ''))
+              // 전에 승인받았던 공동체로 돌아오기(재승인 면제). 반드시 '서버에 이미 있는'
+              // 기록만 본다 — 이번 요청에 함께 실려 온 목록을 믿으면 스스로 통행증을 쓴다.
+              || resource.data.get('approvedChurches', []).hasAny([request.resource.data.get('churchCode', '')])
+              // 초대 코드로 입장. 코드를 아는 것이 곧 승인이다(목록 조회는 아래에서 막았다).
+              || invitedTo(request.resource.data.get('joinedViaCode', ''),
+                           request.resource.data.get('churchCode', '')))
+          // 승인 이력은 '지금 활성인 그 교회'만 덧붙일 수 있다. 아니면 위의 '돌아오기'가
+          // 아무 교회나 적어 넣을 수 있는 무한 통행증이 된다.
+          && (request.resource.data.get('approvedChurches', []) == resource.data.get('approvedChurches', [])
+              || (resource.data.get('churchStatus', '') == 'active'
+                  && request.resource.data.get('approvedChurches', [])
+                       .hasOnly(resource.data.get('approvedChurches', [])
+                                  .concat([resource.data.get('churchCode', '')]))));
+    }
+
+    // 초대 코드를 실제로 들고 있는지 서버가 직접 확인한다. 코드 문서의 churchCode 와
+    // 들어가려는 교회가 같아야 한다 — 아무 코드나 들고 다른 교회에 들어가지 못하게.
+    function invitedTo(code, churchCode) {
+      return code != '' && churchCode != ''
+          && exists(/databases/$(database)/documents/inviteCodes/$(code))
+          && get(/databases/$(database)/documents/inviteCodes/$(code)).data.get('churchCode', '') == churchCode;
     }
 
     // 가입은 update 를 거치지 않으므로 selfKeepsPrivileges 가 닿지 않는다.
