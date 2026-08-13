@@ -8859,6 +8859,104 @@ function openChatRoom(roomId) {
   });
 }
 
+// ── 채팅 말풍선 공용 렌더 ──
+// 예전에는 DM·그룹(_renderRoomMsgs)과 오픈채팅(_renderOpenChatMsgs)이 거의 같은 코드 두 벌이었다.
+// 한쪽만 고쳐지는 일이 반복될 자리라 한 곳으로 모았다. 차이는 직분 표시 하나뿐이다.
+var CHAT_GROUP_MS = 3 * 60 * 1000;   // 같은 사람이 3분 안에 이어 보내면 한 덩어리로 묶는다
+
+function _chatTs(msg) {
+  return msg.createdAt?.toDate ? msg.createdAt.toDate() : new Date();
+}
+function _chatDayKey(d) {
+  return d.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' });
+}
+
+// msgs → 말풍선 HTML. opts: { showRole }
+function _chatMsgsHtml(msgs, opts) {
+  const showRole = !!(opts && opts.showRole);
+  let html = '', lastDate = '';
+  msgs.forEach((msg, i) => {
+    const isMine  = msg.senderId === me.id;
+    const ts      = _chatTs(msg);
+    const dateStr = _chatDayKey(ts);
+    const timeStr = ts.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: true });
+
+    const newDay = dateStr !== lastDate;
+    if (newDay) {
+      html += `<div class="openchat-date-divider"><span>${dateStr}</span></div>`;
+      lastDate = dateStr;
+    }
+
+    // 같은 사람이 이어 보낸 것이면 프로필·이름을 한 번만 보여준다(날짜가 바뀌면 다시 보여준다).
+    const prev = msgs[i - 1];
+    const grouped = !newDay && prev && prev.senderId === msg.senderId
+                    && (ts - _chatTs(prev)) < CHAT_GROUP_MS;
+    // 시간은 묶음의 마지막에만 — 줄마다 찍으면 지저분하다.
+    const next   = msgs[i + 1];
+    const nextTs = next ? _chatTs(next) : null;
+    const lastOfGroup = !(next && next.senderId === msg.senderId
+                          && (nextTs - ts) < CHAT_GROUP_MS
+                          && _chatDayKey(nextTs) === dateStr);
+
+    const photo = (msg.senderId !== 'system' && getUserPhoto(msg.senderId)) || msg.senderPhoto;
+    const avatarHtml = photo
+      ? `<img src="${photo}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`
+      : '👤';
+    const isImg = msg.type === 'image' && msg.imageUrl;
+    const bubbleInner = isImg
+      ? `<img class="chat-img" src="${msg.imageUrl}" alt="사진" loading="lazy" onclick="openImageLightbox(this.src)">`
+      : escHtml(msg.text);
+    const name = showRole
+      ? `${escHtml(getUserName(msg.senderId, msg.senderName))} · ${escHtml(getUserRole(msg.senderId, msg.senderRole || '성도'))}`
+      : escHtml(getUserName(msg.senderId, msg.senderName));
+
+    html += `<div class="chat-bubble-wrap ${isMine ? 'mine' : ''}${grouped ? ' grouped' : ''}">
+      ${!isMine ? (grouped ? '<div class="chat-avatar spacer"></div>'
+                           : `<div class="chat-avatar">${avatarHtml}</div>`) : ''}
+      <div class="chat-bubble-col">
+        ${(!isMine && !grouped) ? `<div class="chat-sender">${name}</div>` : ''}
+        <div class="chat-bubble${isImg ? ' img' : ''}">${bubbleInner}</div>
+        ${lastOfGroup ? `<div class="chat-time">${timeStr}</div>` : ''}
+      </div>
+    </div>`;
+  });
+  return html;
+}
+
+// ── 스크롤 ──
+// 예전에는 렌더할 때마다 무조건 맨 아래로 끌어내렸다. 위로 올려 옛 메시지를 읽는 중에
+// 남이 한 마디 하면 그대로 튕겨 내려갔다. 아래쪽을 보고 있을 때만 따라 내린다.
+function _chatNearBottom(el) {
+  return el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+}
+function _chatScrollBottom(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+  document.getElementById(id + '-newbtn')?.classList.remove('show');
+}
+// 사용자가 직접 아래까지 내리면 버튼을 숨긴다. 컨테이너마다 한 번만 건다.
+function _chatWatchScroll(id) {
+  const el = document.getElementById(id);
+  if (!el || el.dataset.scrollWatched) return;
+  el.dataset.scrollWatched = '1';
+  el.addEventListener('scroll', () => {
+    if (_chatNearBottom(el)) document.getElementById(id + '-newbtn')?.classList.remove('show');
+  }, { passive: true });
+}
+// 렌더 뒤 스크롤 처리. 아래를 보고 있었으면 따라 내리고, 아니면 '새 메시지' 버튼만 띄운다.
+function _chatAfterRender(id, wasNearBottom, grew) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  _chatWatchScroll(id);
+  if (wasNearBottom) {
+    el.scrollTop = el.scrollHeight;
+    document.getElementById(id + '-newbtn')?.classList.remove('show');
+    return;
+  }
+  if (grew) document.getElementById(id + '-newbtn')?.classList.add('show');
+}
+
 async function _renderRoomMsgs(msgs) {
   const el = document.getElementById('room-panel-msgs');
   if (!el) return;
@@ -8878,37 +8976,14 @@ async function _renderRoomMsgs(msgs) {
   // 현재 사진이 표시됨 (루프 안에서 채우면 옛 메시지 그릴 땐 아직 안 차 있음)
   msgs.forEach(harvestSenderPhoto);
 
-  let html = '';
-  let lastDate = '';
-  msgs.forEach(msg => {
-    const isMine  = msg.senderId === me.id;
-    const ts      = msg.createdAt?.toDate ? msg.createdAt.toDate() : new Date();
-    const dateStr = ts.toLocaleDateString('ko-KR', { month:'long', day:'numeric', weekday:'short' });
-    const timeStr = ts.toLocaleTimeString('ko-KR', { hour:'2-digit', minute:'2-digit', hour12:true });
+  const wasNearBottom = _chatNearBottom(el);
+  const grew = msgs.length > (Number(el.dataset.msgCount) || 0);
+  el.dataset.msgCount = msgs.length;
 
-    if (dateStr !== lastDate) {
-      html += `<div class="openchat-date-divider"><span>${dateStr}</span></div>`;
-      lastDate = dateStr;
-    }
-    const photo = (msg.senderId !== 'system' && getUserPhoto(msg.senderId)) || msg.senderPhoto;
-    const avatarHtml = photo
-      ? `<img src="${photo}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`
-      : '👤';
-    const isImg = msg.type === 'image' && msg.imageUrl;
-    const bubbleInner = isImg
-      ? `<img class="chat-img" src="${msg.imageUrl}" alt="사진" loading="lazy" onclick="openImageLightbox(this.src)">`
-      : escHtml(msg.text);
-    html += `<div class="chat-bubble-wrap ${isMine ? 'mine' : ''}">
-      ${!isMine ? `<div class="chat-avatar">${avatarHtml}</div>` : ''}
-      <div class="chat-bubble-col">
-        ${!isMine ? `<div class="chat-sender">${escHtml(getUserName(msg.senderId, msg.senderName))}</div>` : ''}
-        <div class="chat-bubble${isImg ? ' img' : ''}">${bubbleInner}</div>
-        <div class="chat-time">${timeStr}</div>
-      </div>
-    </div>`;
-  });
-  el.innerHTML = html;
-  el.scrollTop = el.scrollHeight;
+  el.innerHTML = _chatMsgsHtml(msgs, { showRole: false })
+    + `<div class="chat-newmsg" id="room-panel-msgs-newbtn"
+            onclick="_chatScrollBottom('room-panel-msgs')">새 메시지 ↓</div>`;
+  _chatAfterRender('room-panel-msgs', wasNearBottom, grew);
 }
 
 async function sendRoomMsg() {
@@ -9976,43 +10051,14 @@ async function _renderOpenChatMsgs(msgs) {
   // 렌더 전에 전체 메시지를 훑어 박제 사진을 캐시에 채움 → 프로필 설정 전 옛 메시지에도 현재 사진 표시
   msgs.forEach(harvestSenderPhoto);
 
-  let html = '';
-  let lastDate = '';
+  const wasNearBottom = _chatNearBottom(el);
+  const grew = msgs.length > (Number(el.dataset.msgCount) || 0);
+  el.dataset.msgCount = msgs.length;
 
-  msgs.forEach(msg => {
-    const isMine  = msg.senderId === me.id;
-    const ts      = msg.createdAt?.toDate ? msg.createdAt.toDate() : new Date();
-    const dateStr = ts.toLocaleDateString('ko-KR', { month:'long', day:'numeric', weekday:'short' });
-    const timeStr = ts.toLocaleTimeString('ko-KR', { hour:'2-digit', minute:'2-digit', hour12:true });
-
-    // 날짜 구분선
-    if (dateStr !== lastDate) {
-      html += `<div class="openchat-date-divider"><span>${dateStr}</span></div>`;
-      lastDate = dateStr;
-    }
-
-    const photo = (msg.senderId !== 'system' && getUserPhoto(msg.senderId)) || msg.senderPhoto;
-    const avatarHtml = photo
-      ? `<img src="${photo}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`
-      : '👤';
-    const isImg = msg.type === 'image' && msg.imageUrl;
-    const bubbleInner = isImg
-      ? `<img class="chat-img" src="${msg.imageUrl}" alt="사진" loading="lazy" onclick="openImageLightbox(this.src)">`
-      : escHtml(msg.text);
-
-    html += `<div class="chat-bubble-wrap ${isMine ? 'mine' : ''}">
-      ${!isMine ? `<div class="chat-avatar">${avatarHtml}</div>` : ''}
-      <div class="chat-bubble-col">
-        ${!isMine ? `<div class="chat-sender">${escHtml(getUserName(msg.senderId, msg.senderName))} · ${escHtml(getUserRole(msg.senderId, msg.senderRole||'성도'))}</div>` : ''}
-        <div class="chat-bubble${isImg ? ' img' : ''}">${bubbleInner}</div>
-        <div class="chat-time">${timeStr}</div>
-      </div>
-    </div>`;
-  });
-
-  el.innerHTML = html;
-  // 최신 메시지로 스크롤
-  el.scrollTop = el.scrollHeight;
+  el.innerHTML = _chatMsgsHtml(msgs, { showRole: true })
+    + `<div class="chat-newmsg" id="openchat-msgs-newbtn"
+            onclick="_chatScrollBottom('openchat-msgs')">새 메시지 ↓</div>`;
+  _chatAfterRender('openchat-msgs', wasNearBottom, grew);
 }
 
 async function sendOpenChatMsg() {

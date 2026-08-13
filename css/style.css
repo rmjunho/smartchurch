@@ -776,8 +776,22 @@
       justify-content:center; font-size:16px; flex-shrink:0;
       overflow:hidden;
     }
+    /* 같은 사람이 이어 보낸 말풍선 — 프로필 자리는 비우되 폭은 유지해 줄이 맞게 한다 */
+    .chat-avatar.spacer { background: none; }
+    .chat-bubble-wrap.grouped { margin-top: -4px; }
     .chat-bubble-col { display:flex; flex-direction:column; gap:3px; max-width:72%; }
     .chat-bubble-wrap.mine .chat-bubble-col { align-items:flex-end; }
+    /* '새 메시지' 버튼 — 스크롤 컨테이너 안에 sticky 로 띄운다.
+       부모에 position 을 요구하지 않아 기존 레이아웃을 건드리지 않는다. */
+    .chat-newmsg {
+      position: sticky; bottom: 8px; z-index: 5;
+      display: none; width: max-content; margin: 0 auto;
+      padding: 7px 14px; border-radius: 20px;
+      background: var(--black); color: var(--white);
+      font-size: 12.5px; font-weight: 700; cursor: pointer;
+      box-shadow: 0 3px 12px rgba(0,0,0,0.28);
+    }
+    .chat-newmsg.show { display: block; }
     .chat-sender { font-size:11px; color:var(--muted); font-weight:600; padding:0 4px; }
     .chat-bubble {
       background: white; border-radius:16px 16px 16px 4px;
