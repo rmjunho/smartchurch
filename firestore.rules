@@ -183,7 +183,15 @@ service cloud.firestore {
     match /challengeProofs/{id} {
       allow read:   if signedIn();
       allow create, update: if signedIn() && request.resource.data.userId == uid();
-      allow delete: if signedIn() && (resource.data.userId == uid() || isLeader());
+      // 삭제: 본인 / 리더(모더레이션) / 1주가 지나 만료된 것은 본 사람이 정리한다.
+      // 채팅 사진과 같은 이유 — 예약 정리(Cloud Functions)가 Blaze 전용이라 못 쓴다.
+      // createdAt 은 serverTimestamp 라 기기 시계를 되돌려도 만료를 앞당길 수 없다.
+      allow delete: if signedIn() && (
+                      resource.data.userId == uid()
+                      || isLeader()
+                      || (resource.data.createdAt is timestamp
+                          && resource.data.createdAt < request.time - duration.value(7, 'd'))
+                    );
     }
 
     // ── 게시판 글 (소유자 필드 authorId) ──
@@ -284,17 +292,17 @@ service cloud.firestore {
                            .hasOnly(['reactions'])
                          && resource.data.get('deleted', false) == false)
                         ||
-                        // ③ 3주 지난 사진 비우기 — 사진이 문서에 base64 로 들어 있어 그냥 두면
+                        // ③ 1주 지난 사진 비우기 — 사진이 문서에 base64 로 들어 있어 그냥 두면
                         // 무료 요금제 저장 용량만 먹는다. 예약 정리(Cloud Functions)는 Blaze
                         // 전용이라, 그 방을 연 사람이 발견하는 대로 비운다.
                         // 비우는 것 말고는 못 하게: imageUrl 은 반드시 빈 문자열이어야 하고
-                        // (다른 사진으로 갈아끼우기 차단), 3주가 지난 메시지여야 한다.
+                        // (다른 사진으로 갈아끼우기 차단), 1주가 지난 메시지여야 한다.
                         (request.resource.data.diff(resource.data).affectedKeys()
                            .hasOnly(['imageUrl', 'imageExpired'])
                          && request.resource.data.get('imageUrl', '') == ''
                          && request.resource.data.get('imageExpired', false) == true
                          && resource.data.createdAt is timestamp
-                         && resource.data.createdAt < request.time - duration.value(21, 'd'))
+                         && resource.data.createdAt < request.time - duration.value(7, 'd'))
                       );
         allow delete: if false;   // 되살릴 수 없는 진짜 삭제는 막는다
       }

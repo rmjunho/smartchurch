@@ -145,8 +145,10 @@ window._fb = {
       // 챌린지 인증샷. users 문서(myChallenges)에 넣지 않는 이유: users 는 교인 누구나
       // 읽을 수 있고 문서 1MB 한도도 사진 몇 장이면 찬다. 문서 ID = {uid}_{챌린지}_{날짜}
       // 라 하루 한 장만 남는다(다시 올리면 덮어쓴다).
+      // createdAt 은 서버 시각으로 박는다 — 1주 만료 정리를 규칙이 판단하려면 클라이언트가
+      // 고칠 수 없는 타임스탬프여야 한다(기기 시계를 되돌려 영구 보관하는 걸 막는다).
       setChallengeProof: (id, data) =>
-        setDoc(doc(fbDb, 'challengeProofs', id), data),
+        setDoc(doc(fbDb, 'challengeProofs', id), { ...data, createdAt: serverTimestamp() }),
       // 정렬은 클라이언트에서 — where + orderBy 를 같이 쓰면 복합 인덱스를 만들어야 한다.
       getChallengeProofs: (challengeId) =>
         getDocs(query(collection(fbDb, 'challengeProofs'),

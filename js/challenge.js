@@ -294,6 +294,15 @@ var _proofList = [];
 // 참여 기록의 uid 는 사람마다 다르다. 같은 챌린지를 한데 모으려면 원본(templateId)이 기준이다.
 function _proofChallengeId(c) { return c.templateId || c.uid; }
 
+// 채팅 사진과 같은 이유로 1주만 둔다 — 사진이 문서에 base64 로 들어 있어 사람 수 × 날짜 수
+// 만큼 쌓이면 무료 요금제 저장 용량을 갉아먹는다. 남길 사진은 눌러서 '저장' 으로 받는다.
+var CH_PROOF_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+function _proofExpired(p) {
+  if (!p || !p.date) return false;
+  const end = new Date(String(p.date) + 'T23:59:59');
+  return !isNaN(end) && (Date.now() - end.getTime() > CH_PROOF_TTL_MS);
+}
+
 async function openChallengeProofs(instanceUid) {
   const c = visibleMyChallenges().find(x => x.uid === instanceUid);
   if (!c) return;
@@ -315,8 +324,14 @@ async function openChallengeProofs(instanceUid) {
     const snap = await window._fb.getChallengeProofs(_proofChallenge.id);
     const rows = [];
     snap.forEach(d => rows.push(Object.assign({ _id: d.id }, d.data())));
+    // 1주 지난 것은 화면에서 내리고, 본 김에 서버에서도 지운다(한 번에 5건까지).
+    const expired = rows.filter(_proofExpired);
+    if (expired.length && window._fb.deleteChallengeProof) {
+      expired.slice(0, 5).forEach(r => window._fb.deleteChallengeProof(r._id).catch(() => {}));
+    }
     // 같은 교회 것만, 최신 날짜부터. 정렬을 서버에 맡기면 복합 인덱스가 필요해진다.
     _proofList = rows
+      .filter(r => !_proofExpired(r))
       .filter(r => !r.churchCode || !me.churchCode || r.churchCode === me.churchCode)
       .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
   } catch (e) {
@@ -353,6 +368,7 @@ function _renderChallengeProofs(loading) {
 
   modal.innerHTML = `<div class="ram-sheet">
     <div class="ram-title">${escHtml(_proofChallenge.label)} · 인증샷</div>
+    <div class="cp-note">사진은 1주 뒤 자동으로 지워져요. 남기려면 사진을 눌러 저장하세요.</div>
     <input type="file" id="challenge-proof-input" accept="image/*" style="display:none"
            onchange="uploadChallengeProof(event)">
     <button class="ram-item" id="challenge-proof-btn"

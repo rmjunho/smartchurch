@@ -878,6 +878,15 @@
       background:rgba(0,0,0,0.88); padding:24px; cursor:zoom-out;
     }
     #img-lightbox img { max-width:96%; max-height:96%; border-radius:10px; }
+    #img-dl-btn {
+      position:absolute; left:50%; transform:translateX(-50%);
+      bottom:calc(24px + env(safe-area-inset-bottom,0px));
+      height:42px; padding:0 22px; border:none; border-radius:21px;
+      background:var(--gold); color:white;
+      font-size:14px; font-weight:700; font-family:inherit; cursor:pointer;
+      box-shadow:0 3px 10px rgba(0,0,0,0.35);
+    }
+    .cp-note { font-size:11.5px; color:var(--muted); text-align:center; padding:0 4px 4px; }
     /* ── 답장(인용) ── */
     .chat-reply-bar {
       display:flex; align-items:center; gap:8px;
