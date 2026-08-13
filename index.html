@@ -4737,8 +4737,15 @@ function startBinderWatch() {
   const dk = dateKey();
   _binderUnsub = window._fb.listenMyBinder(`${me.id}_${dk}`, snap => {
     if (dateKey() !== dk) return;             // 응답 오는 사이 날짜가 바뀜 → 폐기
-    if (!snap.exists()) return;
     const localKey = `binder_${me.id}_${dk}`;
+    if (!snap.exists()) {
+      // 서버에 그 날짜 문서가 아예 없는데 이 기기에는 내용이 있다 = 올라간 적 없는 날짜.
+      // 전송은 저장할 때만 일어나므로, 열어보는 것만으로는 영영 안 올라간다.
+      // 옛 타이머 버그로 업로드가 취소된 날짜들이 여기서 구제된다.
+      const orphan = DB.get(localKey, null);
+      if (orphan && binderHasContent(orphan)) syncBinderToServer();
+      return;
+    }
     const local  = DB.get(localKey, {}) || {};
     const server = Object.assign({}, snap.data());
     delete server.uid; delete server.date; delete server.syncedAt;
@@ -4748,6 +4755,10 @@ function startBinderWatch() {
     if (!res.changed.length) return;
     DB.set(localKey, res.data);               // 버전은 병합 결과 그대로 — 여기서 올리면 안 된다
     applyBinderFields(res.changed);
+    // 합친 결과를 서버에도 올린다. 안 그러면 이쪽만 합쳐진 값을 갖고 상대는 영영 옛 값이다
+    // (동점이라 상대는 자기 것을 최신이라 믿는다). 병합은 양쪽이 같은 답을 내는 함수라
+    // 한두 번 오간 뒤 더 바뀌지 않는다 — 서로 주고받으며 도는 일은 없다.
+    syncBinderToServer();
   });
 }
 function stopBinderWatch() {

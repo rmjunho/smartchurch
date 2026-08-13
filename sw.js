@@ -12,7 +12,7 @@
 // ★ 배포할 때마다 이 숫자를 올린다. sw.js 의 바이트가 바뀌어야 브라우저가 '새 버전'으로 인식하고,
 //   그래야 index.html 의 updatefound 가 떠서 열려 있는 앱이 스스로 새로고침한다.
 //   다른 파일만 고치면 sw.js 는 그대로라 브라우저는 바뀐 걸 영영 모른다(배포해도 반영 안 되던 원인).
-const SW_VERSION = 37;
+const SW_VERSION = 38;
 const CACHE_NAME = 'smartchurch-v' + SW_VERSION;
 
 // 오프라인 폴백용 최소 자산. 설치 실패를 막기 위해 개별 실패는 무시한다.
