@@ -4072,10 +4072,10 @@ function _bootAppTail() {
   const _now = new Date();
   const _doy = Math.floor((_now - new Date(_now.getFullYear(), 0, 0)) / 86400000);
   const v = VERSES[_doy % VERSES.length];
-  const vt = document.getElementById('verse-text');
-  const vr = document.getElementById('verse-ref');
-  if (vt) vt.textContent = v.t;
-  if (vr) vr.textContent = '— ' + v.r;
+  // 클래스로 찾는다 — 히어로 슬라이드가 무한 루프를 위해 말씀 장을 복제해 두기 때문에
+  // id 하나만 채우면 복제본은 빈 채로 남는다(넘기다 보면 빈 말씀이 지나간다).
+  document.querySelectorAll('.verse-text').forEach(el => { el.textContent = v.t; });
+  document.querySelectorAll('.verse-ref').forEach(el => { el.textContent = '— ' + v.r; });
 
   // Greeting
   const g = GREETINGS[new Date().getHours() % GREETINGS.length](me.name);
@@ -4221,19 +4221,28 @@ function _calCenterDate(container) {
 // ── 히어로 슬라이드 (1장: 삶의 예배 제목 / 2장: 오늘의 말씀) ──
 // 넘김은 CSS 가로 스크롤 + scroll-snap 에 맡긴다 — 손으로 미는 건 브라우저가 알아서 부드럽게 한다.
 // JS 는 30초 자동 전환과 점(dot) 표시만 맡는다.
+// 무한으로 넘기기 위해 앞뒤에 복제 장을 하나씩 붙인다:
+//   [말씀(복제)] [제목] [말씀] [제목(복제)]
+//        0         1      2        3
+// 평소에는 1·2번 사이를 오가고, 끝(0 또는 3)에 닿으면 같은 그림인 반대쪽으로 소리 없이
+// 옮겨 놓는다(애니메이션 없이). 사용자 눈에는 계속 같은 방향으로 넘어가는 것처럼 보인다.
 var HERO_AUTO_MS = 30000;
 var _heroTimer   = null;
+var _heroSettleT = null;
 
-function goHeroSlide(i) {
-  const el = document.getElementById('hero-slides');
-  if (!el) return;
-  el.scrollTo({ left: el.clientWidth * i, behavior: 'smooth' });
-  _heroRestartTimer();          // 손으로 넘겼으면 30초를 처음부터 다시 센다
+function _heroEl() { return document.getElementById('hero-slides'); }
+function _heroPanel(el) {                       // 지금 몇 번째 판인가 (0~3)
+  return el && el.clientWidth ? Math.round(el.scrollLeft / el.clientWidth) : 1;
+}
+function _heroIndex() {                         // 실제로 보이는 장 (0=제목, 1=말씀)
+  return (_heroPanel(_heroEl()) + 1) % 2;
 }
 
-function _heroIndex() {
-  const el = document.getElementById('hero-slides');
-  return el && el.clientWidth ? Math.round(el.scrollLeft / el.clientWidth) : 0;
+function goHeroSlide(i) {                       // i: 0=제목, 1=말씀
+  const el = _heroEl();
+  if (!el || !el.clientWidth) return;
+  el.scrollTo({ left: el.clientWidth * (i === 0 ? 1 : 2), behavior: 'smooth' });
+  _heroRestartTimer();                          // 손으로 넘겼으면 30초를 처음부터 다시 센다
 }
 
 function _heroSyncDots() {
@@ -4243,20 +4252,56 @@ function _heroSyncDots() {
   }
 }
 
+// 끝 판에 멈췄으면 같은 그림인 안쪽 판으로 순간이동 — 이게 '무한'을 만든다.
+function _heroWrap() {
+  const el = _heroEl();
+  if (!el || !el.clientWidth) return;
+  const p = _heroPanel(el);
+  if (p === 0) el.scrollLeft = el.clientWidth * 2;        // 말씀(복제) → 진짜 말씀
+  else if (p === 3) el.scrollLeft = el.clientWidth * 1;   // 제목(복제) → 진짜 제목
+}
+
 function _heroRestartTimer() {
   clearInterval(_heroTimer);
   _heroTimer = setInterval(() => {
-    const el = document.getElementById('hero-slides');
+    const el = _heroEl();
     // 삶의 예배 탭이 화면에 없으면 넘기지 않는다 — 돌아왔을 때 엉뚱한 장이 떠 있지 않게.
-    if (!el || !el.offsetParent) return;
-    el.scrollTo({ left: el.clientWidth * (_heroIndex() === 0 ? 1 : 0), behavior: 'smooth' });
+    if (!el || !el.offsetParent || !el.clientWidth) return;
+    _heroWrap();                                          // 끝에 걸쳐 있으면 먼저 안쪽으로
+    el.scrollTo({ left: el.scrollLeft + el.clientWidth, behavior: 'smooth' });   // 항상 앞으로
   }, HERO_AUTO_MS);
 }
 
 (function initHeroSlides() {
-  const el = document.getElementById('hero-slides');
+  const el = _heroEl();
   if (!el) return;
-  el.addEventListener('scroll', _heroSyncDots, { passive: true });
+  const slides = [...el.children];
+  if (slides.length !== 2) return;
+
+  // 복제본에는 id 가 남으면 안 된다 — 문서에 같은 id 가 둘이 되면 getElementById 가 엉뚱한
+  // 쪽을 집는다. 내용은 클래스(.verse-text/.verse-ref)로 채우므로 id 는 없어도 된다.
+  const clone = (n) => {
+    const c = n.cloneNode(true);
+    c.removeAttribute('id');
+    c.querySelectorAll('[id]').forEach(x => x.removeAttribute('id'));
+    c.dataset.heroClone = '1';
+    return c;
+  };
+  el.insertBefore(clone(slides[1]), slides[0]);   // 앞에 말씀 복제
+  el.appendChild(clone(slides[0]));               // 뒤에 제목 복제
+
+  const start = () => {
+    if (!el.clientWidth) { requestAnimationFrame(start); return; }   // 아직 폭이 안 잡혔으면 기다린다
+    el.scrollLeft = el.clientWidth;               // 1번 판(진짜 제목)에서 시작
+    _heroSyncDots();
+  };
+  start();
+
+  el.addEventListener('scroll', () => {
+    _heroSyncDots();
+    clearTimeout(_heroSettleT);
+    _heroSettleT = setTimeout(_heroWrap, 120);    // 멈춘 뒤에 옮겨야 스크롤을 끊지 않는다
+  }, { passive: true });
   // 손으로 미는 중에는 자동 전환이 끼어들지 않게 타이머를 미룬다
   el.addEventListener('pointerdown', _heroRestartTimer);
   _heroRestartTimer();
