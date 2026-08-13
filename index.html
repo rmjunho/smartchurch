@@ -5184,7 +5184,10 @@ function loadDrawingForKey(key) {
   const src  = typeof d === 'string' ? d : d.dataUrl;
   if (!src) { pushHistory(key); return; }
   const img  = new Image();
-  img.onload = () => { ctx.drawImage(img, 0, 0); pushHistory(key); };
+  // 캔버스 크기에 맞춰 그린다. 원본 크기로 그리면(인자 2개) 저장할 때보다 좁은 기기에서
+  // 오른쪽이 잘리고, 그 기기가 뭔가 저장하는 순간 잘린 판이 서버의 원본을 덮는다.
+  // 화면 너비는 기기마다 다르므로 여기서 맞춰야 한다.
+  img.onload = () => { ctx.drawImage(img, 0, 0, canvas.width, canvas.height); pushHistory(key); };
   img.src = src;
 }
 
@@ -5554,7 +5557,8 @@ function initDrawCard(id) {
     const src = typeof saved === 'string' ? saved : saved.dataUrl;
     if (src) {
       const img = new Image();
-      img.onload = () => { ctx.drawImage(img, 0, 0); getHist(key).stack = []; pushHistory(key); };
+      // 주요 캔버스와 같은 이유로 캔버스 크기에 맞춰 그린다(좁은 기기에서 잘리는 것 방지)
+      img.onload = () => { ctx.drawImage(img, 0, 0, canvas.width, canvas.height); getHist(key).stack = []; pushHistory(key); };
       img.src = src;
       return;
     }
