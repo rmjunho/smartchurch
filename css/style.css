@@ -1086,6 +1086,17 @@
     .cal-strip-arrow:active { color: white; background: rgba(255,255,255,0.1); }
     .cal-strip-days {
       display: flex; flex: 1; justify-content: space-around;
+      touch-action: pan-y;   /* 세로 스크롤은 살리고 가로 스와이프는 JS 가 받는다 */
+      user-select: none;     /* PC 에서 드래그로 넘길 때 글자가 선택되지 않게 */
+    }
+    /* 주를 넘길 때 민 방향에서 미끄러져 들어온다 */
+    @keyframes calSlideNext {
+      from { transform: translateX(14px);  opacity: 0.35; }
+      to   { transform: none;              opacity: 1; }
+    }
+    @keyframes calSlidePrev {
+      from { transform: translateX(-14px); opacity: 0.35; }
+      to   { transform: none;              opacity: 1; }
     }
     .cal-strip-day {
       text-align: center; cursor: pointer; padding: 4px 0;
