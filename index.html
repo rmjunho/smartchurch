@@ -4294,7 +4294,7 @@ function loadBinder() {
     if (drawWrap && drawWrap.classList.contains('on')) renderDrawTodoSection();
   }, 30);
   // 다른 기기에서 저장한 최신본 있으면 가져와 반영
-  pullBinderFromServer();
+  startBinderWatch();    // 그날 바인더도 실시간 감시 (날짜 바뀌면 재구독)
   startTodosWatch();     // 그날 투두는 실시간 감시 (날짜 바뀌면 재구독)
 }
 
@@ -4478,7 +4478,7 @@ function saveBinderNow() {
     if (DB.get(binderKey(), null) !== null) DB.del(binderKey());   // 이전에 저장된 빈 항목 정리
     return;
   }
-  DB.set(binderKey(), merged);
+  saveBinderData(merged);
 
   // 공유 허용한 경우 Firestore에도 동기화 (선택한 항목만)
   if (me.binderShareEnabled && window._fbReady && window._fb) {
@@ -4546,29 +4546,146 @@ function syncBinderToServer() {
   }, 1200);
 }
 
-// 다른 기기에서 저장한 최신본을 서버에서 가져와 반영 (서버가 더 최신일 때만)
-async function pullBinderFromServer() {
-  if (!me || !window._fbReady || !window._fb || !window._fb.getMyBinder) return;
-  const dk = dateKey();                       // 요청 시점 날짜 캡처 (도중 날짜 바뀌면 무시)
-  try {
-    const snap = await window._fb.getMyBinder(`${me.id}_${dk}`);
+// ── 바인더 필드 단위 병합 ──
+// 예전에는 문서 전체를 updatedAt 하나로 비교해 늦게 저장한 쪽이 통째로 이겼다. PC 에서 묵상을
+// 쓰고 폰에서 일기를 쓰면, 폰이 저장하는 순간 PC 의 묵상이 사라졌다(폰 화면엔 옛 값이 있었으니까).
+// 이제 필드마다 버전을 두고 필드별로 이긴 쪽을 채택한다. 시계가 아니라 버전으로 가리므로
+// 기기 시계가 몇 분 어긋나도 결과가 달라지지 않는다(느린 시계 탓에 한 기기 저장이 영영
+// 반영되지 않던 문제도 같이 사라진다).
+var BINDER_VER_FIELDS = ['verse','meditation','application','prayer','schRows',
+                         'diary','memoText','memoUpload','photo',
+                         'schSettings','drawSizes','drawTodoCards'];
+
+function binderFieldKeys(d) {
+  const keys = BINDER_VER_FIELDS.slice();
+  Object.keys((d && d.drawings) || {}).forEach(k => keys.push('drawings.' + k));
+  return keys;
+}
+function binderGet(d, key) {
+  if (key.indexOf('drawings.') === 0) return ((d && d.drawings) || {})[key.slice(9)];
+  return d ? d[key] : undefined;
+}
+function binderSet(d, key, v) {
+  if (key.indexOf('drawings.') === 0) {
+    if (!d.drawings) d.drawings = {};
+    if (v === undefined) delete d.drawings[key.slice(9)]; else d.drawings[key.slice(9)] = v;
+    return;
+  }
+  if (v === undefined) delete d[key]; else d[key] = v;
+}
+// 빈 값끼리는 같은 것으로 본다(없음 · 빈 문자열 · 빈 배열).
+// 이게 없으면 그 날짜를 처음 여는 기기가 무엇 하나만 써도 8개 필드가 전부 버전 1이 되어,
+// 아직 서버본을 못 받은 사이 상대 기기의 내용을 '빈 문자열' 로 덮을 수 있다.
+function _binderNorm(v) {
+  if (v === undefined || v === null || v === '') return null;
+  if (Array.isArray(v) && v.length === 0) return null;
+  return v;
+}
+function _binderSame(a, b) {
+  return JSON.stringify(_binderNorm(a)) === JSON.stringify(_binderNorm(b));
+}
+// 저장 직전 값(baseline)과 비교해 실제로 바뀐 필드의 버전만 올린다.
+// 전부 올리면 문서 통짜 덮어쓰기와 똑같아진다.
+// 두 문서의 필드 키 합집합. 중복을 안 걸러내면 같은 필드를 두 번 세어 버전이 2씩 오른다.
+function binderKeyUnion(a, b) {
+  const seen = {}, out = [];
+  binderFieldKeys(a).concat(binderFieldKeys(b)).forEach(k => {
+    if (seen[k]) return;
+    seen[k] = 1; out.push(k);
+  });
+  return out;
+}
+function bumpBinderVers(baseline, cur) {
+  const ver = Object.assign({}, cur.fieldVer || {});
+  binderKeyUnion(baseline, cur).forEach(k => {
+    if (_binderSame(binderGet(baseline, k), binderGet(cur, k))) return;
+    ver[k] = (ver[k] || 0) + 1;
+  });
+  cur.fieldVer = ver;
+  return cur;
+}
+// 바인더 로컬 저장의 유일한 창구. 저장 경로가 여러 곳(텍스트·드로잉·사진·시간표·설정)이라
+// 각 경로에서 버전을 올리면 반드시 어딘가를 빠뜨린다 → 여기 한 곳에서만 처리한다.
+function saveBinderData(data, key) {
+  const k = key || binderKey();
+  bumpBinderVers(DB.get(k, {}) || {}, data);
+  data.updatedAt = new Date().toISOString();
+  DB.set(k, data);
+}
+// 필드별로 버전이 높은 쪽을 채택. 양쪽 중 하나라도 버전이 없으면(옛 문서) 예전 방식대로
+// 문서 단위로 비교한다 — 새 코드가 한 번 저장하면 버전이 생겨 자동으로 넘어간다.
+// ponytail: 서버 merge 는 버전 역행을 막지 못한다(오프라인 기기가 옛 버전으로 덮어쓸 수 있음).
+//           실시간 리스너가 그 창을 아주 좁히므로 트랜잭션까지는 가지 않는다.
+function mergeBinder(local, server) {
+  if (!local.fieldVer || !server.fieldVer) {
+    if ((server.updatedAt || '') <= (local.updatedAt || '')) return { data: local, changed: [] };
+    const m = Object.assign({}, server);
+    if (local.todos !== undefined) m.todos = local.todos;
+    return { data: m, changed: ['*'] };
+  }
+  const out = Object.assign({}, local);
+  const changed = [];
+  binderKeyUnion(local, server).forEach(k => {
+    if ((server.fieldVer[k] || 0) <= (local.fieldVer[k] || 0)) return;
+    binderSet(out, k, binderGet(server, k));
+    changed.push(k);
+  });
+  if (!changed.length) return { data: local, changed: [] };
+  out.fieldVer = Object.assign({}, local.fieldVer);
+  changed.forEach(k => { out.fieldVer[k] = server.fieldVer[k]; });
+  out.updatedAt = (server.updatedAt || '') > (local.updatedAt || '')
+    ? server.updatedAt : local.updatedAt;
+  return { data: out, changed };
+}
+
+// 서버에서 온 필드만 화면에 다시 그린다. 지금 입력 중인 칸은 절대 건드리지 않는다
+// (커서가 튀고 방금 친 글자가 사라진다).
+var BINDER_FIELD_EL = {
+  verse:'qt-verse', meditation:'qt-meditation', application:'qt-application',
+  prayer:'qt-prayer', diary:'diary-text', memoText:'binder-memo-text', memoUpload:'binder-memo-upload'
+};
+function applyBinderFields(changed) {
+  const data = DB.get(binderKey(), {}) || {};
+  const all  = changed.indexOf('*') >= 0;
+  const hit  = f => all || changed.indexOf(f) >= 0;
+  Object.keys(BINDER_FIELD_EL).forEach(f => {
+    if (!hit(f)) return;
+    const el = document.getElementById(BINDER_FIELD_EL[f]);
+    if (!el || el === document.activeElement) return;
+    el.value = data[f] || '';
+    autoGrow(el);
+  });
+  if (hit('schRows'))       buildScheduleRows(data);
+  if (hit('photo'))         loadPhotoForDate(data);
+  if (hit('drawTodoCards')) { try { renderDrawTodoSection(); } catch (e) {} }
+  if (all || changed.some(k => k.indexOf('drawings.') === 0)) {
+    if (canvasReady) DRAW_KEYS.forEach(loadDrawingForKey);
+  }
+}
+
+// 그날 바인더 문서를 실시간 감시 (날짜 바뀌면 재구독). 구독 즉시 현재 서버본이 한 번 온다.
+var _binderUnsub = null;
+function startBinderWatch() {
+  if (_binderUnsub) { _binderUnsub(); _binderUnsub = null; }
+  if (!me || !window._fbReady || !window._fb || !window._fb.listenMyBinder) return;
+  const dk = dateKey();
+  _binderUnsub = window._fb.listenMyBinder(`${me.id}_${dk}`, snap => {
+    if (dateKey() !== dk) return;             // 응답 오는 사이 날짜가 바뀜 → 폐기
     if (!snap.exists()) return;
-    if (dateKey() !== dk) return;              // 응답 오는 사이 날짜가 바뀜 → 폐기
-    const server = snap.data();
     const localKey = `binder_${me.id}_${dk}`;
-    const local = DB.get(localKey, {}) || {};
-    // 서버가 로컬보다 최신일 때만 반영 (last-write-wins)
-    if ((server.updatedAt || '') <= (local.updatedAt || '')) return;
-    const merged = { ...server };
-    delete merged.uid; delete merged.date; delete merged.syncedAt;
-    // 투두는 myTodos 가 관리한다. 분리 전에 올라간 바인더 문서에는 옛 todos 필드가 그대로
-    // 남아 있어(merge 는 필드를 지우지 않는다), 그냥 두면 그 잔재가 최신 목록을 덮는다.
-    delete merged.todos;
-    if (local.todos !== undefined) merged.todos = local.todos;
-    DB.set(localKey, merged);
-    loadBinder();          // 텍스트 필드 재적용 (merged.updatedAt == local 이 되어 재-pull 없음)
-    if (canvasReady) DRAW_KEYS.forEach(loadDrawingForKey);   // 드로잉 캔버스도 서버본으로 갱신
-  } catch (e) { /* 조용히 무시 — 로컬 데이터로 계속 */ }
+    const local  = DB.get(localKey, {}) || {};
+    const server = Object.assign({}, snap.data());
+    delete server.uid; delete server.date; delete server.syncedAt;
+    // 투두는 myTodos 가 관리한다. 분리 전에 올라간 문서에 남은 todos 잔재가 최신 목록을 덮지 않게.
+    delete server.todos;
+    const res = mergeBinder(local, server);
+    if (!res.changed.length) return;
+    DB.set(localKey, res.data);               // 버전은 병합 결과 그대로 — 여기서 올리면 안 된다
+    applyBinderFields(res.changed);
+  });
+}
+function stopBinderWatch() {
+  if (_binderUnsub) { _binderUnsub(); _binderUnsub = null; }
 }
 
 function flashSaved(id) {
@@ -4660,7 +4777,7 @@ function saveDrawSizeForDate(key, h) {
   const data = DB.get(binderKey(), {});
   if (!data.drawSizes) data.drawSizes = {};
   data.drawSizes[key] = h;
-  DB.set(binderKey(), data);
+  saveBinderData(data);
 }
 // 기본값 (사용자가 "기본값으로 저장" 클릭 시 저장됨)
 function getDrawSizeDefault(key) {
@@ -4693,7 +4810,7 @@ function getSchDrawCfg() {
 function saveSchDrawCfg(cfg) {
   const data = DB.get(binderKey(), {});
   data.schDrawCfg = cfg;
-  DB.set(binderKey(), data);
+  saveBinderData(data);
 }
 
 function renderSchRowLines(rows, rowH) {
@@ -5009,7 +5126,7 @@ function saveDrawingFor(key) {
   else                            data.drawings[key] = entry.canvas.toDataURL('image/png');
   data.updatedAt = new Date().toISOString();
   // 바인더 전체에 실제 내용이 없으면 항목을 만들지 않음(정리)
-  if (binderHasContent(data)) DB.set(binderKey(), data);
+  if (binderHasContent(data)) saveBinderData(data);
   else if (DB.get(binderKey(), null) !== null) DB.del(binderKey());
   syncBinderToServer();   // 드로잉 변경도 기기 간 동기화
   // 주요 4칸의 저장됨 배지
@@ -5247,7 +5364,7 @@ function getDrawTodoCards() {
 function saveDrawTodoCards(cards) {
   const data = DB.get(binderKey(), {});
   data.drawTodoCards = cards;
-  DB.set(binderKey(), data);
+  saveBinderData(data);
 }
 
 // 드로잉 카드용 챌린지 연동 🚩 버튼 (텍스트 할 일과 동일 UX)
@@ -5481,7 +5598,7 @@ function deleteDrawTodoCard(e, id) {
   e.stopPropagation();
   const data = DB.get(binderKey(), {});
   if (data.drawings) delete data.drawings['tdraw_' + id];
-  DB.set(binderKey(), data);
+  saveBinderData(data);
   saveDrawTodoCards(getDrawTodoCards().filter(c => c.id !== id));
   delete drawCtxMap['tdraw_' + id];
   delete selCtxMap['tdraw_' + id];
@@ -5591,7 +5708,7 @@ function saveDayTodos(todos) {
   // 묘비는 30일 뒤 정리 — 그때쯤이면 모든 기기가 삭제를 봤다
   const cut = new Date(Date.parse(now) - 30 * 86400000).toISOString();
   data.todos = out.filter(t => !t.deleted || (t.updatedAt || '') > cut);
-  DB.set(binderKey(), data);
+  saveBinderData(data);
   syncTodosToServer();
 }
 
@@ -5660,9 +5777,14 @@ function carryOverTodosIfNeeded() {
   const keeps = t => (t.keepDone !== undefined ? !!t.keepDone : keepDefault);
   const source = prevTodos.filter(t => !t.done || keeps(t));
   if (!source.length) return;
+  // 이월 항목의 id 를 기기마다 랜덤(uid())으로 만들면, 두 기기가 각자 이월했을 때 같은 할 일이
+  // 서로 다른 id 로 두 벌 생긴다. _mergeTodoLists 는 id 로 합치므로 둘 다 살아남아 목록이 불어났다.
+  // 원본(rootId) + 날짜로 정하면 어느 기기가 언제 이월하든 같은 id 가 나와 중복이 불가능하다.
+  const dk = dateKey();
   const carried = source.map(t => {
+    const root = t.rootId || t.id;
     const c = {
-      id: uid(), text: t.text, cat: t.cat,
+      id: `c_${root}_${dk}`, rootId: root, text: t.text, cat: t.cat,
       inputMode: t.inputMode || 'none',
       done: !!t.done,                                   // 완료본이 넘어왔다면 완료 상태 그대로
       progress: t.done ? (t.progress || 0) : 0,
@@ -5698,18 +5820,22 @@ function carryOverDrawTodosIfNeeded() {
 
   // 새 ID로 카드 생성 + 칸 높이도 이전
   const newInv = DB.get('drawInv_' + me.id, {});
+  const dk = dateKey();
   const carried = source.map(c => {
-    const newId = uid();
+    // 텍스트형 이월과 같은 이유로 결정적 id — 칸 높이(drawCatH_)·체크상태(drawInv_)도 id 로 묶여 있어
+    // 기기마다 id 가 다르면 그 설정까지 따로 놀았다.
+    const root  = c.rootId || c.id;
+    const newId = `c_${root}_${dk}`;
     const oldH  = heights[c.id];
     if (oldH) heights[newId] = oldH;
     if (keepDone && invStates[c.id]) newInv[newId] = true;
-    return { id: newId, cat: c.cat, linkedChallengeUid: c.linkedChallengeUid || undefined, createdAt: new Date().toISOString() };
+    return { id: newId, rootId: root, cat: c.cat, linkedChallengeUid: c.linkedChallengeUid || undefined, createdAt: new Date().toISOString() };
   });
 
   DB.set('drawCatH_' + me.id, heights);
   if (keepDone) DB.set('drawInv_' + me.id, newInv);
   todayData.drawTodoCards = carried;
-  DB.set(binderKey(), todayData);
+  saveBinderData(todayData);
   toast(`드로잉 할 일 ${carried.length}칸을 오늘로 이월했어요`);
 }
 
@@ -5902,7 +6028,7 @@ function savePhoto(dataUrl) {
   const data = DB.get(binderKey(), {});
   data.photo = dataUrl;
   data.updatedAt = new Date().toISOString();
-  DB.set(binderKey(), data);
+  saveBinderData(data);
 }
 
 function showPhotoPreview(dataUrl) {
@@ -5923,7 +6049,7 @@ function removePhoto() {
   delete data.photo;
   data.updatedAt = new Date().toISOString();
   // 사진 삭제 후 그날 내용이 없으면 항목 자체를 정리 (달력 점 방지)
-  if (binderHasContent(data)) DB.set(binderKey(), data);
+  if (binderHasContent(data)) saveBinderData(data);
   else if (DB.get(binderKey(), null) !== null) DB.del(binderKey());
   hidePhotoPreview();
   document.getElementById('photo-input').value = '';
@@ -6595,14 +6721,14 @@ function applySchSettings() {
   // 현재 날짜 바인더에 저장
   const data = DB.get(binderKey(), {});
   data.schSettings = cfg;
-  DB.set(binderKey(), data);
+  saveBinderData(data);
 
   // 기본값으로도 저장
   if (setDef) saveSchDefault(cfg);
 
   closeSchSettingsModal();
   delete data.schRows;              // 설정 변경 → 새 슬롯으로 재생성
-  DB.set(binderKey(), data);
+  saveBinderData(data);
   buildScheduleRows(data);
   const slots = generateSchSlots(cfg);
   toast(`시간표 적용 — ${slots.length}개 슬롯`);
@@ -7078,6 +7204,7 @@ function doLogout() {
   if (typeof stopChurchMembersWatch === 'function') stopChurchMembersWatch();
   if (typeof stopPresenceHeartbeat === 'function') stopPresenceHeartbeat();
   if (typeof stopMyBinderCommentsWatch === 'function') stopMyBinderCommentsWatch();
+  if (typeof stopBinderWatch === 'function') stopBinderWatch();
   if (_selfDocUnsub) { _selfDocUnsub(); _selfDocUnsub = null; }
   DB.clearSession();
   me = null;

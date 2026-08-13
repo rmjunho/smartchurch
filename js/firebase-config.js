@@ -97,6 +97,10 @@ window._fb = {
       // 개인 바인더 기기 간 동기화 (비공개 — 본인만 read/write). key = `${uid}_${date}`
       setMyBinder: (key, data) => setDoc(doc(fbDb, 'myBinders', key), data, { merge: true }),
       getMyBinder: (key)       => getDoc(doc(fbDb, 'myBinders', key)),
+      // 바인더도 투두처럼 실시간으로 감시한다. 열 때 1회만 받아 오던 시절엔, 상대 기기가
+      // 그 뒤에 쓴 내용을 모른 채 내 화면 값을 저장해 상대 것을 통째로 덮었다.
+      listenMyBinder: (key, cb) => onSnapshot(doc(fbDb, 'myBinders', key), cb,
+        e => window._fbErr && window._fbErr('바인더 실시간 동기화', e)),
       // 투두 기기 간 동기화. 바인더와 문서를 나눈다 — 같은 문서에 있던 시절엔 한 기기가
       // 바인더를 저장하면 다른 기기에서 추가한 투두까지 통째로 덮여 사라졌다. key = `${uid}_${date}`
       setMyTodos:    (key, data) => setDoc(doc(fbDb, 'myTodos', key), data, { merge: true }),
