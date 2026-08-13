@@ -142,6 +142,16 @@ window._fb = {
       sendChatMsg: (roomId, msg) =>
         addDoc(collection(fbDb, 'chatRooms', roomId, 'messages'),
           { ...msg, createdAt: serverTimestamp() }),
+      // 챌린지 인증샷. users 문서(myChallenges)에 넣지 않는 이유: users 는 교인 누구나
+      // 읽을 수 있고 문서 1MB 한도도 사진 몇 장이면 찬다. 문서 ID = {uid}_{챌린지}_{날짜}
+      // 라 하루 한 장만 남는다(다시 올리면 덮어쓴다).
+      setChallengeProof: (id, data) =>
+        setDoc(doc(fbDb, 'challengeProofs', id), data),
+      // 정렬은 클라이언트에서 — where + orderBy 를 같이 쓰면 복합 인덱스를 만들어야 한다.
+      getChallengeProofs: (challengeId) =>
+        getDocs(query(collection(fbDb, 'challengeProofs'),
+          where('challengeId', '==', challengeId), limit(60))),
+      deleteChallengeProof: (id) => deleteDoc(doc(fbDb, 'challengeProofs', id)),
       // 3주 지난 사진 비우기. 문서에 base64 로 들어 있어 그냥 두면 저장 용량만 먹는다.
       // 그 방을 연 사람이 발견하는 대로 비운다(예약 정리는 Cloud Functions = Blaze 전용).
       expireChatImage: (roomId, msgId) =>

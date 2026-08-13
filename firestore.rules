@@ -177,6 +177,15 @@ service cloud.firestore {
                     );
     }
 
+    // ── 챌린지 인증샷 (문서 ID = {uid}_{챌린지}_{날짜}) ──
+    // 사진을 users 문서에 넣지 않으려고 따로 뒀다 — users 는 교인 누구나 읽고, 1MB 한도도
+    // 사진 몇 장이면 찬다. 쓰기는 본인만(userId 검사), 삭제는 본인 또는 리더(모더레이션).
+    match /challengeProofs/{id} {
+      allow read:   if signedIn();
+      allow create, update: if signedIn() && request.resource.data.userId == uid();
+      allow delete: if signedIn() && (resource.data.userId == uid() || isLeader());
+    }
+
     // ── 게시판 글 (소유자 필드 authorId) ──
     // 수정은 로그인 누구나 허용(좋아요 likes[] 를 모든 교인이 갱신). 삭제는 작성자/관리자.
     match /boardPosts/{postId} {

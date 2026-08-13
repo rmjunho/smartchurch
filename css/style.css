@@ -935,6 +935,35 @@
       border:none; background:var(--cream2); font-size:20px; cursor:pointer;
     }
     .ram-emojis button.on { background:var(--cream); box-shadow:inset 0 0 0 2px var(--gold); }
+    /* ── 챌린지 인증샷 ── */
+    .ch-proof-btn {
+      margin-top:6px; width:100%; height:34px; border-radius:10px;
+      border:1.5px solid var(--border); background:white; color:var(--dark);
+      font-size:12.5px; font-weight:700; font-family:inherit; cursor:pointer;
+    }
+    #challenge-proof-modal {
+      position:fixed; inset:0; z-index:9998; display:none;
+      align-items:flex-end; justify-content:center; background:rgba(0,0,0,0.4);
+    }
+    .cp-list { max-height:48vh; overflow-y:auto; display:flex; flex-direction:column; gap:8px; }
+    .cp-item {
+      display:flex; align-items:center; gap:10px;
+      background:white; border-radius:12px; padding:8px 10px;
+    }
+    .cp-item img {
+      width:56px; height:56px; object-fit:cover; border-radius:8px;
+      cursor:pointer; flex-shrink:0;
+    }
+    .cp-meta { flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; }
+    .cp-who  { font-size:13.5px; font-weight:700; color:var(--black);
+               white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .cp-date { font-size:11.5px; color:var(--muted); }
+    .cp-del {
+      flex-shrink:0; height:28px; padding:0 10px; border-radius:14px;
+      border:1.5px solid var(--border); background:white;
+      font-size:11.5px; font-weight:700; font-family:inherit;
+      color:var(--danger); cursor:pointer;
+    }
     /* ── @멘션 ── */
     .chat-mention { color:var(--gold); font-weight:700; }
     .chat-bubble-wrap.mentioned .chat-bubble { box-shadow:0 0 0 2px var(--gold); }

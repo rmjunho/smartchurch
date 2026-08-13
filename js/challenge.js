@@ -243,6 +243,7 @@ function renderMyChallenges() {
           onclick="checkChallengeToday('${c.uid}');setTimeout(()=>openSubscreen('my-challenges'),200)">
           ${btnLabel}
         </button>
+        <button class="ch-proof-btn" onclick="openChallengeProofs('${c.uid}')">📷 인증샷</button>
         ${showLeave ? `
           <button onclick="leaveChallenge('${c.uid}')"
             style="margin-top:6px;width:100%;height:30px;border-radius:8px;background:none;
@@ -281,6 +282,138 @@ function renderMyChallenges() {
   </button>`;
 
   return html + '</div>';
+}
+
+// ================= 챌린지 인증샷 =================
+// 사진은 challengeProofs 컬렉션에만 둔다. myChallenges 는 내 users 문서에 통째로 올라가는데
+// (saveMyChallenges 참고) 거기에 사진을 넣으면 교인 누구나 읽을 수 있고 문서 1MB 한도도
+// 금방 찬다. 문서 ID 를 {uid}_{챌린지}_{날짜} 로 두어 하루 한 장만 남는다(다시 올리면 덮어씀).
+var _proofChallenge = null;   // { uid, id, label }
+var _proofList = [];
+
+// 참여 기록의 uid 는 사람마다 다르다. 같은 챌린지를 한데 모으려면 원본(templateId)이 기준이다.
+function _proofChallengeId(c) { return c.templateId || c.uid; }
+
+async function openChallengeProofs(instanceUid) {
+  const c = visibleMyChallenges().find(x => x.uid === instanceUid);
+  if (!c) return;
+  _proofChallenge = { uid: c.uid, id: _proofChallengeId(c), label: c.label || c.name || '챌린지' };
+  _proofList = [];
+
+  let modal = document.getElementById('challenge-proof-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'challenge-proof-modal';
+    modal.onclick = e => { if (e.target.id === 'challenge-proof-modal') closeChallengeProofs(); };
+    document.body.appendChild(modal);
+  }
+  modal.style.display = 'flex';
+  _renderChallengeProofs(true);
+
+  if (!window._fbReady || !window._fb?.getChallengeProofs) { _renderChallengeProofs(false); return; }
+  try {
+    const snap = await window._fb.getChallengeProofs(_proofChallenge.id);
+    const rows = [];
+    snap.forEach(d => rows.push(Object.assign({ _id: d.id }, d.data())));
+    // 같은 교회 것만, 최신 날짜부터. 정렬을 서버에 맡기면 복합 인덱스가 필요해진다.
+    _proofList = rows
+      .filter(r => !r.churchCode || !me.churchCode || r.churchCode === me.churchCode)
+      .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
+  } catch (e) {
+    console.warn('인증샷 불러오기 실패:', e);
+  }
+  _renderChallengeProofs(false);
+}
+function closeChallengeProofs() {
+  const m = document.getElementById('challenge-proof-modal');
+  if (m) m.style.display = 'none';
+  _proofChallenge = null;
+  _proofList = [];
+}
+
+function _renderChallengeProofs(loading) {
+  const modal = document.getElementById('challenge-proof-modal');
+  if (!modal || !_proofChallenge) return;
+  const today = todayDateKey();
+  const mine  = _proofList.some(p => p.userId === me.id && p.date === today);
+
+  const rows = _proofList.map(p => {
+    const src = _safeImgSrc(p.photo);
+    if (!src) return '';
+    const canDelete = p.userId === me.id || (typeof isLeader === 'function' && isLeader());
+    return `<div class="cp-item">
+        <img src="${src}" alt="인증샷" loading="lazy" onclick="openImageLightbox(this.src)">
+        <div class="cp-meta">
+          <span class="cp-who">${escHtml(p.userName || '이름 없음')}</span>
+          <span class="cp-date">${escHtml(p.date || '')}</span>
+        </div>
+        ${canDelete ? `<button class="cp-del" onclick="deleteChallengeProof('${escHtml(p._id)}')">삭제</button>` : ''}
+      </div>`;
+  }).join('');
+
+  modal.innerHTML = `<div class="ram-sheet">
+    <div class="ram-title">${escHtml(_proofChallenge.label)} · 인증샷</div>
+    <input type="file" id="challenge-proof-input" accept="image/*" style="display:none"
+           onchange="uploadChallengeProof(event)">
+    <button class="ram-item" id="challenge-proof-btn"
+            onclick="document.getElementById('challenge-proof-input').click()">
+      ${mine ? '오늘 인증샷 바꾸기' : '오늘 인증샷 올리기'}
+    </button>
+    <div class="cp-list">
+      ${loading ? '<div class="ram-empty">불러오는 중…</div>'
+                : (rows || '<div class="ram-empty">아직 올라온 인증샷이 없어요</div>')}
+    </div>
+    <button class="ram-item" onclick="closeChallengeProofs()">닫기</button>
+  </div>`;
+}
+
+async function uploadChallengeProof(event) {
+  const file = event.target.files[0];
+  event.target.value = '';
+  if (!file || !_proofChallenge) return;
+  if (!file.type.startsWith('image/')) { toast('이미지 파일만 올릴 수 있어요'); return; }
+  if (file.size > 10 * 1024 * 1024) { toast('사진이 너무 커요 (10MB 이하)'); return; }
+  if (!window._fbReady || !window._fb?.setChallengeProof) { toast('연결 중입니다'); return; }
+
+  const btn = document.getElementById('challenge-proof-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '올리는 중…'; }
+  try {
+    const raw = await _readFileAsDataUrl(file);
+    // 채팅 사진(260KB)보다 더 조인다 — 한 챌린지에 사람 수 × 날짜 수만큼 쌓인다.
+    const photo = await _fitImageForFirestore(raw, 140 * 1024);
+    const date  = todayDateKey();
+    const id    = `${me.id}_${_proofChallenge.id}_${date}`;
+    const row = {
+      userId: me.id, userName: me.name || '',
+      churchCode: me.churchCode || '',
+      challengeId: _proofChallenge.id,
+      challengeLabel: _proofChallenge.label,
+      date, photo, createdAt: new Date().toISOString()
+    };
+    await window._fb.setChallengeProof(id, row);
+    _proofList = _proofList.filter(p => p._id !== id);
+    _proofList.unshift(Object.assign({ _id: id }, row));
+    _renderChallengeProofs(false);
+    toast('인증샷을 올렸어요');
+  } catch (e) {
+    console.error('인증샷 올리기 실패:', e);
+    toast(e?.code === 'permission-denied' ? '권한이 없어요' : '올리기에 실패했어요');
+    if (btn) { btn.disabled = false; btn.textContent = '오늘 인증샷 올리기'; }
+  }
+}
+
+async function deleteChallengeProof(docId) {
+  if (!confirm('이 인증샷을 지울까요?')) return;
+  if (!window._fbReady || !window._fb?.deleteChallengeProof) { toast('연결 중입니다'); return; }
+  try {
+    await window._fb.deleteChallengeProof(docId);
+    _proofList = _proofList.filter(p => p._id !== docId);
+    _renderChallengeProofs(false);
+    toast('지웠어요');
+  } catch (e) {
+    console.error('인증샷 삭제 실패:', e);
+    toast(e?.code === 'permission-denied' ? '권한이 없어요' : '삭제에 실패했어요');
+  }
 }
 
 function leaveChallenge(instanceUid) {
