@@ -776,6 +776,9 @@
       justify-content:center; font-size:16px; flex-shrink:0;
       overflow:hidden;
     }
+    /* 길게 누르면 OS 의 선택·복사 메뉴 대신 우리 메뉴가 뜨게 한다(복사는 메뉴에서 제공).
+       이게 없으면 길게 누를 때 텍스트 선택이 먼저 잡혀 메뉴가 안 뜬다. */
+    .chat-bubble { -webkit-touch-callout: none; user-select: none; }
     /* 같은 사람이 이어 보낸 말풍선 — 프로필 자리는 비우되 폭은 유지해 줄이 맞게 한다 */
     .chat-avatar.spacer { background: none; }
     .chat-bubble-wrap.grouped { margin-top: -4px; }
@@ -858,7 +861,7 @@
     }
     #img-lightbox img { max-width:96%; max-height:96%; border-radius:10px; }
     /* 채팅 액션 시트 / 차단 목록 모달 */
-    #room-action-menu, #blocked-modal, #role-sheet, #friend-action-menu {
+    #room-action-menu, #blocked-modal, #role-sheet, #friend-action-menu, #msg-action-menu {
       position:fixed; inset:0; z-index:9998; display:none;
       align-items:flex-end; justify-content:center; background:rgba(0,0,0,0.4);
     }

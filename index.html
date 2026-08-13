@@ -8871,6 +8871,10 @@ function _chatDayKey(d) {
   return d.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' });
 }
 
+// 길게 눌렀을 때 어떤 메시지인지 찾으려면 본문이 필요하다. HTML 속성에 실으면 따옴표·줄바꿈
+// 처리가 지저분해지므로, 그린 메시지를 id 로 여기에 담아 두고 메뉴에서 꺼내 쓴다.
+var _chatMsgIndex = {};
+
 // msgs → 말풍선 HTML. opts: { showRole }
 function _chatMsgsHtml(msgs, opts) {
   const showRole = !!(opts && opts.showRole);
@@ -8910,7 +8914,15 @@ function _chatMsgsHtml(msgs, opts) {
       ? `${escHtml(getUserName(msg.senderId, msg.senderName))} · ${escHtml(getUserRole(msg.senderId, msg.senderRole || '성도'))}`
       : escHtml(getUserName(msg.senderId, msg.senderName));
 
-    html += `<div class="chat-bubble-wrap ${isMine ? 'mine' : ''}${grouped ? ' grouped' : ''}">
+    if (msg.id) {
+      _chatMsgIndex[msg.id] = {
+        text: msg.text || '', isImg: !!isImg,
+        senderId: msg.senderId, senderName: getUserName(msg.senderId, msg.senderName)
+      };
+    }
+
+    html += `<div class="chat-bubble-wrap ${isMine ? 'mine' : ''}${grouped ? ' grouped' : ''}"
+                  data-mid="${escHtml(msg.id || '')}">
       ${!isMine ? (grouped ? '<div class="chat-avatar spacer"></div>'
                            : `<div class="chat-avatar">${avatarHtml}</div>`) : ''}
       <div class="chat-bubble-col">
@@ -8944,11 +8956,100 @@ function _chatWatchScroll(id) {
     if (_chatNearBottom(el)) document.getElementById(id + '-newbtn')?.classList.remove('show');
   }, { passive: true });
 }
+// ── 길게 눌러 메뉴 ──
+// 폰은 길게 누르기, PC 는 우클릭. 말풍선은 렌더할 때마다 새로 그려지므로 리스너는 컨테이너에 건다.
+var CHAT_PRESS_MS = 500;
+var _chatPress = { t: null, mid: null, x: 0, y: 0 };
+
+function _chatCancelPress() { clearTimeout(_chatPress.t); _chatPress.t = null; }
+
+function _chatBindPress(id) {
+  const el = document.getElementById(id);
+  if (!el || el.dataset.pressBound) return;
+  el.dataset.pressBound = '1';
+  const midOf = e => e.target.closest?.('.chat-bubble-wrap')?.dataset.mid || '';
+
+  el.addEventListener('pointerdown', e => {
+    const mid = midOf(e);
+    if (!mid) return;
+    _chatPress.mid = mid; _chatPress.x = e.clientX; _chatPress.y = e.clientY;
+    _chatCancelPress();
+    _chatPress.t = setTimeout(() => openMsgMenu(mid), CHAT_PRESS_MS);
+  });
+  // 스크롤하려고 끌었을 뿐인데 메뉴가 뜨면 안 된다
+  el.addEventListener('pointermove', e => {
+    if (!_chatPress.t) return;
+    if (Math.abs(e.clientX - _chatPress.x) > 10 || Math.abs(e.clientY - _chatPress.y) > 10) _chatCancelPress();
+  });
+  el.addEventListener('pointerup', _chatCancelPress);
+  el.addEventListener('pointercancel', _chatCancelPress);
+  el.addEventListener('scroll', _chatCancelPress, { passive: true });
+  el.addEventListener('contextmenu', e => {
+    const mid = midOf(e);
+    if (!mid) return;
+    e.preventDefault();          // PC 브라우저 기본 메뉴 대신 우리 메뉴를 띄운다
+    _chatCancelPress();
+    openMsgMenu(mid);
+  });
+}
+
+function openMsgMenu(mid) {
+  const m = _chatMsgIndex[mid];
+  if (!m) return;
+  let menu = document.getElementById('msg-action-menu');
+  if (!menu) {
+    menu = document.createElement('div');
+    menu.id = 'msg-action-menu';
+    menu.onclick = e => { if (e.target.id === 'msg-action-menu') closeMsgMenu(); };
+    document.body.appendChild(menu);
+  }
+  const preview = m.isImg ? '사진' : (m.text || '').replace(/\s+/g, ' ').slice(0, 40);
+  menu.innerHTML = `<div class="ram-sheet">
+    <div class="ram-title">${escHtml(preview)}</div>
+    ${m.isImg ? '' : `<button class="ram-item" onclick="copyChatMsg('${mid}')">복사</button>`}
+    <button class="ram-item" onclick="closeMsgMenu()">취소</button>
+  </div>`;
+  menu.style.display = 'flex';
+}
+function closeMsgMenu() {
+  const m = document.getElementById('msg-action-menu');
+  if (m) m.style.display = 'none';
+}
+
+function copyChatMsg(mid) {
+  const m = _chatMsgIndex[mid];
+  if (!m || !m.text) { closeMsgMenu(); return; }
+  // 클립보드 API 는 '사용자가 방금 누른' 상태에서만 허용된다. 메뉴를 닫거나 await 를 먼저 걸면
+  // 그 자격이 끊겨 거부당한다 — 복사부터 걸고 메뉴는 그 뒤에 닫는다.
+  const done = (ok) => { closeMsgMenu(); toast(ok ? '복사했어요' : '복사에 실패했어요'); };
+  try {
+    if (!navigator.clipboard?.writeText) throw new Error('clipboard 없음');
+    navigator.clipboard.writeText(m.text).then(() => done(true)).catch(() => _copyFallback(m.text, done));
+    return;
+  } catch (e) {
+    _copyFallback(m.text, done);
+  }
+}
+
+// 비보안 컨텍스트(http)·구형 브라우저 폴백
+function _copyFallback(text, done) {
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0';
+  document.body.appendChild(ta);
+  ta.select();
+  let ok = false;
+  try { ok = document.execCommand('copy'); } catch (_) {}
+  ta.remove();
+  done(ok);
+}
+
 // 렌더 뒤 스크롤 처리. 아래를 보고 있었으면 따라 내리고, 아니면 '새 메시지' 버튼만 띄운다.
 function _chatAfterRender(id, wasNearBottom, grew) {
   const el = document.getElementById(id);
   if (!el) return;
   _chatWatchScroll(id);
+  _chatBindPress(id);
   if (wasNearBottom) {
     el.scrollTop = el.scrollHeight;
     document.getElementById(id + '-newbtn')?.classList.remove('show');
