@@ -4645,9 +4645,42 @@ function mergeBinder(local, server, skip) {
   }
   const out = Object.assign({}, local);
   const changed = [];
+  // 동점 해소기. 두 기기가 반드시 '같은 답'을 내야 한 번에 수렴한다(교환 법칙이 성립해야 한다).
+  // 둘 다 평범한 객체면 키를 합친다 — 드로잉 체크·칸 높이가 여기 해당해서 어느 쪽 것도 잃지 않는다.
+  // 키가 겹치면 값 자체로 큰 쪽을 고르고, 결과의 키 순서는 정렬한다. 비교가 JSON 문자열이라
+  // 순서가 다르면 서로 '다른 값'으로 보고 계속 주고받는다.
+  // 시계는 쓰지 않는다 — 기기 시계 차이가 결과를 바꾸면 안 된다.
+  function _binderTieMerge(a, b) {
+    const plain = v => v && typeof v === 'object' && !Array.isArray(v);
+    if (!plain(a) || !plain(b)) {
+      return JSON.stringify(_binderNorm(b)) > JSON.stringify(_binderNorm(a)) ? b : a;
+    }
+    const merged = {};
+    Object.keys(Object.assign({}, a, b)).sort().forEach(k => {
+      if (!(k in a)) { merged[k] = b[k]; return; }
+      if (!(k in b)) { merged[k] = a[k]; return; }
+      merged[k] = JSON.stringify(b[k]) > JSON.stringify(a[k]) ? b[k] : a[k];
+    });
+    return merged;
+  }
   binderKeyUnion(local, server).forEach(k => {
     if (skip[k]) return;                                   // 입력 중 — 값·버전 모두 그대로 둔다
-    if ((server.fieldVer[k] || 0) <= (local.fieldVer[k] || 0)) return;
+    const sv = server.fieldVer[k] || 0, lv = local.fieldVer[k] || 0;
+    if (sv < lv) return;
+    if (sv === lv) {
+      // 버전이 같은데 값이 다른 경우. 새로 생긴 필드에서 반드시 일어난다 — 두 기기 모두 그 필드가
+      // 없는 상태(0)에서 시작하니 각자 처음 저장하는 순간 나란히 1 이 된다. 여기서 양쪽 다
+      // '내 것이 최신'이라 판단하면 서로 자기 값만 지켜 영영 수렴하지 않는다.
+      // 시계로 정하면 기기 시계 차이가 결과를 바꾸므로 값 자체로 정한다 — 두 기기가 같은 답을
+      // 내야 한 번 만에 수렴한다. 진 쪽 값은 사라지지만, 안 맞춘 채로 갈리는 것보다 낫다.
+      const lvv = binderGet(local, k), svv = binderGet(server, k);
+      if (_binderSame(lvv, svv)) return;
+      const tie = _binderTieMerge(lvv, svv);
+      if (_binderSame(tie, lvv)) return;                   // 내 값이 이미 결과와 같다
+      binderSet(out, k, tie);
+      changed.push(k);
+      return;
+    }
     binderSet(out, k, binderGet(server, k));
     changed.push(k);
   });
