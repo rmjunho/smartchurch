@@ -7541,7 +7541,11 @@ function renderAppSettings() {
       <!-- 데이터 -->
       <div style="font-size:12px;font-weight:700;color:var(--muted);letter-spacing:0.5px;margin-bottom:8px">데이터</div>
       <div style="background:white;border-radius:14px;border:1.5px solid var(--border);overflow:hidden;margin-bottom:16px">
-        <div class="ss-setting-row" onclick="clearAppCache()" style="cursor:pointer">
+        <div class="ss-setting-row" onclick="exportMyData()" style="cursor:pointer">
+          <div><div class="ss-setting-label">내 데이터 내보내기</div><div class="ss-setting-sub">이 기기의 묵상·할 일을 파일로 저장해요</div></div>
+          <span class="sm-arrow">›</span>
+        </div>
+        <div class="ss-setting-row" onclick="clearAppCache()" style="border-top:1px solid var(--border);cursor:pointer">
           <div><div class="ss-setting-label">캐시 초기화</div><div class="ss-setting-sub">드로잉 등 임시 데이터를 지워요</div></div>
           <span class="sm-arrow">›</span>
         </div>
@@ -7795,6 +7799,50 @@ function clearAppCache() {
     Object.keys(DRAW_HISTORY).forEach(k => delete DRAW_HISTORY[k]);
     Object.keys(drawCtxMap).forEach(k => delete drawCtxMap[k]);
     toast('캐시를 초기화했어요');
+  }
+}
+// ── 내 데이터 내보내기 ──
+// 서버에 백업 컬렉션을 따로 두지 않는다. 그러려면 새 보안 규칙(수동 콘솔 배포)과 복원 UI 가
+// 필요한데, 사용자가 직접 들고 있는 파일이 같은 안전망을 훨씬 싸게 준다.
+//
+// 키에 내 uid 가 든 것만 담는다 — 한 기기를 여러 계정이 쓰므로 다른 사람 기록이 섞이면 안 되고,
+// 공유 캐시(sc2_users)에는 남의 프로필이 통째로 들어 있어 반드시 빠져야 한다.
+function collectMyLocalRecords(uid) {
+  const out = {};
+  if (!uid) return out;
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (!k || k.indexOf('sc2_') !== 0 || k.indexOf(uid) < 0) continue;
+    try { out[k.slice(4)] = JSON.parse(localStorage.getItem(k)); } catch (e) {}
+  }
+  return out;
+}
+function exportMyData() {
+  if (!me) { toast('로그인이 필요해요'); return; }
+  const records = collectMyLocalRecords(me.id);
+  const n = Object.keys(records).length;
+  if (!n) { toast('이 기기에 내보낼 기록이 없어요'); return; }
+
+  const payload = {
+    app: 'SmartChurch', formatVersion: 1,
+    exportedAt: new Date().toISOString(),
+    // 전화번호는 담지 않는다 — userPhones 에 따로 두는 값이고 파일은 밖으로 나간다
+    user: { id: me.id, name: me.name || '', church: me.church || '', role: me.role || '' },
+    recordCount: n,
+    records: records
+  };
+  let url;
+  try {
+    url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `smartchurch_${(me.name || 'backup')}_${todayDateKey()}.json`;
+    document.body.appendChild(a); a.click(); a.remove();
+    toast(`기록 ${n}개를 파일로 저장했어요`);
+  } catch (e) {
+    toast('내보내기에 실패했어요');
+  } finally {
+    if (url) setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 }
 function resetAllData() {
