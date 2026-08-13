@@ -9676,7 +9676,8 @@ function downloadLightboxImage() {
       const url = URL.createObjectURL(b);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `smartchurch_${stamp}.jpg`;
+      // 확장자를 실제 형식에 맞춘다 — webp 를 .jpg 로 받으면 갤러리가 못 여는 기기가 있다
+      a.download = `smartchurch_${stamp}.${(b.type.split('/')[1] || 'jpg').replace('jpeg', 'jpg')}`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -10987,36 +10988,81 @@ function _readFileAsDataUrl(file) {
     r.readAsDataURL(file);
   });
 }
-function _compressImageDataUrl(dataUrl, maxDim, quality) {
+function _loadImage(dataUrl) {
   return new Promise((resolve, reject) => {
     const img = new Image();
-    img.onload = () => {
-      let w = img.width, h = img.height;
-      if (w > maxDim || h > maxDim) {
-        if (w >= h) { h = Math.round(h * maxDim / w); w = maxDim; }
-        else        { w = Math.round(w * maxDim / h); h = maxDim; }
-      }
-      const c = document.createElement('canvas');
-      c.width = w; c.height = h;
-      c.getContext('2d').drawImage(img, 0, 0, w, h);
-      resolve(c.toDataURL('image/jpeg', quality));
-    };
+    img.onload = () => resolve(img);
     img.onerror = reject;
     img.src = dataUrl;
   });
 }
-// Firestore 문서 크기 제한(1MB) 안에 들어가도록 반복 축소. 기본 목표 base64 < 700KB,
+// 글씨가 든 화면 캡처는 JPEG 에서 유난히 뭉개진다(경계가 번지는 방식이라). WebP 는 같은
+// 용량에서 훨씬 또렷하다. 안 되는 브라우저면 JPEG 로 내려간다.
+var _imgTypeCache = null;
+function _bestImageType() {
+  if (_imgTypeCache) return _imgTypeCache;
+  const c = document.createElement('canvas');
+  c.width = c.height = 1;
+  _imgTypeCache = c.toDataURL('image/webp').indexOf('data:image/webp') === 0
+    ? 'image/webp' : 'image/jpeg';
+  return _imgTypeCache;
+}
+// src 는 <img> 든 <canvas> 든 상관없다(둘 다 width/height 가 있고 drawImage 가 받는다).
+function _scaleToCanvas(src, maxDim) {
+  let w = src.width, h = src.height;
+  if (w > maxDim || h > maxDim) {
+    if (w >= h) { h = Math.round(h * maxDim / w); w = maxDim; }
+    else        { w = Math.round(w * maxDim / h); h = maxDim; }
+  } else if (src.getContext) {
+    return src;    // 이미 캔버스이고 줄일 것도 없다 — 통째로 다시 그릴 이유가 없다
+  }
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const ctx = c.getContext('2d');
+  ctx.imageSmoothingQuality = 'high';        // 줄일 때 글씨가 덜 깨진다
+  ctx.drawImage(src, 0, 0, w, h);
+  return c;
+}
+function _encodeImage(src, maxDim, quality, type) {
+  return _scaleToCanvas(src, maxDim).toDataURL(type || _bestImageType(), quality);
+}
+// 기존 호출부 호환용 얇은 껍데기
+async function _compressImageDataUrl(dataUrl, maxDim, quality, type) {
+  return _encodeImage(await _loadImage(dataUrl), maxDim, quality, type);
+}
+
+// 목표 용량에 들어가는 것 중 가장 좋은 화질을 고른다.
+// 예전에는 여유가 있든 없든 무조건 1000px·품질 0.6 으로 먼저 줄여 놓고 그게 한도를 넘을
+// 때만 더 줄였다. 그래서 260KB 를 줘도 쓰지 않고 항상 1000px 였고, 글씨가 든 화면 캡처는
+// 읽을 수 없게 뭉개졌다. 이제 큰 쪽부터 시도해 한도에 들어오는 첫 단계에서 멈춘다.
+// 단계를 촘촘히 두면 한 장에 몇 초씩 걸린다(캔버스 인코딩이 단계마다 수백 ms). 첫 단계는
+// 폰 화면 캡처(세로 2400px)가 원본 그대로 담기도록 2560 으로 잡았다.
+var _IMG_STEPS = [
+  [2560, 0.90], [2048, 0.85], [1600, 0.80], [1280, 0.75],
+  [1000, 0.70], [800, 0.60],  [560, 0.50]
+];
+// Firestore 문서 크기 제한(1MB) 안에 들어가도록 축소. 기본 목표 base64 < 700KB,
 // 채팅 사진처럼 한 번에 여러 장을 받아야 하는 곳은 maxBytes 를 더 작게 넘긴다.
 async function _fitImageForFirestore(dataUrl, maxBytes) {
   maxBytes = maxBytes || 700 * 1024;
-  let out = await _compressImageDataUrl(dataUrl, 1000, 0.6);
-  let dim = 800, q = 0.55;
-  for (let i = 0; i < 6 && out.length > maxBytes; i++) {
-    out = await _compressImageDataUrl(dataUrl, dim, q);
-    dim = Math.round(dim * 0.8);
-    q = Math.max(0.4, q - 0.05);
+  const img  = await _loadImage(dataUrl);   // 디코딩은 한 번만
+  const type = _bestImageType();
+  const side = Math.max(img.width, img.height);
+  // 12MP 원본을 단계마다 다시 그리면 한 장에 2~3초씩 걸린다. 원본이 첫 단계보다 크면
+  // 한 번만 줄여 두고 이후 단계는 그 결과에서 그린다. 이미 작으면 그대로 쓴다(불필요한 복사).
+  const base = side > _IMG_STEPS[0][0] ? _scaleToCanvas(img, _IMG_STEPS[0][0]) : img;
+  let out = '', lastDim = 0, lastQ = 0;
+  for (let i = 0; i < _IMG_STEPS.length; i++) {
+    // 원본보다 큰 단계는 결국 같은 크기다. 크기·품질이 앞 단계와 똑같으면 굽지 않는다
+    // — 2000px 사진에서 2560·2048 단계가 같은 그림을 두 번 굽던 낭비를 없앤다.
+    const dim = Math.min(_IMG_STEPS[i][0], side);
+    const q   = _IMG_STEPS[i][1];
+    if (dim === lastDim && q === lastQ) continue;
+    lastDim = dim; lastQ = q;
+    out = _encodeImage(base, dim, q, type);
+    if (out.length <= maxBytes) return out;
   }
-  return out;
+  return out;   // 마지막(가장 작은) 것이라도 돌려준다
 }
 
 // 화면에 <img src> 로 넣어도 되는 주소인지 검사. 메시지 필드는 로그인한 사람이면 누구나
