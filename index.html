@@ -4616,16 +4616,32 @@ function saveBinderData(data, key) {
 // 문서 단위로 비교한다 — 새 코드가 한 번 저장하면 버전이 생겨 자동으로 넘어간다.
 // ponytail: 서버 merge 는 버전 역행을 막지 못한다(오프라인 기기가 옛 버전으로 덮어쓸 수 있음).
 //           실시간 리스너가 그 창을 아주 좁히므로 트랜잭션까지는 가지 않는다.
-function mergeBinder(local, server) {
+// 지금 입력 중인 칸은 병합에서 통째로 제외한다.
+// 화면만 안 바꾸고 로컬에는 서버 값을 저장하면, 화면에는 내가 친 글이 있는데 저장된 값은
+// 서버 것이 되어 새로고침하는 순간 방금 쓴 게 사라진다(보내는 쪽 기기는 이 경로를 안 타서
+// 한쪽만 멀쩡해 보였다). 값도 버전도 손대지 않으면 내 글이 그대로 다음 저장에 실려 올라간다.
+function busyBinderFields() {
+  const a = document.activeElement;
+  if (!a) return {};
+  const out = {};
+  Object.keys(BINDER_FIELD_EL).forEach(f => { if (a.id && BINDER_FIELD_EL[f] === a.id) out[f] = 1; });
+  // 시간표는 행마다 input 이라 개별 id 가 없다 — 표 안에 커서가 있으면 schRows 를 통째로 보류
+  if (a.closest && a.closest('#sch-rows')) out.schRows = 1;
+  return out;
+}
+function mergeBinder(local, server, skip) {
+  skip = skip || {};
   if (!local.fieldVer || !server.fieldVer) {
     if ((server.updatedAt || '') <= (local.updatedAt || '')) return { data: local, changed: [] };
     const m = Object.assign({}, server);
     if (local.todos !== undefined) m.todos = local.todos;
+    Object.keys(skip).forEach(f => { m[f] = local[f]; });   // 입력 중인 칸은 내 값을 지킨다
     return { data: m, changed: ['*'] };
   }
   const out = Object.assign({}, local);
   const changed = [];
   binderKeyUnion(local, server).forEach(k => {
+    if (skip[k]) return;                                   // 입력 중 — 값·버전 모두 그대로 둔다
     if ((server.fieldVer[k] || 0) <= (local.fieldVer[k] || 0)) return;
     binderSet(out, k, binderGet(server, k));
     changed.push(k);
@@ -4678,7 +4694,7 @@ function startBinderWatch() {
     delete server.uid; delete server.date; delete server.syncedAt;
     // 투두는 myTodos 가 관리한다. 분리 전에 올라간 문서에 남은 todos 잔재가 최신 목록을 덮지 않게.
     delete server.todos;
-    const res = mergeBinder(local, server);
+    const res = mergeBinder(local, server, busyBinderFields());
     if (!res.changed.length) return;
     DB.set(localKey, res.data);               // 버전은 병합 결과 그대로 — 여기서 올리면 안 된다
     applyBinderFields(res.changed);
