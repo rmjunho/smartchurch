@@ -276,15 +276,20 @@ service cloud.firestore {
         // 다른 사람 화면에 남아 있던 것과 어긋난다.
         allow update: if signedIn() && (
                         // ① 삭제 표시 — 본인 또는 그 방을 관리할 수 있는 리더.
-                        // 사진 메시지는 지울 때 imageUrl 도 같이 비운다(안 그러면 base64 원본이
-                        // 문서에 그대로 남는다). 그래서 그 두 키까지 열되, imageUrl 은 '비우기'
-                        // 아니면 '그대로' 만 허용한다 — 지우는 척하며 다른 사진을 끼워 넣지
-                        // 못하게. '그대로' 를 허용하는 건 아직 옛 JS 를 들고 있는 앱이
-                        // 사진을 못 지우는 일이 없게 하기 위해서다.
+                        // 지울 때 본문(text)과 사진(imageUrl)도 같이 비운다. 안 그러면 화면엔
+                        // '삭제된 메시지입니다' 로 보여도 원문이 문서에 그대로 남고, 메시지는
+                        // 로그인한 교인이면 누구나 읽을 수 있어 그냥 꺼내 볼 수 있다.
+                        // 그 키들을 열되 '비우기' 아니면 '그대로' 만 허용한다 — 지우는 척하며
+                        // 다른 내용을 끼워 넣지 못하게. '그대로' 를 허용하는 건 아직 옛 JS 를
+                        // 들고 있는 앱이 삭제를 못 하는 일이 없게 하기 위해서다.
                         (request.resource.data.diff(resource.data).affectedKeys()
-                           .hasOnly(['deleted', 'deletedBy', 'deletedAt', 'imageUrl', 'imageExpired'])
+                           .hasOnly(['deleted', 'deletedBy', 'deletedAt',
+                                     'text', 'imageUrl', 'imageExpired'])
                          && request.resource.data.get('deleted', false) == true
                          && request.resource.data.get('deletedBy', '') == uid()
+                         && (request.resource.data.get('text', '') == ''
+                             || request.resource.data.get('text', '')
+                                == resource.data.get('text', ''))
                          && (request.resource.data.get('imageUrl', '') == ''
                              || request.resource.data.get('imageUrl', '')
                                 == resource.data.get('imageUrl', ''))

@@ -9422,6 +9422,8 @@ async function deleteChatMsg(mid) {
   try {
     await window._fb.deleteChatMsg(m.roomId, mid, me.id);
     m.deleted = true;      // 실시간 구독이 곧 다시 그리지만, 눈에 바로 반영되게
+    m.text = '';
+    _clearRoomPreviewIfLast(m.roomId, mid);
     toast('삭제했어요');
   } catch (e) {
     console.error('메시지 삭제 실패:', e);
@@ -9481,6 +9483,21 @@ async function unpinChatNotice() {
     console.error('공지 내리기 실패:', e);
     toast('실패했어요');
   }
+}
+
+// 방 문서의 lastMessage 에는 마지막 메시지 본문이 그대로 박혀 있다. 메시지를 지워도
+// 이건 안 바뀌어서, 채팅방 목록 미리보기에 지운 글이 계속 보였다(문서 안에만 남는 게
+// 아니라 화면에 그대로 보이던 것). 마지막 메시지를 지운 경우에만 미리보기도 바꾼다.
+function _clearRoomPreviewIfLast(roomId, mid) {
+  if (!roomId || !window._fbReady || !window._fb) return;
+  const kind = roomId === _currentRoomId ? 'room' : 'open';
+  const list = _chatLastMsgs[kind] || [];
+  const last = list[list.length - 1];
+  if (!last || last.id !== mid) return;
+  const meta = { lastMessage: '삭제된 메시지입니다' };
+  const p = kind === 'open' ? window._fb.ensureChatRoom(roomId, meta)
+                            : window._fb.updateChatRoom(roomId, meta);
+  p && p.catch && p.catch(() => {});
 }
 
 // 비보안 컨텍스트(http)·구형 브라우저 폴백
