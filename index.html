@@ -4024,6 +4024,7 @@ function startSelfDocWatch() {
       }
       _syncTodoCats(data);
       _syncTodoPrefs(data);
+      _syncDrawDefaults(data);
       if (changed) {
         DB.saveUser(me);
         _userInfoCache[me.id] = { name: me.name || '', role: me.role || '' };   // 내 이름/직분 캐시 갱신
@@ -4846,6 +4847,10 @@ function saveDrawSizeDefault(key, h) {
   const d = DB.get('drawSizeDefault_' + me.id, {});
   d[key] = h;
   DB.set('drawSizeDefault_' + me.id, d);
+  // 기기별 로컬로만 두면 다른 기기는 영영 옛 기본값을 쓴다. 그 날짜에 드래그한 적 없는 칸은
+  // drawSizes 가 아니라 이 기본값을 쓰므로, 기기마다 칸 높이가 다르게 보이던 원인이었다.
+  // 날짜가 아니라 사용자에 딸린 값이라 바인더(날짜별)에는 넣을 수 없다 — 투두 설정과 같이 users 에 둔다.
+  if (window._fbReady && window._fb) window._fb.updateUser(me.id, { drawDefaults: d }).catch(() => {});
 }
 // 실제 사용할 높이: 날짜별 > 기본값 순으로 적용
 function getEffectiveDrawH(key) {
@@ -6352,6 +6357,16 @@ function _syncTodoPrefs(data) {
   pull('todoKeepDone', 'todoKeepDone_', false,   'boolean');
   if (!hit) return;
   try { renderTodos(); renderDrawTodoSection(); refreshTodoSettingsUI(); } catch (e) {}
+}
+
+// 칸 기본 높이를 이 기기에 반영한다 (startSelfDocWatch 에서 호출).
+// 스칼라가 아니라 맵이라 위 pull 을 못 쓴다 — JSON 으로 비교한다.
+function _syncDrawDefaults(data) {
+  if (!me || !data.drawDefaults || typeof data.drawDefaults !== 'object') return;
+  const cur = DB.get('drawSizeDefault_' + me.id, {});
+  if (JSON.stringify(data.drawDefaults) === JSON.stringify(cur)) return;
+  DB.set('drawSizeDefault_' + me.id, data.drawDefaults);
+  try { applyRemoteDrawSizes(); } catch (e) {}
 }
 
 // 서버 스냅샷의 카테고리를 이 기기에 반영한다 (startSelfDocWatch 에서 호출).
@@ -7955,7 +7970,12 @@ function showSyncDiag() {
     '실시간 감시: ' + (window._binderUnsub ? '켜짐' : '꺼짐'),
     '서버 연결: '  + (window._fbReady ? '됨' : '안 됨'),
     '',
-    '칸 높이: '    + JSON.stringify(d.drawSizes || null),
+    '칸 높이(날짜별): ' + JSON.stringify(d.drawSizes || null),
+    '칸 높이(기본값): ' + JSON.stringify(DB.get('drawSizeDefault_' + me.id, {})),
+    '실제 적용 높이: '  + JSON.stringify(DRAW_KEYS.reduce((o, k) => {
+      if (k !== 'schedule') o[k] = getEffectiveDrawH(k);
+      return o;
+    }, {})),
     '시간표: '     + JSON.stringify(d.schDrawCfg || null),
     '그림 칸: '    + Object.keys(d.drawings || {}).join(', '),
     '',
