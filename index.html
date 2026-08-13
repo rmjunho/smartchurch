@@ -4256,6 +4256,15 @@ function sharedSchRows(rows) {
   return Array.isArray(rows) ? rows.filter(r => r && (r.plan || '').trim()) : [];
 }
 
+// 나눔에 내보낼 할 일. 삭제 묘비(deleted)와 빈 항목은 뺀다 — getDayTodos 와 같은 기준.
+// 묘비를 그냥 실으면 리더 화면에 빈 줄이 뜨고 개수도 부풀려진다.
+function sharedTodos(todos) {
+  return Array.isArray(todos)
+    ? todos.filter(t => t && !t.deleted && (t.text || '').trim())
+           .map(t => ({ text: t.text, done: !!t.done }))
+    : [];
+}
+
 function loadBinder() {
   // 미완료 할 일 이월 (텍스트형 + 드로잉형) — 오늘 날짜에서만.
   // 이월은 viewDate 기준으로 '전날' 을 가져오므로, 가드가 없으면 달력에서 지난 날짜를 열어보는
@@ -4485,37 +4494,8 @@ function saveBinderNow() {
     if (DB.get(binderKey(), null) !== null) DB.del(binderKey());   // 이전에 저장된 빈 항목 정리
     return;
   }
+  // 로컬 저장 · 개인 동기화 · 리더 나눔 전송은 전부 saveBinderData 한 곳에서 처리한다.
   saveBinderData(merged);
-
-  // 공유 허용한 경우 Firestore에도 동기화 (선택한 항목만)
-  if (me.binderShareEnabled && window._fbReady && window._fb) {
-    const items   = getBinderShareItems();
-    const qtText  = [merged.meditation, merged.application, merged.prayer].filter(Boolean).join('\n\n');
-    const drw     = merged.drawings || {};
-    const firestoreData = {
-      userId:     me.id,
-      userName:   me.name,
-      church:     me.church || '',
-      churchCode: me.churchCode || '',
-      date:       dateKey(),
-      shareItems: items,
-      verse:      items.verse    ? (merged.verse || '')  : '',
-      qt:         items.qt       ? qtText                : '',
-      diary:      items.diary    ? (merged.diary || '')  : '',
-      schRows:    items.schedule ? sharedSchRows(merged.schRows) : [],
-      todos:      items.todos    ? (merged.todos || []).map(t => ({ text: t.text || '', done: !!t.done })) : [],
-      drawings:   {
-        qt:       items.verse ? (drw.qt || '')       : '',
-        schedule: items.schedule ? (drw.schedule || '') : '',
-        diary:    items.diary ? (drw.diary || '')     : '',
-      },
-      hasDrawings: !!(drw.qt || drw.schedule || drw.diary),
-      updatedAt:  new Date().toISOString()
-    };
-    window._fb.setBinderEntry(`${me.id}_${dateKey()}`, firestoreData).catch(() => {});
-  }
-  // 개인 바인더 전체를 기기 간 동기화 (비공개)
-  syncBinderToServer();
 }
 
 function autoSave(section) {
@@ -4524,6 +4504,48 @@ function autoSave(section) {
     saveBinderNow();
     flashSaved(section + '-saved');
   }, 900);
+}
+
+// ── 리더 나눔 전송 (binderEntries/${uid}_${date}, 공유 허용 시에만) ──
+// saveBinderData 와 같은 자리에서 부른다. 예전에는 saveBinderNow 안에만 있어서, 투두·드로잉·
+// 사진처럼 saveBinderData 로만 저장되는 항목은 글자를 다시 칠 때까지 나눔에 영영 안 올라갔다
+// (할 일을 적어도 리더 화면에 안 보이던 원인). 개인 동기화가 겪은 것과 똑같은 문제다.
+// 타이머는 개인 동기화와 같은 이유로 반드시 날짜별이어야 한다 — 전역 하나면 날짜를 옮길 때
+// 앞 날짜의 대기 중인 전송이 죽는다.
+var _shareSyncTimers = {};
+function syncShareToServer() {
+  if (!me || !me.binderShareEnabled) return;                 // 공유 허용 안 했으면 아무것도 안 올린다
+  if (!window._fbReady || !window._fb || !window._fb.setBinderEntry) return;
+  const dk = dateKey();
+  clearTimeout(_shareSyncTimers[dk]);
+  _shareSyncTimers[dk] = setTimeout(() => {
+    delete _shareSyncTimers[dk];
+    const d = DB.get(`binder_${me.id}_${dk}`, null);
+    if (!d) return;
+    const items  = getBinderShareItems();
+    const qtText = [d.meditation, d.application, d.prayer].filter(Boolean).join('\n\n');
+    const drw    = d.drawings || {};
+    window._fb.setBinderEntry(`${me.id}_${dk}`, {
+      userId:     me.id,
+      userName:   me.name,
+      church:     me.church || '',
+      churchCode: me.churchCode || '',
+      date:       dk,
+      shareItems: items,
+      verse:      items.verse    ? (d.verse || '') : '',
+      qt:         items.qt       ? qtText          : '',
+      diary:      items.diary    ? (d.diary || '') : '',
+      schRows:    items.schedule ? sharedSchRows(d.schRows) : [],
+      todos:      items.todos    ? sharedTodos(d.todos)     : [],
+      drawings:   {
+        qt:       items.verse    ? (drw.qt || '')       : '',
+        schedule: items.schedule ? (drw.schedule || '') : '',
+        diary:    items.diary    ? (drw.diary || '')    : '',
+      },
+      hasDrawings: !!(drw.qt || drw.schedule || drw.diary),
+      updatedAt:  new Date().toISOString()
+    }).catch(() => {});
+  }, 1200);
 }
 
 // ── 개인 바인더 기기 간 동기화 (비공개, 본인 전용) ──
@@ -4628,7 +4650,7 @@ function saveBinderData(data, key) {
   // 로컬에만 남아 다른 기기로 영영 가지 않았다(드로잉 카드 체크가 그랬다). 버전 증가와 같은
   // 자리에서 처리해야 빠뜨릴 수 없다. 1.2초 디바운스라 연타해도 전송은 한 번이다.
   // 오늘이 아닌 날짜를 명시 저장할 때는 부르지 않는다 — 전송 대상은 항상 오늘 문서다.
-  if (!key || k === binderKey()) syncBinderToServer();
+  if (!key || k === binderKey()) { syncBinderToServer(); syncShareToServer(); }
 }
 // 필드별로 버전이 높은 쪽을 채택. 양쪽 중 하나라도 버전이 없으면(옛 문서) 예전 방식대로
 // 문서 단위로 비교한다 — 새 코드가 한 번 저장하면 버전이 생겨 자동으로 넘어간다.
@@ -10641,6 +10663,7 @@ function toggleBinderShare() {
   const toggle = document.getElementById('binder-share-toggle');
   if (toggle) toggle.classList.toggle('on', !current);
   toast(!current ? '리더에게 공유됩니다' : '비공개로 변경됐어요');
+  syncShareToServer();   // 켠 즉시 올린다 — 예전엔 다음 저장 때까지 아무것도 안 올라갔다
 }
 
 // ── 리더: 교인 묵상 나눔 (커뮤니티 바인더) ──
