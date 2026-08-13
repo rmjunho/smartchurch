@@ -1,7 +1,8 @@
 // Firebase 설정 + 초기화 + Firestore 파사드 (ESM 모듈)
 // auth 부분은 js/auth.js 로 분리됨 (이 파일 다음에 로드)
 import { initializeApp }                              from "https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js";
-import { getFirestore, doc, setDoc, getDoc,
+import { getFirestore, initializeFirestore, persistentLocalCache,
+         persistentMultipleTabManager, doc, setDoc, getDoc,
          updateDoc, deleteDoc, collection, collectionGroup, getDocs,
          addDoc, query, where, orderBy, limit,
          arrayUnion, onSnapshot, serverTimestamp }              from "https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js";
@@ -18,7 +19,20 @@ const firebaseConfig = {
 };
 
 const fbApp    = initializeApp(firebaseConfig);
-const fbDb     = getFirestore(fbApp);
+// 오프라인 영속성(IndexedDB). 기본값은 메모리 캐시라, 지하철·엘리베이터에서 저장한 뒤
+// 앱을 닫으면 아직 전송 못 한 쓰기가 통째로 사라졌다. 영속 캐시는 그 대기 쓰기를 디스크에
+// 남겨 두었다가 다시 연결되면 스스로 보낸다. multipleTabManager 는 PWA 와 브라우저 탭이
+// 동시에 떠 있어도 캐시를 공유하게 한다(단일 탭 모드면 나중에 연 쪽이 캐시를 못 쓴다).
+// 사파리 프라이빗 등 IndexedDB 를 못 쓰는 환경에서는 예외가 나므로 메모리 캐시로 내려간다.
+let fbDb;
+try {
+  fbDb = initializeFirestore(fbApp, {
+    localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+  });
+} catch (e) {
+  console.warn('오프라인 캐시 사용 불가 — 메모리 캐시로 진행:', e);
+  fbDb = getFirestore(fbApp);
+}
 const fbStore  = getStorage(fbApp);
 
 // 전역 노출
@@ -83,10 +97,16 @@ window._fb = {
       // 개인 바인더 기기 간 동기화 (비공개 — 본인만 read/write). key = `${uid}_${date}`
       setMyBinder: (key, data) => setDoc(doc(fbDb, 'myBinders', key), data, { merge: true }),
       getMyBinder: (key)       => getDoc(doc(fbDb, 'myBinders', key)),
+      // 바인더도 투두처럼 실시간으로 감시한다. 열 때 1회만 받아 오던 시절엔, 상대 기기가
+      // 그 뒤에 쓴 내용을 모른 채 내 화면 값을 저장해 상대 것을 통째로 덮었다.
+      listenMyBinder: (key, cb) => onSnapshot(doc(fbDb, 'myBinders', key), cb,
+        e => window._fbErr && window._fbErr('바인더 실시간 동기화', e)),
       // 투두 기기 간 동기화. 바인더와 문서를 나눈다 — 같은 문서에 있던 시절엔 한 기기가
       // 바인더를 저장하면 다른 기기에서 추가한 투두까지 통째로 덮여 사라졌다. key = `${uid}_${date}`
       setMyTodos:    (key, data) => setDoc(doc(fbDb, 'myTodos', key), data, { merge: true }),
-      listenMyTodos: (key, cb)   => onSnapshot(doc(fbDb, 'myTodos', key), cb, () => {}),
+      // 에러를 삼키면 투두 동기화가 조용히 죽는다 — 화면엔 아무 일도 안 일어나고 기기끼리 어긋난다.
+      listenMyTodos: (key, cb)   => onSnapshot(doc(fbDb, 'myTodos', key), cb,
+        e => window._fbErr && window._fbErr('투두 실시간 동기화', e)),
       // 공유 바인더 코멘트 — entryKey = `${바인더주인id}_${date}` 로 묶음
       addBinderComment:  (data)     => addDoc(collection(fbDb, 'binderComments'),
                                         { ...data, createdAt: serverTimestamp() }),
@@ -115,7 +135,8 @@ window._fb = {
       listenChatMsgs: (roomId, n, cb) =>
         onSnapshot(
           query(collection(fbDb, 'chatRooms', roomId, 'messages'),
-            orderBy('createdAt', 'asc'), limit(n)), cb),
+            orderBy('createdAt', 'asc'), limit(n)), cb,
+          e => window._fbErr && window._fbErr('채팅 메시지 실시간 수신', e)),
       ensureChatRoom: (roomId, data) =>
         setDoc(doc(fbDb, 'chatRooms', roomId), data, { merge: true }),
       // DM/그룹 채팅방 목록 (내가 멤버인 방)
@@ -165,7 +186,8 @@ window._fb = {
           e => {
             if (window._fbErr) window._fbErr('모임 목록 실시간 조회', e);
             unsub = onSnapshot(query(collection(fbDb, 'meetings'),
-              where('churchCode', '==', churchCode)), cb);
+              where('churchCode', '==', churchCode)), cb,
+              e2 => window._fbErr && window._fbErr('모임 목록 재구독', e2));
           });
         return () => unsub && unsub();
       },
@@ -183,9 +205,12 @@ window._fb = {
       updateBoardComment: (postId, commentId, data) => updateDoc(doc(fbDb, 'boardPosts', postId, 'comments', commentId), data),
       deleteBoardComment: (postId, commentId)       => deleteDoc(doc(fbDb, 'boardPosts', postId, 'comments', commentId)),
       listenBoardComments:(postId, cb) => onSnapshot(query(
-        collection(fbDb, 'boardPosts', postId, 'comments'), orderBy('createdAt', 'asc')), cb),
+        collection(fbDb, 'boardPosts', postId, 'comments'), orderBy('createdAt', 'asc')), cb,
+        e => window._fbErr && window._fbErr('게시판 댓글 실시간 수신', e)),
       // 사용자 문서 실시간 감지 (승인/거절 대기용)
-      listenUser: (uid, cb) => onSnapshot(doc(fbDb, 'users', uid), cb),
+      // 에러 콜백이 없으면 리스너가 조용히 죽어, 승인·직분 변경이 영영 안 들어온다.
+      listenUser: (uid, cb) => onSnapshot(doc(fbDb, 'users', uid), cb,
+        e => window._fbErr && window._fbErr('내 계정 실시간 감시', e)),
       // 초대 코드 (Firestore - 기기 간 공유)
       setInviteCode: (code, data) => setDoc(doc(fbDb, 'inviteCodes', code), data),
       getInviteCode: (code)       => getDoc(doc(fbDb, 'inviteCodes', code)),
