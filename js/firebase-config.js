@@ -142,6 +142,11 @@ window._fb = {
       sendChatMsg: (roomId, msg) =>
         addDoc(collection(fbDb, 'chatRooms', roomId, 'messages'),
           { ...msg, createdAt: serverTimestamp() }),
+      // 3주 지난 사진 비우기. 문서에 base64 로 들어 있어 그냥 두면 저장 용량만 먹는다.
+      // 그 방을 연 사람이 발견하는 대로 비운다(예약 정리는 Cloud Functions = Blaze 전용).
+      expireChatImage: (roomId, msgId) =>
+        updateDoc(doc(fbDb, 'chatRooms', roomId, 'messages', msgId),
+          { imageUrl: '', imageExpired: true }),
       // 이모지 리액션. reactions 맵 전체를 덮어쓰지 않고 해당 키 배열에 내 uid 만 넣고 뺀다
       // — 통째로 쓰면 두 사람이 동시에 누를 때 나중 쓰기가 앞사람 것을 지운다.
       toggleMsgReaction: (roomId, msgId, key, userId, on) =>

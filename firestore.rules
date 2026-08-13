@@ -274,6 +274,18 @@ service cloud.firestore {
                         (request.resource.data.diff(resource.data).affectedKeys()
                            .hasOnly(['reactions'])
                          && resource.data.get('deleted', false) == false)
+                        ||
+                        // ③ 3주 지난 사진 비우기 — 사진이 문서에 base64 로 들어 있어 그냥 두면
+                        // 무료 요금제 저장 용량만 먹는다. 예약 정리(Cloud Functions)는 Blaze
+                        // 전용이라, 그 방을 연 사람이 발견하는 대로 비운다.
+                        // 비우는 것 말고는 못 하게: imageUrl 은 반드시 빈 문자열이어야 하고
+                        // (다른 사진으로 갈아끼우기 차단), 3주가 지난 메시지여야 한다.
+                        (request.resource.data.diff(resource.data).affectedKeys()
+                           .hasOnly(['imageUrl', 'imageExpired'])
+                         && request.resource.data.get('imageUrl', '') == ''
+                         && request.resource.data.get('imageExpired', false) == true
+                         && resource.data.createdAt is timestamp
+                         && resource.data.createdAt < request.time - duration.value(21, 'd'))
                       );
         allow delete: if false;   // 되살릴 수 없는 진짜 삭제는 막는다
       }

@@ -1114,11 +1114,22 @@
             <div class="openchat-header-title" id="room-panel-name"></div>
             <div class="openchat-header-sub" id="room-panel-sub"></div>
           </div>
+          <button onclick="toggleChatSearch('room')" title="대화 검색" style="background:none;border:none;font-size:18px;cursor:pointer;padding:0 2px;color:var(--black)">🔍</button>
           <button onclick="openRoomMenu()" style="background:none;border:none;font-size:22px;cursor:pointer;padding:0 4px;color:var(--black)">⋮</button>
+        </div>
+        <div class="chat-search-bar" id="room-panel-search" style="display:none">
+          <input type="search" placeholder="대화 내용 검색" autocomplete="off"
+                 oninput="onChatSearchInput('room',this.value)"
+                 onkeydown="if(event.key==='Enter'){event.preventDefault();stepChatSearch('room',-1);}">
+          <span class="cs-count"></span>
+          <button onclick="stepChatSearch('room',-1)" title="이전">▲</button>
+          <button onclick="stepChatSearch('room',1)" title="다음">▼</button>
+          <button onclick="closeChatSearch('room')" title="닫기">✕</button>
         </div>
         <div class="openchat-msgs" id="room-panel-msgs">
           <div style="text-align:center;padding:20px;color:var(--muted);font-size:13px">불러오는 중...</div>
         </div>
+        <div class="mention-pop" id="room-panel-mention" style="display:none"></div>
         <div class="chat-reply-bar" id="room-panel-reply" style="display:none"></div>
         <div class="openchat-input-bar">
           <input type="file" id="room-panel-img-input" accept="image/*" style="display:none" onchange="sendChatImage('room',event)">
@@ -1126,7 +1137,7 @@
           <textarea class="openchat-input" id="room-panel-input"
             placeholder="메시지를 입력해 주세요..."
             rows="1" autocomplete="off" autocorrect="off" autocapitalize="off"
-            oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,100)+'px'"
+            oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,100)+'px';onChatInput(this,'room')"
             onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendRoomMsg();}"></textarea>
           <button class="openchat-send-btn" id="room-panel-send-btn" onclick="sendRoomMsg()">➤</button>
         </div>
@@ -1179,10 +1190,21 @@
               <div class="openchat-header-title" id="openchat-room-name">교회 오픈채팅</div>
               <div class="openchat-header-sub" id="openchat-room-sub">실시간 채팅</div>
             </div>
+            <button onclick="toggleChatSearch('open')" title="대화 검색" style="background:none;border:none;color:inherit;font-size:18px;cursor:pointer;padding:0 4px">🔍</button>
+          </div>
+          <div class="chat-search-bar" id="openchat-search" style="display:none">
+            <input type="search" placeholder="대화 내용 검색" autocomplete="off"
+                   oninput="onChatSearchInput('open',this.value)"
+                   onkeydown="if(event.key==='Enter'){event.preventDefault();stepChatSearch('open',-1);}">
+            <span class="cs-count"></span>
+            <button onclick="stepChatSearch('open',-1)" title="이전">▲</button>
+            <button onclick="stepChatSearch('open',1)" title="다음">▼</button>
+            <button onclick="closeChatSearch('open')" title="닫기">✕</button>
           </div>
           <div class="openchat-msgs" id="openchat-msgs">
             <div style="text-align:center;padding:20px;color:var(--muted);font-size:13px">메시지 불러오는 중...</div>
           </div>
+          <div class="mention-pop" id="openchat-mention" style="display:none"></div>
           <div class="chat-reply-bar" id="openchat-reply" style="display:none"></div>
           <div class="openchat-input-bar">
             <input type="file" id="openchat-img-input" accept="image/*" style="display:none" onchange="sendChatImage('open',event)">
@@ -1190,7 +1212,7 @@
             <textarea class="openchat-input" id="openchat-input"
               placeholder="메시지를 입력해 주세요..."
               rows="1" autocomplete="off" autocorrect="off" autocapitalize="off"
-              oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,100)+'px'"
+              oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,100)+'px';onChatInput(this,'open')"
               onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendOpenChatMsg();}"></textarea>
             <button class="openchat-send-btn" id="openchat-send-btn" onclick="sendOpenChatMsg()">➤</button>
           </div>
@@ -8896,6 +8918,8 @@ var _chatEntryLastRead = '';     // 이 방에 들어오기 직전의 내 마지
 function _chatWatchRoomDoc(roomId, rerender, markRead) {
   _chatStopRoomWatch();
   cancelReply();   // 방을 옮기면 인용도 버린다 — 안 그러면 딴 방 메시지에 답장이 달린다
+  ['room', 'open'].forEach(k => { closeMentionPop(k); if (_searchBar(k)) _searchBar(k).style.display = 'none'; });
+  _chatSearch = null;
   if (!roomId || !window._fbReady || !window._fb?.listenChatRoom) return;
   let first = true;
   _chatRoomUnsub = window._fb.listenChatRoom(roomId, snap => {
@@ -9003,11 +9027,161 @@ function _chatNoticeHtml() {
     </div>`;
 }
 
-// msgs → 말풍선 HTML. opts: { showRole }
+// ── @멘션 ──
+// 후보는 DM/그룹이면 그 방 멤버, 오픈채팅이면 같은 교회 교인 전체(_userInfoCache).
+var _mentionHits = [];
+function _mentionCandidates(kind) {
+  const ids = kind === 'room'
+    ? (((_chatRoomDoc && _chatRoomDoc.members) || []).filter(id => id !== me.id))
+    : Object.keys(_userInfoCache || {}).filter(id => id !== me.id);
+  return ids.map(id => ({ id, name: getUserName(id, '') })).filter(c => c.name);
+}
+function _mentionPop(kind) {
+  return document.getElementById(kind === 'open' ? 'openchat-mention' : 'room-panel-mention');
+}
+function closeMentionPop(kind) {
+  const p = _mentionPop(kind);
+  if (p) { p.style.display = 'none'; p.innerHTML = ''; }
+}
+// 커서 바로 앞이 '@무언가' 일 때만 뜬다. 문장 중간에 쓴 이메일(a@b)에는 안 걸리게
+// 앞 글자가 공백이거나 줄 처음일 때로 한정한다.
+function onChatInput(el, kind) {
+  const upto = el.value.slice(0, el.selectionStart);
+  const m = /(^|\s)@([^\s@]{0,20})$/.exec(upto);
+  if (!m) { closeMentionPop(kind); return; }
+  const q = m[2];
+  _mentionHits = _mentionCandidates(kind)
+    .filter(c => !q || c.name.indexOf(q) >= 0)
+    .slice(0, 6);
+  if (!_mentionHits.length) { closeMentionPop(kind); return; }
+  const pop = _mentionPop(kind);
+  if (!pop) return;
+  // 이름을 onclick 문자열에 넣지 않는다 — 따옴표가 든 이름이면 그대로 깨진다. 번호만 넘긴다.
+  pop.innerHTML = _mentionHits.map((c, i) =>
+    `<button onclick="pickMention('${kind}',${i})">@${escHtml(c.name)}</button>`).join('');
+  pop.style.display = 'flex';
+}
+function pickMention(kind, i) {
+  const c = _mentionHits[i];
+  const el = document.getElementById(kind === 'open' ? 'openchat-input' : 'room-panel-input');
+  if (!c || !el) return;
+  const cut = el.selectionStart;
+  const before = el.value.slice(0, cut).replace(/(^|\s)@([^\s@]{0,20})$/, '$1@' + c.name + ' ');
+  el.value = before + el.value.slice(cut);
+  closeMentionPop(kind);
+  el.focus();
+  el.selectionStart = el.selectionEnd = before.length;
+}
+// 보낼 때 본문에서 다시 훑는다 — 목록에서 고르지 않고 직접 쳐 넣은 이름도 잡힌다.
+function _collectMentions(text, kind) {
+  const ids = [];
+  _mentionCandidates(kind).forEach(c => {
+    if (text.indexOf('@' + c.name) >= 0 && ids.indexOf(c.id) < 0) ids.push(c.id);
+  });
+  return ids;
+}
+
+// ── 방 안 메시지 검색 ──
+// 화면에 들고 있는 최근 100개 안에서만 찾는다. Firestore 는 부분 문자열 검색을 못 하고,
+// 전체를 훑으려면 방 전체를 내려받아야 해서 무료 요금제 읽기 한도가 금방 찬다.
+var _chatSearch = null;        // { kind, q, hits:[msgId], idx }
+var _chatSearchTimer = null;
+
+function _searchBar(kind) {
+  return document.getElementById(kind === 'open' ? 'openchat-search' : 'room-panel-search');
+}
+function toggleChatSearch(kind) {
+  const bar = _searchBar(kind);
+  if (!bar) return;
+  if (bar.style.display === 'flex') { closeChatSearch(kind); return; }
+  bar.style.display = 'flex';
+  const inp = bar.querySelector('input');
+  if (inp) { inp.value = ''; inp.focus(); }
+  _chatSearch = { kind, q: '', hits: [], idx: 0 };
+  _updateSearchCount(kind);
+}
+function closeChatSearch(kind) {
+  const bar = _searchBar(kind);
+  if (bar) bar.style.display = 'none';
+  _chatSearch = null;
+  _chatRerender(kind);
+}
+function onChatSearchInput(kind, q) {
+  clearTimeout(_chatSearchTimer);   // 한 글자마다 100개를 다시 그리지 않게
+  _chatSearchTimer = setTimeout(() => runChatSearch(kind, q), 200);
+}
+async function runChatSearch(kind, q) {
+  q = (q || '').trim();
+  const lower = q.toLowerCase();
+  const hits = !q ? [] : (_chatLastMsgs[kind] || [])
+    .filter(m => m.id && !m.deleted && m.senderId !== 'system'
+                 && (m.text || '').toLowerCase().indexOf(lower) >= 0)
+    .map(m => m.id);
+  // 최근 것부터 보여주는 게 자연스럽다 — 마지막 결과에서 시작해 ▲ 로 거슬러 올라간다.
+  _chatSearch = { kind, q, hits, idx: hits.length ? hits.length - 1 : 0 };
+  _updateSearchCount(kind);
+  await _chatRerender(kind);
+  if (hits.length) _chatGotoMsg(hits[_chatSearch.idx]);
+}
+function stepChatSearch(kind, d) {
+  if (!_chatSearch || !_chatSearch.hits.length) return;
+  const n = _chatSearch.hits.length;
+  _chatSearch.idx = (_chatSearch.idx + d + n) % n;
+  _updateSearchCount(kind);
+  _chatGotoMsg(_chatSearch.hits[_chatSearch.idx]);
+}
+function _updateSearchCount(kind) {
+  const bar = _searchBar(kind);
+  const c = bar && bar.querySelector('.cs-count');
+  if (!c) return;
+  const s = _chatSearch;
+  c.textContent = (!s || !s.q) ? '' : (s.hits.length ? `${s.idx + 1}/${s.hits.length}` : '없음');
+}
+function _chatRerender(kind) {
+  const msgs = _chatLastMsgs[kind];
+  if (!msgs) return Promise.resolve();
+  return kind === 'open' ? _renderOpenChatMsgs(msgs) : _renderRoomMsgs(msgs);
+}
+// 지금 이 패널에 걸린 검색어 (다른 패널 것이면 무시)
+function _searchQFor(kind) {
+  return (_chatSearch && _chatSearch.kind === kind) ? _chatSearch.q : '';
+}
+
+// 말풍선 본문 꾸미기 — 이미 escHtml 을 거친 문자열에만 우리 태그를 덧입힌다.
+function _chatDecorate(escaped, mentions, q) {
+  (mentions || []).forEach(id => {
+    const nm = escHtml(getUserName(id, ''));
+    if (!nm) return;
+    escaped = escaped.split('@' + nm).join(`<span class="chat-mention">@${nm}</span>`);
+  });
+  if (q) {
+    const rx = new RegExp(escHtml(q).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+    // 태그 사이의 글자만 바꾼다 — 안 그러면 위에서 넣은 <span> 속성까지 <mark> 로 쪼갠다.
+    escaped = escaped.replace(/[^<>]+/g, seg => seg.replace(rx, mm => `<mark>${mm}</mark>`));
+  }
+  return escaped;
+}
+
+// ── 사진 유효 기간 ──
+// 사진을 문서에 base64 로 담기 때문에 방이 오래될수록 무료 요금제 저장 용량을 갉아먹는다.
+// 3주가 지나면 화면에서 내리고, 본 사람이 그 자리에서 문서의 사진 데이터를 비운다
+// (예약 정리는 Cloud Functions 가 필요한데 그것도 Blaze 전용이라 못 쓴다).
+var CHAT_IMG_TTL_MS = 21 * 24 * 60 * 60 * 1000;
+var _imgExpireTried = {};
+function _expireOldChatImages(jobs) {
+  if (!jobs.length || !window._fbReady || !window._fb?.expireChatImage) return;
+  jobs.slice(0, 5).forEach(j => {            // 한 번에 몰아 쓰지 않는다
+    window._fb.expireChatImage(j.roomId, j.id).catch(() => {});
+  });
+}
+
+// msgs → 말풍선 HTML. opts: { showRole, roomId, q }
 function _chatMsgsHtml(msgs, opts) {
   const showRole = !!(opts && opts.showRole);
+  const q        = (opts && opts.q) || '';
   const entryRead = _chatEntryLastRead ? new Date(_chatEntryLastRead) : null;
   let html = '', lastDate = '', readLineDrawn = false;
+  const expireJobs = [];
   msgs.forEach((msg, i) => {
     const isMine  = msg.senderId === me.id;
     const ts      = _chatTs(msg);
@@ -9052,13 +9226,23 @@ function _chatMsgsHtml(msgs, opts) {
       : '👤';
     // 지운 메시지는 자리를 남긴다 — 없애면 앞뒤 대화가 어긋난다(카카오톡과 같은 방식).
     const isDeleted = !!msg.deleted;
-    const imgSrc = !isDeleted && msg.type === 'image' ? _safeImgSrc(msg.imageUrl) : '';
+    // 3주가 지난 사진은 보여주지 않는다. 아직 문서에 데이터가 남아 있으면 지금 비우게 예약한다.
+    const isImgMsg = !isDeleted && msg.type === 'image';
+    const imgOld   = isImgMsg && (Date.now() - ts.getTime() > CHAT_IMG_TTL_MS);
+    if (imgOld && msg.imageUrl && msg.id && !_imgExpireTried[msg.id]) {
+      _imgExpireTried[msg.id] = 1;
+      expireJobs.push({ roomId: (opts && opts.roomId) || '', id: msg.id });
+    }
+    const imgSrc = (isImgMsg && !imgOld && !msg.imageExpired) ? _safeImgSrc(msg.imageUrl) : '';
     const isImg = !!imgSrc;
+    const mentions = (!isDeleted && Array.isArray(msg.mentions)) ? msg.mentions : [];
     const bubbleInner = isDeleted
       ? '삭제된 메시지입니다'
       : (isImg
           ? `<img class="chat-img" src="${imgSrc}" alt="사진" loading="lazy" onclick="openImageLightbox(this.src)">`
-          : escHtml(msg.text));
+          : (isImgMsg
+              ? '<span class="chat-img-expired">🖼️ 기간이 지난 사진이에요</span>'
+              : _chatDecorate(escHtml(msg.text), mentions, q)));
     const name = showRole
       ? `${escHtml(getUserName(msg.senderId, msg.senderName))} · ${escHtml(getUserRole(msg.senderId, msg.senderRole || '성도'))}`
       : escHtml(getUserName(msg.senderId, msg.senderName));
@@ -9090,7 +9274,8 @@ function _chatMsgsHtml(msgs, opts) {
         ).join('')}</div>`
       : '';
 
-    html += `<div class="chat-bubble-wrap ${isMine ? 'mine' : ''}${grouped ? ' grouped' : ''}"
+    const mentionsMe = mentions.indexOf(me.id) >= 0;
+    html += `<div class="chat-bubble-wrap ${isMine ? 'mine' : ''}${grouped ? ' grouped' : ''}${mentionsMe ? ' mentioned' : ''}"
                   data-mid="${mid}">
       ${!isMine ? (grouped ? '<div class="chat-avatar spacer"></div>'
                            : `<div class="chat-avatar">${avatarHtml}</div>`) : ''}
@@ -9109,6 +9294,7 @@ function _chatMsgsHtml(msgs, opts) {
       </div>
     </div>`;
   });
+  _expireOldChatImages(expireJobs);
   return html;
 }
 
@@ -9345,7 +9531,7 @@ async function _renderRoomMsgs(msgs) {
 
   _chatLastMsgs.room = msgs;
   el.innerHTML = _chatNoticeHtml()
-    + _chatMsgsHtml(msgs, { showRole: false, roomId: _currentRoomId })
+    + _chatMsgsHtml(msgs, { showRole: false, roomId: _currentRoomId, q: _searchQFor('room') })
     + `<div class="chat-newmsg" id="room-panel-msgs-newbtn"
             onclick="_chatScrollBottom('room-panel-msgs')">새 메시지 ↓</div>`;
   _chatAfterRender('room-panel-msgs', wasNearBottom, grew);
@@ -9364,12 +9550,15 @@ async function sendRoomMsg() {
   input.style.height = 'auto';
   const replyTo    = _replyPayload('room');
   const savedReply = _chatReply;
+  const mentions   = _collectMentions(text, 'room');
   cancelReply();
+  closeMentionPop('room');
 
   try {
     await window._fb.sendChatMsg(_currentRoomId, {
       text,
       ...(replyTo ? { replyTo } : {}),
+      ...(mentions.length ? { mentions } : {}),
       senderId:    me.id,
       senderName:  me.name,
       senderRole:  me.role || '성도',
@@ -10491,7 +10680,7 @@ async function _renderOpenChatMsgs(msgs) {
 
   _chatLastMsgs.open = msgs;
   el.innerHTML = _chatNoticeHtml()
-    + _chatMsgsHtml(msgs, { showRole: true, roomId: _currentOpenChannelId })
+    + _chatMsgsHtml(msgs, { showRole: true, roomId: _currentOpenChannelId, q: _searchQFor('open') })
     + `<div class="chat-newmsg" id="openchat-msgs-newbtn"
             onclick="_chatScrollBottom('openchat-msgs')">새 메시지 ↓</div>`;
   _chatAfterRender('openchat-msgs', wasNearBottom, grew);
@@ -10513,12 +10702,15 @@ async function sendOpenChatMsg() {
   input.style.height = 'auto';
   const replyTo    = _replyPayload('open');
   const savedReply = _chatReply;
+  const mentions   = _collectMentions(text, 'open');
   cancelReply();
+  closeMentionPop('open');
 
   try {
     await window._fb.sendChatMsg(roomId, {
       text,
       ...(replyTo ? { replyTo } : {}),
+      ...(mentions.length ? { mentions } : {}),
       senderId:    me.id,
       senderName:  me.name,
       senderRole:  me.role || '성도',

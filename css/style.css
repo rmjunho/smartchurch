@@ -935,6 +935,45 @@
       border:none; background:var(--cream2); font-size:20px; cursor:pointer;
     }
     .ram-emojis button.on { background:var(--cream); box-shadow:inset 0 0 0 2px var(--gold); }
+    /* ── @멘션 ── */
+    .chat-mention { color:var(--gold); font-weight:700; }
+    .chat-bubble-wrap.mentioned .chat-bubble { box-shadow:0 0 0 2px var(--gold); }
+    .mention-pop {
+      display:flex; gap:6px; overflow-x:auto;
+      padding:8px 12px; background:var(--cream2);
+      border-top:1px solid var(--border);
+    }
+    .mention-pop button {
+      flex-shrink:0; height:30px; padding:0 12px; border-radius:15px;
+      border:1.5px solid var(--gold); background:white;
+      font-size:13px; font-weight:600; font-family:inherit;
+      color:var(--black); cursor:pointer;
+    }
+    /* ── 방 안 검색 ── */
+    .chat-search-bar {
+      display:flex; align-items:center; gap:4px;
+      padding:8px 12px; background:var(--cream2);
+      border-bottom:1px solid var(--border);
+    }
+    .chat-search-bar input {
+      flex:1; min-width:0; height:34px; padding:0 12px;
+      border:1.5px solid var(--border); border-radius:17px;
+      background:white; font-size:13.5px; font-family:inherit; color:var(--black);
+    }
+    .chat-search-bar input:focus { outline:none; border-color:var(--gold); }
+    .chat-search-bar .cs-count {
+      flex-shrink:0; min-width:34px; text-align:center;
+      font-size:11.5px; font-weight:700; color:var(--muted);
+    }
+    .chat-search-bar button {
+      flex-shrink:0; width:28px; height:28px; border:none; border-radius:50%;
+      background:none; font-size:12px; color:var(--black); cursor:pointer;
+    }
+    .chat-bubble mark {
+      background:var(--gold); color:white; border-radius:3px; padding:0 1px;
+    }
+    /* 기간이 지나 내려간 사진 */
+    .chat-img-expired { font-size:12.5px; color:var(--muted); }
     /* ── 공지 고정 ── */
     .chat-notice {
       position:sticky; top:0; z-index:5;
