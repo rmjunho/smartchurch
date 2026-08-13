@@ -8965,17 +8965,18 @@ function _chatMsgsHtml(msgs, opts) {
                           && (nextTs - ts) < CHAT_GROUP_MS
                           && _chatDayKey(nextTs) === dateStr);
 
-    const photo = (msg.senderId !== 'system' && getUserPhoto(msg.senderId)) || msg.senderPhoto;
+    const photo = _safeImgSrc((msg.senderId !== 'system' && getUserPhoto(msg.senderId)) || msg.senderPhoto);
     const avatarHtml = photo
       ? `<img src="${photo}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`
       : '👤';
     // 지운 메시지는 자리를 남긴다 — 없애면 앞뒤 대화가 어긋난다(카카오톡과 같은 방식).
     const isDeleted = !!msg.deleted;
-    const isImg = !isDeleted && msg.type === 'image' && msg.imageUrl;
+    const imgSrc = !isDeleted && msg.type === 'image' ? _safeImgSrc(msg.imageUrl) : '';
+    const isImg = !!imgSrc;
     const bubbleInner = isDeleted
       ? '삭제된 메시지입니다'
       : (isImg
-          ? `<img class="chat-img" src="${msg.imageUrl}" alt="사진" loading="lazy" onclick="openImageLightbox(this.src)">`
+          ? `<img class="chat-img" src="${imgSrc}" alt="사진" loading="lazy" onclick="openImageLightbox(this.src)">`
           : escHtml(msg.text));
     const name = showRole
       ? `${escHtml(getUserName(msg.senderId, msg.senderName))} · ${escHtml(getUserRole(msg.senderId, msg.senderRole || '성도'))}`
@@ -9259,15 +9260,14 @@ async function sendChatImage(kind, event) {
   }
 
   try {
-    // Storage 업로드 → 메시지엔 다운로드 URL(짧은 문자열)만 저장 (문서 경량화 + 브라우저 캐싱)
+    // Storage(Blaze 전용) 대신 압축본을 문서에 직접 담는다. 방을 열 때 최근 100개를 한꺼번에
+    // 받으므로 프로필 사진(700KB)보다 더 조인다 — 사진 여러 장이 든 방이 무거워지지 않도록.
+    // ponytail: 문서 내장이라 화질·용량에 천장이 있다. Blaze 로 올리면 Storage 업로드로 되돌린다.
     const raw      = await _readFileAsDataUrl(file);
-    const compact  = await _compressImageDataUrl(raw, 1600, 0.82);   // Storage 는 1MB 제한 없음 → 고화질
-    const path     = `chatImages/${roomId}/${Date.now()}.jpg`;
-    const imageUrl = await window._fb.uploadChatImage(path, compact);
+    const imageUrl = await _fitImageForFirestore(raw, 260 * 1024);
     await window._fb.sendChatMsg(roomId, {
       type:        'image',
       imageUrl,
-      imagePath:   path,
       text:        '',
       senderId:    me.id,
       senderName:  me.name,
@@ -9279,10 +9279,7 @@ async function sendChatImage(kind, event) {
     else                 window._fb.updateChatRoom(roomId, meta).catch(() => {});
   } catch(e) {
     console.error('이미지 전송 실패:', e);
-    const hint = (e && String(e.code||e.message||'').indexOf('storage/') >= 0)
-      ? '사진 전송 실패 — Storage 설정을 확인해 주세요'
-      : '사진 전송 실패. 다시 시도해 주세요';
-    toast(hint);
+    toast('사진 전송 실패. 다시 시도해 주세요');
     if (spin && spin.parentNode) spin.parentNode.removeChild(spin);
   } finally {
     if (attachBtn) attachBtn.disabled = false;
@@ -9298,7 +9295,9 @@ function openImageLightbox(src) {
     ov.onclick = () => { ov.style.display = 'none'; ov.innerHTML = ''; };
     document.body.appendChild(ov);
   }
-  ov.innerHTML = `<img src="${src}" alt="이미지">`;
+  const safe = _safeImgSrc(src);
+  if (!safe) return;
+  ov.innerHTML = `<img src="${safe}" alt="이미지">`;
   ov.style.display = 'flex';
 }
 
@@ -10547,16 +10546,28 @@ function _compressImageDataUrl(dataUrl, maxDim, quality) {
     img.src = dataUrl;
   });
 }
-// Firestore 문서 크기 제한(1MB) 안에 들어가도록 반복 축소 (목표 base64 < 700KB)
-async function _fitImageForFirestore(dataUrl) {
+// Firestore 문서 크기 제한(1MB) 안에 들어가도록 반복 축소. 기본 목표 base64 < 700KB,
+// 채팅 사진처럼 한 번에 여러 장을 받아야 하는 곳은 maxBytes 를 더 작게 넘긴다.
+async function _fitImageForFirestore(dataUrl, maxBytes) {
+  maxBytes = maxBytes || 700 * 1024;
   let out = await _compressImageDataUrl(dataUrl, 1000, 0.6);
   let dim = 800, q = 0.55;
-  for (let i = 0; i < 5 && out.length > 700 * 1024; i++) {
+  for (let i = 0; i < 6 && out.length > maxBytes; i++) {
     out = await _compressImageDataUrl(dataUrl, dim, q);
     dim = Math.round(dim * 0.8);
     q = Math.max(0.4, q - 0.05);
   }
   return out;
+}
+
+// 화면에 <img src> 로 넣어도 되는 주소인지 검사. 메시지 필드는 로그인한 사람이면 누구나
+// 써 넣을 수 있으므로(규칙이 senderId 만 본다) 남이 보낸 imageUrl 을 그대로 믿으면
+// src="x" onerror="..." 처럼 속성을 탈출해 스크립트를 심을 수 있다. escHtml 은 따옴표를
+// 이스케이프하지 않아 여기서는 쓸 수 없다 — 아예 형식을 제한한다.
+function _safeImgSrc(u) {
+  u = String(u || '');
+  if (/["'<>\s]/.test(u)) return '';
+  return /^(data:image\/(png|jpeg|jpg|gif|webp);base64,|https:\/\/)/i.test(u) ? u : '';
 }
 
 function updateProfileAvatarDisplay() {
