@@ -4022,7 +4022,10 @@ function startSelfDocWatch() {
       if (!snap.exists()) {
         if (!_selfSeen || !me) return;            // 최초 스냅샷이 '없음'이면 동기화 지연으로 보고 무시
         if (_selfDocUnsub) { _selfDocUnsub(); _selfDocUnsub = null; }
-        _clearAllLocalData();
+        // 로컬은 지우지 않는다. 여기서 sc2_* 를 전부 날리면 바인더·투두·친구가 함께 사라지는데,
+        // 그 로컬본이 서버에 못 올라간 기록의 마지막 사본이다. 스냅샷이 '없음' 으로 오는 이유는
+        // 실제 삭제 말고도 있을 수 있어(리스너 오류·규칙 변경), 오탐 한 번의 대가가 너무 크다.
+        // 세션만 끊는다 — 진짜 탈퇴는 본인이 누른 경로가 _clearAllLocalData 로 따로 처리한다.
         toast('계정이 삭제되었습니다.');
         setTimeout(() => { doLogout(); location.reload(); }, 900);
         return;
@@ -4274,9 +4277,14 @@ function binderHasContent(d) {
 }
 
 function loadBinder() {
-  // 미완료 할 일 이월 (텍스트형 + 드로잉형)
-  carryOverTodosIfNeeded();
-  carryOverDrawTodosIfNeeded();
+  // 미완료 할 일 이월 (텍스트형 + 드로잉형) — 오늘 날짜에서만.
+  // 이월은 viewDate 기준으로 '전날' 을 가져오므로, 가드가 없으면 달력에서 지난 날짜를 열어보는
+  // 것만으로 그 날짜에 없던 할 일이 새로 만들어지고 서버(myTodos)에도 올라갔다.
+  // ("오늘 쓴 할 일이 왜 이전 날에도 있죠?" 의 정체)
+  if (dateKey() === todayDateKey()) {
+    carryOverTodosIfNeeded();
+    carryOverDrawTodosIfNeeded();
+  }
   // 날짜가 바뀌면 할 일 목록도 다시 그린다. 이게 없어서 앞 날짜 목록이 화면에 그대로 남았고,
   // 그 상태에서 체크·삭제하면 보이는 것과 다른 날짜 기록에 저장됐다.
   renderTodos();

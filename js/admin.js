@@ -230,31 +230,11 @@ async function adminDeleteUser(userId, name) {
   }
 }
 
-async function adminSyncAllToFirestore() {
-  if (!window._fbReady || !window._fb) {
-    toast('Firestore에 연결되지 않았어요 '); return;
-  }
-  const users = DB.get('users', []);
-  if (!users.length) { toast('동기화할 사용자가 없어요'); return; }
-  toast('서버 동기화 중...');
-  let count = 0;
-  for (const u of users) {
-    try {
-      // setUser(setDoc merge) → Firestore에 문서가 없어도 생성됨 (updateDoc는 실패)
-      await window._fb.setUser(u.id, u);
-      count++;
-    } catch(e) { console.warn('동기화 실패:', u.id, e); }
-  }
-  // 교회 데이터도 동기화
-  const churches = DB.get('customChurches', {});
-  for (const [code, data] of Object.entries(churches)) {
-    try {
-      if (typeof data === 'object') await window._fb.setChurchInfo(code, data);
-    } catch(e) {}
-  }
-  toast(`${count}명 서버 동기화 완료!`);
-  setTimeout(() => openSubscreen('admin-panel'), 300);
-}
+// adminSyncAllToFirestore 제거됨.
+// 이 기기의 localStorage 스냅샷(sc2_users)을 전 사용자 문서에 setDoc(merge) 로 되쓰는 함수였다.
+// 원본이 서버가 아니라 로컬 캐시라, 누르면 남이 폰에서 바꾼 직분·교회·승인 상태가 이 기기가
+// 기억하는 옛 값으로 되돌아가고, merge 는 문서가 없으면 만들어내므로 삭제한 계정까지 부활했다.
+// 서버가 진실이므로 로컬을 서버로 밀어 올리는 경로는 존재하면 안 된다.
 
 function activateAdminCode() {
   const code = document.getElementById('admin-code-input')?.value.trim();
@@ -615,12 +595,6 @@ function renderAdminPanelHtml(allUsers) {
                  font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;
                  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px">
           <span>📢</span><span style="font-size:11.5px">공지 작성</span>
-        </button>
-        <button onclick="adminSyncAllToFirestore()"
-          style="height:52px;border-radius:12px;border:1.5px solid var(--border);background:white;
-                 font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;
-                 display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px">
-          <span>☁️</span><span style="font-size:11.5px">서버 동기화</span>
         </button>
       </div>
     </div>
