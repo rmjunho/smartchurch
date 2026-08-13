@@ -4554,7 +4554,7 @@ function syncBinderToServer() {
 // 반영되지 않던 문제도 같이 사라진다).
 var BINDER_VER_FIELDS = ['verse','meditation','application','prayer','schRows',
                          'diary','memoText','memoUpload','photo',
-                         'schSettings','drawSizes','drawTodoCards','drawInv','drawCatH'];
+                         'schSettings','schDrawCfg','drawSizes','drawTodoCards','drawInv','drawCatH'];
 
 function binderFieldKeys(d) {
   const keys = BINDER_VER_FIELDS.slice();
@@ -4714,7 +4714,7 @@ function applyBinderFields(changed) {
   // 값은 도착하는데 화면을 고치는 가지가 없어서 새로고침해야 보이던 것들.
   // 저장 경로는 멀쩡했다 — 받는 쪽에서 아무 일도 안 했을 뿐이다.
   if (hit('drawSizes'))     applyRemoteDrawSizes();
-  if (hit('schSettings'))   applySchLayout(false);
+  if (hit('schSettings') || hit('schDrawCfg')) applySchLayout(false);
   // 체크상태·칸 높이도 카드 렌더에서 함께 읽으므로 같은 경로로 다시 그린다
   if (hit('drawTodoCards') || hit('drawInv') || hit('drawCatH')) { try { renderDrawTodoSection(); } catch (e) {} }
   if (all || changed.some(k => k.indexOf('drawings.') === 0)) {
@@ -7629,7 +7629,11 @@ function renderAppSettings() {
       <!-- 데이터 -->
       <div style="font-size:12px;font-weight:700;color:var(--muted);letter-spacing:0.5px;margin-bottom:8px">데이터</div>
       <div style="background:white;border-radius:14px;border:1.5px solid var(--border);overflow:hidden;margin-bottom:16px">
-        <div class="ss-setting-row" onclick="exportMyData()" style="cursor:pointer">
+        <div class="ss-setting-row" onclick="showSyncDiag()" style="cursor:pointer">
+          <div><div class="ss-setting-label">동기화 상태 보기</div><div class="ss-setting-sub">두 기기가 어긋날 때 이 값을 비교해요</div></div>
+          <span class="sm-arrow">›</span>
+        </div>
+        <div class="ss-setting-row" onclick="exportMyData()" style="border-top:1px solid var(--border);cursor:pointer">
           <div><div class="ss-setting-label">내 데이터 내보내기</div><div class="ss-setting-sub">이 기기의 묵상·할 일을 파일로 저장해요</div></div>
           <span class="sm-arrow">›</span>
         </div>
@@ -7933,6 +7937,30 @@ function exportMyData() {
     if (url) setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 }
+// ── 동기화 상태 보기 ──
+// 두 기기가 어긋날 때 어디서 막혔는지 추측하지 않으려고 만든 창구. 폰에는 개발자 콘솔이 없어
+// 같은 값을 눈으로 대조할 방법이 이것밖에 없다. 읽기만 하고 아무것도 바꾸지 않는다.
+function showSyncDiag() {
+  if (!me) { toast('로그인이 필요해요'); return; }
+  const d     = DB.get(binderKey(), {}) || {};
+  const bytes = JSON.stringify(d).length;
+  const ver   = d.fieldVer || {};
+  const lines = [
+    '날짜: ' + dateKey(),
+    '문서 크기: ' + Math.round(bytes / 1024) + 'KB' + (bytes > 950000 ? '  ⚠ 동기화 한도 초과' : ''),
+    '실시간 감시: ' + (window._binderUnsub ? '켜짐' : '꺼짐'),
+    '서버 연결: '  + (window._fbReady ? '됨' : '안 됨'),
+    '',
+    '칸 높이: '    + JSON.stringify(d.drawSizes || null),
+    '시간표: '     + JSON.stringify(d.schDrawCfg || null),
+    '그림 칸: '    + Object.keys(d.drawings || {}).join(', '),
+    '',
+    '버전:',
+    Object.keys(ver).sort().map(k => '  ' + k + ' = ' + ver[k]).join('\n') || '  (없음)'
+  ];
+  alert(lines.join('\n'));
+}
+
 function resetAllData() {
   // confirm()은 iframe에서 차단되므로 바로 실행
   localStorage.clear();
