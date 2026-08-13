@@ -5,7 +5,7 @@ import { getFirestore, initializeFirestore, persistentLocalCache,
          persistentMultipleTabManager, doc, setDoc, getDoc,
          updateDoc, deleteDoc, collection, collectionGroup, getDocs,
          addDoc, query, where, orderBy, limit, writeBatch,
-         arrayUnion, onSnapshot, serverTimestamp }              from "https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js";
+         arrayUnion, arrayRemove, onSnapshot, serverTimestamp }  from "https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js";
 // Firebase Storage 는 쓰지 않는다 — Blaze(유료) 요금제여야 열리는데 이 프로젝트는 Spark 다.
 // 채팅 사진은 압축해서 Firestore 문서에 base64 로 직접 담는다(index.html sendChatImage).
 
@@ -142,6 +142,11 @@ window._fb = {
       sendChatMsg: (roomId, msg) =>
         addDoc(collection(fbDb, 'chatRooms', roomId, 'messages'),
           { ...msg, createdAt: serverTimestamp() }),
+      // 이모지 리액션. reactions 맵 전체를 덮어쓰지 않고 해당 키 배열에 내 uid 만 넣고 뺀다
+      // — 통째로 쓰면 두 사람이 동시에 누를 때 나중 쓰기가 앞사람 것을 지운다.
+      toggleMsgReaction: (roomId, msgId, key, userId, on) =>
+        updateDoc(doc(fbDb, 'chatRooms', roomId, 'messages', msgId),
+          { ['reactions.' + key]: on ? arrayUnion(userId) : arrayRemove(userId) }),
       // 메시지 삭제 = '삭제 표시'. 문서를 없애지 않는다(규칙이 delete 를 막아 둔다).
       deleteChatMsg: (roomId, msgId, byUid) =>
         updateDoc(doc(fbDb, 'chatRooms', roomId, 'messages', msgId),

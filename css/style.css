@@ -878,8 +878,102 @@
       background:rgba(0,0,0,0.88); padding:24px; cursor:zoom-out;
     }
     #img-lightbox img { max-width:96%; max-height:96%; border-radius:10px; }
+    /* ── 답장(인용) ── */
+    .chat-reply-bar {
+      display:flex; align-items:center; gap:8px;
+      padding:8px 12px; background:var(--cream2);
+      border-top:1px solid var(--border);
+      border-left:3px solid var(--gold);
+    }
+    .chat-reply-bar .crb-body { flex:1; min-width:0; }
+    .chat-reply-bar .crb-name { font-size:11px; font-weight:700; color:var(--gold); }
+    .chat-reply-bar .crb-text {
+      font-size:12px; color:var(--muted);
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    }
+    .chat-reply-bar .crb-x {
+      background:none; border:none; font-size:15px; color:var(--muted);
+      cursor:pointer; padding:2px 4px; flex-shrink:0;
+    }
+    /* 말풍선 위에 붙는 인용 블록 */
+    .chat-quote {
+      max-width:220px; padding:5px 9px; margin-bottom:3px;
+      background:rgba(0,0,0,0.05); border-left:3px solid var(--gold);
+      border-radius:0 8px 8px 0; cursor:pointer;
+      font-size:11px; line-height:1.35; overflow:hidden;
+    }
+    .chat-bubble-wrap.mine .chat-quote { margin-left:auto; }
+    .chat-quote .cq-name { display:block; font-weight:700; color:var(--gold); }
+    .chat-quote .cq-text {
+      display:block; color:var(--muted);
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    }
+    /* 인용을 눌러 원본으로 갔을 때 잠깐 강조 */
+    .chat-bubble-wrap.flash .chat-bubble { animation: chatFlash 1.5s ease; }
+    @keyframes chatFlash {
+      0%, 60% { box-shadow:0 0 0 3px var(--gold); }
+      100%    { box-shadow:0 0 0 3px rgba(0,0,0,0); }
+    }
+    /* ── 이모지 리액션 ── */
+    .chat-reacts { display:flex; flex-wrap:wrap; gap:3px; margin-top:3px; }
+    .chat-bubble-wrap.mine .chat-reacts { justify-content:flex-end; }
+    .chat-react {
+      display:inline-flex; align-items:center; gap:3px;
+      height:22px; padding:0 7px; border-radius:11px;
+      border:1px solid var(--border); background:white;
+      font-size:11px; font-family:inherit; color:var(--black);
+      cursor:pointer; line-height:1;
+    }
+    .chat-react.on { border-color:var(--gold); background:var(--cream); font-weight:700; }
+    /* 액션 시트 안의 이모지 줄 */
+    .ram-emojis {
+      display:flex; justify-content:space-around; gap:4px;
+      padding:10px 8px; border-bottom:1px solid var(--border);
+    }
+    .ram-emojis button {
+      width:42px; height:42px; border-radius:50%;
+      border:none; background:var(--cream2); font-size:20px; cursor:pointer;
+    }
+    .ram-emojis button.on { background:var(--cream); box-shadow:inset 0 0 0 2px var(--gold); }
+    /* ── 공지 고정 ── */
+    .chat-notice {
+      position:sticky; top:0; z-index:5;
+      display:flex; align-items:center; gap:7px;
+      flex-shrink:0; padding:8px 10px;
+      background:var(--cream); border:1px solid var(--gold);
+      border-radius:10px; cursor:pointer;
+      box-shadow:0 2px 6px rgba(0,0,0,0.08);
+    }
+    .chat-notice .cn-tag {
+      flex-shrink:0; padding:2px 6px; border-radius:5px;
+      background:var(--gold); color:white; font-size:10px; font-weight:700;
+    }
+    .chat-notice .cn-text {
+      flex:1; min-width:0; font-size:12px; color:var(--black);
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    }
+    .chat-notice .cn-x {
+      flex-shrink:0; background:none; border:none;
+      font-size:14px; color:var(--muted); cursor:pointer; padding:0 2px;
+    }
+    /* ── 시스템 안내 줄 (초대 등) ── */
+    .chat-sysline {
+      text-align:center; margin:8px 0; font-size:11px; color:var(--muted);
+    }
+    .chat-sysline span {
+      display:inline-block; padding:4px 10px; border-radius:12px;
+      background:rgba(0,0,0,0.05);
+    }
+    /* 친구 초대 시트 안의 목록 */
+    .invite-pick { max-height:46vh; overflow-y:auto; }
+    .invite-pick label {
+      display:flex; align-items:center; gap:10px;
+      padding:10px 16px; cursor:pointer; font-size:14px; color:var(--black);
+    }
+    .invite-pick input { width:17px; height:17px; accent-color:var(--gold); flex-shrink:0; }
     /* 채팅 액션 시트 / 차단 목록 모달 */
-    #room-action-menu, #blocked-modal, #role-sheet, #friend-action-menu, #msg-action-menu {
+    #room-action-menu, #blocked-modal, #role-sheet, #friend-action-menu, #msg-action-menu,
+    #invite-room-menu {
       position:fixed; inset:0; z-index:9998; display:none;
       align-items:flex-end; justify-content:center; background:rgba(0,0,0,0.4);
     }

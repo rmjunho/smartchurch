@@ -257,12 +257,24 @@ service cloud.firestore {
         // 통째로 고쳐 쓸 수 있었다. 이제 '삭제 표시'만 허용한다 — 본문·발신자는 못 건드린다.
         // 실제로 지우지 않고 표시만 하는 이유: 문서를 없애면 리더가 지운 기록도 사라지고,
         // 다른 사람 화면에 남아 있던 것과 어긋난다.
-        allow update: if signedIn()
-                      && request.resource.data.diff(resource.data).affectedKeys()
+        allow update: if signedIn() && (
+                        // ① 삭제 표시 — 본인 또는 그 방을 관리할 수 있는 리더
+                        (request.resource.data.diff(resource.data).affectedKeys()
                            .hasOnly(['deleted', 'deletedBy', 'deletedAt'])
-                      && request.resource.data.get('deleted', false) == true
-                      && request.resource.data.get('deletedBy', '') == uid()
-                      && (resource.data.get('senderId', '') == uid() || canModerateRoom(roomId));
+                         && request.resource.data.get('deleted', false) == true
+                         && request.resource.data.get('deletedBy', '') == uid()
+                         && (resource.data.get('senderId', '') == uid() || canModerateRoom(roomId)))
+                        ||
+                        // ② 이모지 리액션 — 남의 메시지에도 달 수 있어야 하므로 발신자를 따지지
+                        // 않는다. 대신 reactions 말고는 아무것도 못 바꾸게 막고, 이미 지운
+                        // 메시지에는 못 달게 한다.
+                        // 한계: reactions 맵 안의 배열에 누구 uid 가 들어가는지까지는 규칙으로
+                        //       볼 수 없다. 남의 이름으로 누른 척은 가능하지만 게시판 좋아요와
+                        //       같은 수준이라 여기서 멈춘다.
+                        (request.resource.data.diff(resource.data).affectedKeys()
+                           .hasOnly(['reactions'])
+                         && resource.data.get('deleted', false) == false)
+                      );
         allow delete: if false;   // 되살릴 수 없는 진짜 삭제는 막는다
       }
     }
