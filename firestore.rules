@@ -275,11 +275,19 @@ service cloud.firestore {
         // 실제로 지우지 않고 표시만 하는 이유: 문서를 없애면 리더가 지운 기록도 사라지고,
         // 다른 사람 화면에 남아 있던 것과 어긋난다.
         allow update: if signedIn() && (
-                        // ① 삭제 표시 — 본인 또는 그 방을 관리할 수 있는 리더
+                        // ① 삭제 표시 — 본인 또는 그 방을 관리할 수 있는 리더.
+                        // 사진 메시지는 지울 때 imageUrl 도 같이 비운다(안 그러면 base64 원본이
+                        // 문서에 그대로 남는다). 그래서 그 두 키까지 열되, imageUrl 은 '비우기'
+                        // 아니면 '그대로' 만 허용한다 — 지우는 척하며 다른 사진을 끼워 넣지
+                        // 못하게. '그대로' 를 허용하는 건 아직 옛 JS 를 들고 있는 앱이
+                        // 사진을 못 지우는 일이 없게 하기 위해서다.
                         (request.resource.data.diff(resource.data).affectedKeys()
-                           .hasOnly(['deleted', 'deletedBy', 'deletedAt'])
+                           .hasOnly(['deleted', 'deletedBy', 'deletedAt', 'imageUrl', 'imageExpired'])
                          && request.resource.data.get('deleted', false) == true
                          && request.resource.data.get('deletedBy', '') == uid()
+                         && (request.resource.data.get('imageUrl', '') == ''
+                             || request.resource.data.get('imageUrl', '')
+                                == resource.data.get('imageUrl', ''))
                          && (resource.data.get('senderId', '') == uid() || canModerateRoom(roomId)))
                         ||
                         // ② 이모지 리액션 — 남의 메시지에도 달 수 있어야 하므로 발신자를 따지지

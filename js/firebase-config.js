@@ -165,9 +165,14 @@ window._fb = {
         updateDoc(doc(fbDb, 'chatRooms', roomId, 'messages', msgId),
           { ['reactions.' + key]: on ? arrayUnion(userId) : arrayRemove(userId) }),
       // 메시지 삭제 = '삭제 표시'. 문서를 없애지 않는다(규칙이 delete 를 막아 둔다).
+      // 사진은 이때 같이 비운다. 예전에는 '삭제 표시'만 해서 base64 원본이 문서에 그대로
+      // 남았고, 렌더러가 지운 메시지를 만료 대상에서 빼는 바람에 1주 정리에도 안 걸렸다
+      // — 지운 사람은 없어진 줄 아는데 서버에는 영영 남아 있었다.
+      // 글 메시지에도 빈 imageUrl 이 붙지만, 경로를 하나로 두는 편이 빠뜨릴 일이 없다.
       deleteChatMsg: (roomId, msgId, byUid) =>
         updateDoc(doc(fbDb, 'chatRooms', roomId, 'messages', msgId),
-          { deleted: true, deletedBy: byUid, deletedAt: new Date().toISOString() }),
+          { deleted: true, deletedBy: byUid, deletedAt: new Date().toISOString(),
+            imageUrl: '', imageExpired: true }),
       listenChatMsgs: (roomId, n, cb) =>
         onSnapshot(
           query(collection(fbDb, 'chatRooms', roomId, 'messages'),

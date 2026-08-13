@@ -9229,8 +9229,11 @@ function _chatMsgsHtml(msgs, opts) {
     const isDeleted = !!msg.deleted;
     // 1주가 지난 사진은 보여주지 않는다. 아직 문서에 데이터가 남아 있으면 지금 비우게 예약한다.
     const isImgMsg = !isDeleted && msg.type === 'image';
-    const imgOld   = isImgMsg && (Date.now() - ts.getTime() > CHAT_IMG_TTL_MS);
-    if (imgOld && msg.imageUrl && msg.id && !_imgExpireTried[msg.id]) {
+    // 만료 판정은 '지웠는지' 와 별개로 한다. 예전 버전에서 지운 사진은 imageUrl 이 남아
+    // 있는데, 지운 메시지를 여기서 빼 버리면 그 데이터가 영영 정리되지 않는다.
+    const imgAged  = msg.type === 'image' && (Date.now() - ts.getTime() > CHAT_IMG_TTL_MS);
+    const imgOld   = isImgMsg && imgAged;
+    if (imgAged && msg.imageUrl && msg.id && !_imgExpireTried[msg.id]) {
       _imgExpireTried[msg.id] = 1;
       expireJobs.push({ roomId: (opts && opts.roomId) || '', id: msg.id });
     }
