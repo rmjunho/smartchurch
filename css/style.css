@@ -86,12 +86,21 @@
       inset: 0;
       overflow: hidden;
       opacity: 0;
+      /* 투명하기만 해서는 안 된다. 비활성 로그인 화면의 <input type="password"> 가 레이아웃을
+         그대로 차지해서, 브라우저가 '보이는 비밀번호 칸'으로 보고 자동 로그인 중에도 자동완성을
+         띄웠다(칸이 잠깐 비쳐 보이기도 했다). visibility 로 진짜 숨긴다 — display:none 과 달리
+         레이아웃이 남아 폭·높이 측정과 페이드가 그대로 동작한다.
+         visibility 는 트랜지션에 넣지 않는다 — 넣으면 이 앱에서는 전환이 끝나도 visible 로
+         남아(트랜지션 이벤트 자체가 안 뜬다) 숨기는 목적을 아예 못 이룬다. 즉시 전환한다.
+         대신 나가는 화면의 페이드아웃은 포기한다(들어오는 화면은 그대로 페이드인). */
+      visibility: hidden;
       pointer-events: none;
       transition: opacity 0.35s ease;
       will-change: opacity;
     }
     .screen.active {
       opacity: 1;
+      visibility: visible;
       pointer-events: all;
     }
     /* 비활성 화면의 모든 자식 요소도 클릭 차단 — 핵심 버그 수정 */
