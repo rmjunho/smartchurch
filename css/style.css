@@ -1011,6 +1011,39 @@
       text-shadow: 0 1px 6px rgba(0,0,0,0.7);
     }
 
+    /* ── 히어로 슬라이드 (1장: 제목 / 2장: 오늘의 말씀) ──
+       넘김은 CSS 가로 스크롤 + scroll-snap 에 맡긴다. JS 는 30초 자동 전환과 점만 맡는다. */
+    .hero-slides {
+      display: flex;
+      overflow-x: auto;
+      overflow-y: hidden;
+      scroll-snap-type: x mandatory;      /* 여기는 두 장뿐이라 딱 붙는 게 맞다 */
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior-x: contain;
+      touch-action: pan-x;
+      background: var(--black);
+    }
+    .hero-slides::-webkit-scrollbar { display: none; }
+    .hero-slide {
+      flex: 0 0 100%;
+      scroll-snap-align: start;
+      display: flex;
+      flex-direction: column;
+    }
+    .hero-slide > * { flex: 1; }          /* 두 장의 높이를 맞춘다 */
+    .hero-dots {
+      display: flex; justify-content: center; gap: 6px;
+      padding: 8px 0 9px; background: var(--dark);
+    }
+    .hero-dot {
+      width: 6px; height: 6px; padding: 0; border: none; border-radius: 50%;
+      background: rgba(255,255,255,0.25); cursor: pointer;
+      transition: background 0.2s, width 0.2s;
+    }
+    .hero-dot.on { background: var(--gold); width: 16px; border-radius: 3px; }
+
     /* =============================================
        TAB: 삶의 예배
     ============================================= */
@@ -1075,8 +1108,8 @@
       white-space: nowrap;   /* "2026년 7월"이 여러 줄로 쪼개지지 않게 */
     }
     .cal-strip {
-      display: flex; align-items: center; gap: 2px;
-      padding: 6px 8px 10px; background: var(--dark);
+      display: flex; align-items: center;
+      padding: 6px 0 10px; background: var(--dark);
     }
     .cal-strip-arrow {
       background: none; border: none; color: rgba(255,255,255,0.5);
@@ -1084,23 +1117,29 @@
       line-height: 1; flex-shrink: 0;
     }
     .cal-strip-arrow:active { color: white; background: rgba(255,255,255,0.1); }
+    /* 하루 단위로 걸리는 것 없이 밀리게 — 브라우저 가로 스크롤에 그대로 맡긴다.
+       주 단위 스냅도, 화살표도 없다. 관성 스크롤은 브라우저가 알아서 해준다. */
     .cal-strip-days {
-      display: flex; flex: 1; justify-content: space-around;
-      touch-action: pan-y;   /* 세로 스크롤은 살리고 가로 스와이프는 JS 가 받는다 */
-      user-select: none;     /* PC 에서 드래그로 넘길 때 글자가 선택되지 않게 */
+      display: flex;
+      flex: 1;
+      overflow-x: auto;
+      overflow-y: hidden;
+      scrollbar-width: none;             /* 파이어폭스 */
+      -ms-overflow-style: none;
+      -webkit-overflow-scrolling: touch; /* iOS 관성 */
+      overscroll-behavior-x: contain;    /* 끝에서 페이지가 딸려 나가지 않게 */
+      scroll-snap-type: x proximity;     /* 살짝만 붙여준다 — mandatory 면 자유로운 느낌이 죽는다 */
+      touch-action: pan-x;
+      user-select: none;                 /* PC 에서 드래그할 때 글자가 선택되지 않게 */
+      padding: 0 8px;
+      gap: 2px;
     }
-    /* 주를 넘길 때 민 방향에서 미끄러져 들어온다 */
-    @keyframes calSlideNext {
-      from { transform: translateX(14px);  opacity: 0.35; }
-      to   { transform: none;              opacity: 1; }
-    }
-    @keyframes calSlidePrev {
-      from { transform: translateX(-14px); opacity: 0.35; }
-      to   { transform: none;              opacity: 1; }
-    }
+    .cal-strip-days::-webkit-scrollbar { display: none; }
     .cal-strip-day {
       text-align: center; cursor: pointer; padding: 4px 0;
-      min-width: 38px; border-radius: 12px; transition: background 0.15s;
+      min-width: 42px; flex: 0 0 auto;   /* 줄어들지 않아야 스크롤이 생긴다 */
+      scroll-snap-align: center;
+      border-radius: 12px; transition: background 0.15s;
     }
     .cal-strip-day:active { background: rgba(255,255,255,0.08); }
     .cal-strip-day.selected {
