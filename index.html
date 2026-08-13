@@ -2773,7 +2773,7 @@ var DB = {
 
   users()           { return this.get('users', []); },
   saveUser(u)       { const us = this.users(); const i = us.findIndex(x=>x.id===u.id); i>=0?us[i]=u:us.push(u); this.set('users', us); },
-  findByEmail(e)    { return this.users().find(u=>u.email===e); },
+  // findByEmail 제거 — 로컬 비밀번호 대조 로그인 폴백이 사라지면서 호출처가 없어졌다.
   session()         { return this.get('session'); },
   setSession(id)    { this.set('session', id); },
   clearSession()    { this.del('session'); },
@@ -3592,28 +3592,21 @@ async function doLogin() {
       }[e.code] || null;
 
       if (msg) { showErr('l-err', msg); return; }
-      // Firebase에 없으면 localStorage로 fallback
+      console.error('로그인 실패(Firebase):', e);
+      showErr('l-err', '로그인 중 오류가 발생했어요. 인터넷 연결을 확인하고 다시 시도해 주세요.');
+      return;
     }
+    // Auth 는 통과했는데 users 문서가 없다 — 가입 도중 끊긴 계정이다.
+    // 예전에는 여기서 localStorage 로 넘어가 서버에 없는 '유령 계정' 으로 앱에 들어갔고,
+    // 그 상태로는 채팅·바인더 등 모든 서버 쓰기가 규칙에서 거부됐다.
+    hideLoadingOverlay();
+    showErr('l-err', '계정 정보를 찾을 수 없어요. 담당 교역자나 관리자에게 문의해 주세요.');
+    return;
   }
 
-  // ── localStorage fallback ──
-  const user = DB.findByEmail(email);
-  if (!user || user.password !== pw) {
-    showErr('l-err', '이메일 또는 비밀번호가 올바르지 않습니다.'); return;
-  }
-  if (user.status === 'rejected') {
-    showErr('l-err', '계정 신청이 거절됐어요. 담당 교역자에게 문의해 주세요.'); return;
-  }
-  DB.setSession(user.id);
-  me = user;
-  if (user.status === 'pending') {
-    updatePendingScreen(user); setTimeout(() => go('pending'), 200); return;
-  }
-  if (!isOnboarded(user)) { setTimeout(() => startOnboarding(), 300); return; }
-  DB.set('onboarded_' + user.id, true);   // 새로고침 시 온보딩이 다시 뜨지 않도록
-  toast('로그인 중...');
-  try { bootApp(); } catch(e) { toast('앱 초기화 오류: ' + e.message); }
-  setTimeout(() => go('main'), 300);
+  // Firebase 가 아예 준비되지 않은 경우. 로컬 비밀번호 대조 폴백은 제거했다 —
+  // 평문 비밀번호를 localStorage 에 두고 있었고, 서버 계정 없이 들어가 봐야 아무것도 저장되지 않는다.
+  showErr('l-err', '서버에 연결하지 못했어요. 인터넷 연결을 확인하고 다시 시도해 주세요.');
 }
 
 async function doRegister() {
@@ -3734,30 +3727,10 @@ async function doRegister() {
     }
   }
 
-  // ── localStorage fallback (Firebase 미연결 시에만) ──
-  if (DB.findByEmail(email)) { showErr('r-email-err', '이미 사용 중인 이메일입니다.'); return; }
-  const user = {
-    id: uid(), name, email, password: pw, birthdate: birth,
-    church:  '',
-    role:    role,     // 온보딩 ob2에서 선택 — 건너뛰면 이 값이 남으므로 목록에 있는 이름이어야 한다
-    orgType: orgType,  // 온보딩 ob2에서 선택
-    status:          isMinor ? 'pending' : 'active',
-    isMinor, guardianName,   // 로컬 모드에도 번호는 공유 배열(users)에 넣지 않는다 — 같은 기기의 다른 계정에 보인다
-    isAppAdmin:      false,
-    marketingConsent: marketing,
-    createdAt:       new Date().toISOString()
-  };
-  DB.saveUser(user);
-  DB.setSession(user.id);
-  me = Object.assign({}, user, { phone, guardianPhone: guardianContact });
-  if (isMinor) {
-    toast(name + '님, 가입 신청이 접수됐어요! 교역자 승인 후 이용 가능해요 ');
-    updatePendingScreen(user);
-    setTimeout(() => go('pending'), 400);
-  } else {
-    toast(name + '님, 가입을 축하해요! ');
-    setTimeout(() => startOnboarding(), 400);
-  }
+  // Firebase 미연결 시의 로컬 가입 폴백은 제거했다. 평문 비밀번호를 localStorage 에 남겼고,
+  // 서버에 계정이 없는 채로 앱에 들어가면 채팅·바인더 등 모든 서버 쓰기가 규칙에서 거부된다
+  // ('가입은 됐는데 아무것도 저장 안 되는' 계정이 만들어졌다).
+  showErr('r-email-err', '서버에 연결하지 못했어요. 인터넷 연결을 확인하고 다시 시도해 주세요.');
 }
 
 function demoLogin() {
@@ -7906,9 +7879,21 @@ function ccSetType(type) {
 function cleanupDemoData() {
   // 박지민 가상 계정 및 관련 데이터 자동 삭제
   const users = DB.get('users', []).filter(u => u.id !== 'demo' && u.email !== 'demo@smartchurch.kr');
+  // 옛 로컬 가입 폴백이 남긴 평문 비밀번호를 지운다. 코드는 없앴지만 이미 저장된 값은
+  // 그 기기에 그대로 남아 있고, users 배열은 같은 기기의 다른 계정도 읽는 공유 캐시다.
+  users.forEach(u => { if (u && u.password !== undefined) delete u.password; });
   DB.set('users', users);
   if (DB.session() === 'demo') DB.clearSession();
 }
+
+// 세션의 원본은 Firebase Auth 다.
+// 예전에는 localStorage(sc2_session + sc2_users)에서만 복원해서, 브라우저가 저장소를 비우면
+// (iOS 저장소 만료·캐시 지우기·용량 압박) Auth 세션은 멀쩡한데도 로그인 화면으로 튕겼다.
+// 게다가 me 가 늘 옛 로컬 스냅샷이라, 다른 기기에서 바뀐 교회·직분이 반영되지 않은 채
+// 그 값으로 실시간 구독(startChurchMembersWatch)까지 걸렸다.
+// 이제 Auth → users/{uid} 서버 조회 → me 확정 순서다. 로컬은 서버에 못 닿을 때의 폴백일 뿐이다.
+var _bootAt         = Date.now();
+var _sessionSettled = false;
 
 function startApp() {
   cleanupDemoData();
@@ -7922,36 +7907,80 @@ function startApp() {
     }
   }, 3500);
 
-  const sid = DB.session();
-  if (sid) {
-    const user = DB.users().find(u => u.id === sid);
-    if (user) {
-      me = user;
-      // 승인 거절 → 세션 정리 후 로그인
-      if (user.status === 'rejected') {
+  resolveSession();
+}
+
+// 스플래시 최소 유지 시간 — Auth 가 즉시 응답하면 화면이 깜빡인다.
+function afterSplash(fn) {
+  setTimeout(fn, Math.max(0, 1500 - (Date.now() - _bootAt)));
+}
+
+function resolveSession() {
+  // 어떤 이유로든(오프라인·모듈 로드 실패·차단) 7초 안에는 화면을 준다.
+  setTimeout(() => {
+    if (_sessionSettled) return;
+    _sessionSettled = true;
+    bootFromLocalCache();
+  }, 7000);
+
+  // 인라인 <script> 는 type=module 보다 먼저 실행된다 → _fb 가 아직 없을 수 있다.
+  const attach = () => {
+    if (!window._fb || !window._fb.onAuth) return;   // 위 타임아웃이 처리한다
+    window._fb.onAuth(async user => {
+      if (_sessionSettled) return;                   // 부팅 시점의 첫 신호만 쓴다
+      _sessionSettled = true;
+      if (!user) {                                   // 로그인 이력 없음 / 로그아웃 상태
         DB.clearSession(); me = null;
-        setTimeout(() => go('login'), 1800); return;
+        afterSplash(() => go('login'));
+        return;
       }
-      // 승인 대기 → 대기 화면
-      if (user.status === 'pending') {
-        setTimeout(() => { updatePendingScreen(user); go('pending'); }, 1800); return;
-      }
-      if (!isOnboarded(user)) {
-        setTimeout(() => { try { startOnboarding(); } catch(e) { go('login'); } }, 1800);
-      } else {
-        setTimeout(() => {
-          try { bootApp(); go('main'); }
-          catch(e) {
-            console.error('bootApp 오류:', e);
-            DB.clearSession(); me = null; go('login');
-          }
-        }, 1800);
-      }
-      return;
-    }
-    DB.clearSession();
+      let profile = null;
+      try {
+        const snap = await window._fb.getUser(user.uid);
+        // 문서 ID 가 곧 uid. data() 에 id 필드가 없는 문서도 있어 여기서 확실히 박아 둔다.
+        if (snap.exists()) profile = Object.assign({}, snap.data(), { id: snap.id });
+      } catch (e) { /* 오프라인 등 — 아래 캐시 폴백 */ }
+      if (!profile) { bootFromLocalCache(user.uid); return; }
+      DB.saveUser(profile);
+      DB.setSession(profile.id);
+      me = profile;
+      routeUser(profile);
+    });
+  };
+  if (window._fbReady) attach();
+  else window.addEventListener('fb-ready', attach, { once: true });
+}
+
+// 서버에 못 닿을 때만 쓰는 폴백. uid 를 알면 그 계정으로, 모르면 마지막 세션으로.
+function bootFromLocalCache(uid) {
+  const sid  = uid || DB.session();
+  const user = sid ? DB.users().find(u => u.id === sid) : null;
+  if (!user) { DB.clearSession(); me = null; afterSplash(() => go('login')); return; }
+  me = user;
+  routeUser(user);
+}
+
+function routeUser(user) {
+  // 승인 거절 → 세션 정리 후 로그인
+  if (user.status === 'rejected') {
+    DB.clearSession(); me = null;
+    afterSplash(() => go('login')); return;
   }
-  setTimeout(() => go('login'), 1800);
+  // 승인 대기 → 대기 화면
+  if (user.status === 'pending') {
+    afterSplash(() => { updatePendingScreen(user); go('pending'); }); return;
+  }
+  if (!isOnboarded(user)) {
+    afterSplash(() => { try { startOnboarding(); } catch (e) { go('login'); } });
+    return;
+  }
+  afterSplash(() => {
+    try { bootApp(); go('main'); }
+    catch (e) {
+      console.error('bootApp 오류:', e);
+      DB.clearSession(); me = null; go('login');
+    }
+  });
 }
 
 // ================================================

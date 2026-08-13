@@ -12,6 +12,9 @@ Object.assign(window._fb, {
   createUser: (email, pw) => createUserWithEmailAndPassword(fbAuth, email, pw),
   signIn:     (email, pw) => signInWithEmailAndPassword(fbAuth, email, pw),
   signOut:    ()          => signOut(fbAuth),
+  // 세션 복원의 원본. SDK 가 저장소에서 로그인 상태를 복원한 뒤 반드시 한 번은 부른다
+  // (이력이 없으면 null 로). 앱 부팅은 localStorage 가 아니라 이 신호를 기다린다.
+  onAuth:     (cb)        => onAuthStateChanged(fbAuth, cb),
 });
 
 // 로그인 상태 → window.currentUser 노출
