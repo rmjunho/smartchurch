@@ -4522,13 +4522,19 @@ function autoSave(section) {
 
 // ── 개인 바인더 기기 간 동기화 (비공개, 본인 전용) ──
 // 저장할 때마다 myBinders/${uid}_${date} 에 전체 바인더를 올림(디바운스). 다른 기기에서 로드 시 최신본 반영.
-var _binderSyncTimer = null;
+// 타이머는 반드시 날짜별이어야 한다. 예전에는 전역 하나여서, 어제 칸에 그린 뒤 1.2초 안에
+// 다른 날짜로 넘어가면(날짜 이동은 saveBinderNow 로 저장을 한 번 더 부른다) clearTimeout 이
+// 앞 날짜의 대기 중인 업로드까지 죽였다 — 그 날짜는 영영 서버에 올라가지 않았다.
+// 두 기기가 각자 로컬본만 들고 갈라지는데 버전은 양쪽 다 같아서, 나중에 붙어도 병합이 아무것도
+// 고치지 못한다(둘 다 '내가 최신'이라 믿는다).
+var _binderSyncTimers = {};
 var _binderSizeWarned = {};
 function syncBinderToServer() {
   if (!me || !window._fbReady || !window._fb || !window._fb.setMyBinder) return;
-  clearTimeout(_binderSyncTimer);
   const dk = dateKey();
-  _binderSyncTimer = setTimeout(() => {
+  clearTimeout(_binderSyncTimers[dk]);
+  _binderSyncTimers[dk] = setTimeout(() => {
+    delete _binderSyncTimers[dk];
     const data = DB.get(`binder_${me.id}_${dk}`, null);
     if (!data) return;
     // 투두는 myTodos 로 따로 나간다. 여기 실으면 바인더를 저장할 때마다 투두까지
