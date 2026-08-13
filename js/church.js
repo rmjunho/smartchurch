@@ -2232,8 +2232,7 @@ async function _loadMemberBinder(userId, userName, date) {
   const verse    = (share.verse && data.verse) ? data.verse : '';
   const qt       = (share.qt    && data.qt)    ? data.qt    : '';
   const diary    = (share.diary && data.diary) ? data.diary : '';
-  const schRows  = (share.schedule && Array.isArray(data.schRows))
-                     ? data.schRows.filter(r => (r.time||'').trim() || (r.plan||'').trim()) : [];
+  const schRows  = share.schedule ? sharedSchRows(data.schRows) : [];
   const todos    = (share.todos && Array.isArray(data.todos)) ? data.todos : [];
   const drawings = data.drawings || {};
 

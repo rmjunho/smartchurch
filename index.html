@@ -4250,6 +4250,12 @@ function binderHasContent(d) {
   return false;
 }
 
+// 나눔에 내보낼 시간표 행. 시간 슬롯은 설정대로 자동 생성되므로 시간만 있는 행은
+// '안 쓴 것'이다 — 일정 내용(plan)이 있어야 내용으로 친다(binderHasContent 와 같은 기준).
+function sharedSchRows(rows) {
+  return Array.isArray(rows) ? rows.filter(r => r && (r.plan || '').trim()) : [];
+}
+
 function loadBinder() {
   // 미완료 할 일 이월 (텍스트형 + 드로잉형) — 오늘 날짜에서만.
   // 이월은 viewDate 기준으로 '전날' 을 가져오므로, 가드가 없으면 달력에서 지난 날짜를 열어보는
@@ -4496,7 +4502,7 @@ function saveBinderNow() {
       verse:      items.verse    ? (merged.verse || '')  : '',
       qt:         items.qt       ? qtText                : '',
       diary:      items.diary    ? (merged.diary || '')  : '',
-      schRows:    items.schedule ? (merged.schRows || []): [],
+      schRows:    items.schedule ? sharedSchRows(merged.schRows) : [],
       todos:      items.todos    ? (merged.todos || []).map(t => ({ text: t.text || '', done: !!t.done })) : [],
       drawings:   {
         qt:       items.verse ? (drw.qt || '')       : '',
@@ -10721,7 +10727,8 @@ async function loadCommunityBinders() {
 function renderCommunityEntry(e) {
   const share = e.shareItems || { verse:1, qt:1, todos:1, schedule:1, diary:1 };
   const drw   = e.drawings || {};
-  const hasText = !!(e.verse || e.qt || e.diary || (e.todos||[]).length || (e.schRows||[]).length);
+  const schRows = sharedSchRows(e.schRows);   // 옛 문서에 남은 빈 시간 슬롯도 여기서 걸러진다
+  const hasText = !!(e.verse || e.qt || e.diary || (e.todos||[]).length || schRows.length);
   const hasDraw = !!(drw.qt || drw.schedule || drw.diary);
 
   if (!hasText && !hasDraw) return '';
@@ -10741,8 +10748,8 @@ function renderCommunityEntry(e) {
         color:${t.done?'var(--muted)':'var(--black)'};text-decoration:${t.done?'line-through':'none'};font-size:13px">
         <span>${t.done?'☑':'☐'}</span>${escHtml(t.text||'')}</div>`).join(''));
   }
-  if ((e.schRows||[]).length) sections += accSection('📅', '시간표',
-    e.schRows.map(r => `<div style="display:flex;gap:10px;font-size:13px;padding:4px 0">
+  if (schRows.length) sections += accSection('📅', '시간표',
+    schRows.map(r => `<div style="display:flex;gap:10px;font-size:13px;padding:4px 0">
       <span style="min-width:78px;color:var(--muted);font-weight:600">${escHtml(r.time||'')}</span>
       <span>${escHtml(r.plan||'')}</span></div>`).join(''));
   if (drw.schedule) sections += accSection('🎨', '시간표 (드로잉)',
