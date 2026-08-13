@@ -7882,12 +7882,14 @@ async function _purgeUserData(uid) {
   await window._fb.getMyReservations(uid).then(delDocs).catch(warn('reservations'));
 
   // ④ 바인더 — 문서 ID 가 `uid_날짜` 라 소유자 필드가 없다.
-  //    공유본(binderEntries)은 규칙이 read: signedIn 이라 ID 범위로 훑을 수 있지만,
+  //    공유본(binderEntries)은 '>= uid_ AND < uid_' 로 훑고 있었는데 이건 빈 범위라 하나도
+  //    안 잡혔다 — 탈퇴해도 남에게 보이던 나눔이 서버에 그대로 남았다. 날짜 키로 직접 지운다.
   try {
-    const snap = await getDocs(query(collection(db, 'binderEntries'),
-      where(documentId(), '>=', `${uid}_`), where(documentId(), '<', `${uid}_`)));
-    await delDocs(snap);
+    let createdAt = null;
+    try { const s = await window._fb.getUser(uid); if (s.exists()) createdAt = s.data().createdAt; } catch(_) {}
+    await window._fb.deleteMyBinderEntries(uid, createdAt);
   } catch(e) { warn('binderEntries')(e); }
+
 
   //    개인 동기화본(myBinders)은 규칙이 문서 ID 로 주인을 판단해서 목록 조회 자체가 막혀 있다.
   //    어느 날짜에 썼는지 알아낼 방법이 없으니, 가입일~오늘의 모든 날짜 키를 그냥 지운다.
@@ -10659,11 +10661,24 @@ function closeBinderSettings(e) {
 
 function toggleBinderShare() {
   const current = getBinderShareEnabled();
+  // 끄는 건 되돌릴 수 없다(지난 나눔이 서버에서 사라진다) — 먼저 묻는다.
+  if (current && !confirm('비공개로 바꿀까요?\n\n리더가 볼 수 있던 지난 나눔이 서버에서 모두 지워져요.\n내 바인더 내용은 그대로 남아요.')) return;
   setBinderShareEnabled(!current);
   const toggle = document.getElementById('binder-share-toggle');
   if (toggle) toggle.classList.toggle('on', !current);
   toast(!current ? '리더에게 공유됩니다' : '비공개로 변경됐어요');
-  syncShareToServer();   // 켠 즉시 올린다 — 예전엔 다음 저장 때까지 아무것도 안 올라갔다
+
+  if (!current) { syncShareToServer(); return; }   // 켠 즉시 올린다 — 예전엔 다음 저장 때까지 안 올라갔다
+
+  // 껐다 — 서버에 남은 공유본을 지운다. 안 지우면 '비공개'인데 리더는 마지막 내용을 계속 본다.
+  // 대기 중인 전송을 먼저 죽인다. 안 그러면 1.2초 뒤에 오늘 문서가 되살아난다.
+  Object.keys(_shareSyncTimers).forEach(k => clearTimeout(_shareSyncTimers[k]));
+  _shareSyncTimers = {};
+  if (window._fbReady && window._fb && window._fb.deleteMyBinderEntries) {
+    window._fb.deleteMyBinderEntries(me.id, me.createdAt)
+      .then(() => toast('지난 나눔도 정리했어요'))
+      .catch(e => { console.warn('나눔 정리 실패:', e); toast('나눔 정리에 실패했어요 — 잠시 후 다시 시도해 주세요'); });
+  }
 }
 
 // ── 리더: 교인 묵상 나눔 (커뮤니티 바인더) ──

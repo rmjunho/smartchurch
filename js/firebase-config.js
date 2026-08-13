@@ -4,7 +4,7 @@ import { initializeApp }                              from "https://www.gstatic.
 import { getFirestore, initializeFirestore, persistentLocalCache,
          persistentMultipleTabManager, doc, setDoc, getDoc,
          updateDoc, deleteDoc, collection, collectionGroup, getDocs,
-         addDoc, query, where, orderBy, limit,
+         addDoc, query, where, orderBy, limit, writeBatch,
          arrayUnion, onSnapshot, serverTimestamp }              from "https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js";
 import { getStorage, ref as storageRef, uploadString,
          getDownloadURL }                                       from "https://www.gstatic.com/firebasejs/12.15.0/firebase-storage.js";
@@ -94,6 +94,24 @@ window._fb = {
       getBinderEntry:  (key)       => getDoc(doc(fbDb, 'binderEntries', key)),
       getBinderEntriesByDate: (date) =>
         getDocs(query(collection(fbDb, 'binderEntries'), where('date', '==', date))),
+      // 나눔을 끄거나 탈퇴할 때 서버에 남은 공유본을 지운다. 안 지우면 '비공개'로 바꿔도
+      // 리더는 마지막에 올라간 내용을 계속 본다. 문서를 읽지 않고 날짜 키로 바로 지운다 —
+      // getDocs 로 훑으면 드로잉(base64)까지 통째로 내려받게 된다. 없는 문서 삭제는
+      // 오류가 아니라 무시되므로 빠뜨리는 날짜가 없다. 개인 바인더(myBinders)는 안 건드린다.
+      deleteMyBinderEntries: async (uid, createdAt) => {
+        let from = createdAt ? new Date(createdAt) : null;
+        if (!from || isNaN(from)) from = new Date(Date.now() - 730 * 864e5);   // 가입일을 모르면 2년 전부터
+        from.setHours(0, 0, 0, 0);                    // 날짜 키가 로컬 기준이라 로컬 자정에 맞춘다
+        const days = Math.min(1500, Math.floor((Date.now() - from.getTime()) / 864e5) + 2);  // 상한 약 4년
+        let batch = writeBatch(fbDb), n = 0;
+        for (let i = 0; i < days; i++) {
+          const d = new Date(from.getTime() + i * 864e5);
+          const key = `${uid}_${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+          batch.delete(doc(fbDb, 'binderEntries', key));
+          if (++n >= 450) { await batch.commit(); batch = writeBatch(fbDb); n = 0; }   // 배치 상한 500
+        }
+        if (n) await batch.commit();
+      },
       // 개인 바인더 기기 간 동기화 (비공개 — 본인만 read/write). key = `${uid}_${date}`
       setMyBinder: (key, data) => setDoc(doc(fbDb, 'myBinders', key), data, { merge: true }),
       getMyBinder: (key)       => getDoc(doc(fbDb, 'myBinders', key)),
