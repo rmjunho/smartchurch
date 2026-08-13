@@ -8825,7 +8825,10 @@ function openChatRoom(roomId) {
   _currentRoomId = roomId;
   _photoRefreshedThisView = new Set();  // 이 채팅 진입 시 발신자 사진 최신 갱신
   _userInfoWarmed = false;              // 이름/직분도 다시 불러와 최신 반영
+  // '여기까지 읽었습니다' 기준은 읽음 처리로 덮이기 전에 붙잡아야 한다
+  _chatEntryLastRead = room.lastReadAt?.[me.id] || '';
   _markRoomAsRead(roomId); // 읽음 처리
+  _chatWatchRoomDoc(roomId, () => _renderRoomMsgs(_chatLastMsgs.room || []));
 
   // 패널 표시
   const panel = document.getElementById('chat-room-panel');
@@ -8875,10 +8878,64 @@ function _chatDayKey(d) {
 // 처리가 지저분해지므로, 그린 메시지를 id 로 여기에 담아 두고 메뉴에서 꺼내 쓴다.
 var _chatMsgIndex = {};
 
+// ── 안 읽은 사람 수 · '여기까지 읽었습니다' ──
+// 둘 다 방 문서의 lastReadAt 하나로 계산한다. 방을 열면 내 lastReadAt 이 곧바로 갱신되므로,
+// 구분선 기준은 '들어오기 직전 값'을 따로 붙잡아 둬야 한다(안 그러면 선이 늘 맨 아래에 생긴다).
+// 방 문서(lastReadAt)만 바뀌어도 안 읽은 수를 다시 그려야 하는데, 그때 메시지 목록이 없다.
+// 마지막으로 그린 목록을 들고 있다가 그대로 다시 그린다.
+var _chatLastMsgs      = { room: [], open: [] };
+var _chatRoomDoc       = null;   // 지금 열려 있는 방 문서
+var _chatRoomUnsub     = null;
+var _chatEntryLastRead = '';     // 이 방에 들어오기 직전의 내 마지막 읽은 시각
+
+// markRead=true 면 첫 스냅샷에서 '들어오기 직전 값'을 붙잡은 뒤에 읽음 처리를 한다.
+// 오픈채팅은 방 문서를 로컬에 들고 있지 않아 먼저 읽음 처리를 하면 기준이 '지금'이 돼
+// 구분선이 영영 안 생긴다. DM·그룹은 목록 캐시가 있어 부르기 전에 이미 붙잡아 둔다.
+function _chatWatchRoomDoc(roomId, rerender, markRead) {
+  _chatStopRoomWatch();
+  if (!roomId || !window._fbReady || !window._fb?.listenChatRoom) return;
+  let first = true;
+  _chatRoomUnsub = window._fb.listenChatRoom(roomId, snap => {
+    if (!snap.exists()) return;
+    _chatRoomDoc = snap.data();
+    if (first) {
+      first = false;
+      if (markRead) {
+        _chatEntryLastRead = (_chatRoomDoc.lastReadAt || {})[me.id] || '';
+        _markRoomAsRead(roomId);
+      }
+    }
+    try { rerender && rerender(); } catch (e) {}
+  });
+}
+function _chatStopRoomWatch() {
+  if (_chatRoomUnsub) { _chatRoomUnsub(); _chatRoomUnsub = null; }
+  _chatRoomDoc = null;
+  _chatEntryLastRead = '';
+}
+
+// 이 메시지를 아직 안 읽은 사람 수. 보낸 사람 자신은 세지 않는다.
+// 모수 — DM·그룹은 members, 오픈채팅은 members 가 없으므로 '한 번이라도 방을 연 사람'
+// (lastReadAt 에 이름이 올라온 사람)이 유일하게 셀 수 있는 대상이다.
+function _chatUnreadCount(msgTs, senderId) {
+  const room = _chatRoomDoc;
+  if (!room) return 0;
+  const lr = room.lastReadAt || {};
+  const people = (room.members && room.members.length) ? room.members : Object.keys(lr);
+  let n = 0;
+  people.forEach(uid => {
+    if (uid === senderId) return;
+    const t = lr[uid];
+    if (!t || new Date(t) < msgTs) n++;
+  });
+  return n;
+}
+
 // msgs → 말풍선 HTML. opts: { showRole }
 function _chatMsgsHtml(msgs, opts) {
   const showRole = !!(opts && opts.showRole);
-  let html = '', lastDate = '';
+  const entryRead = _chatEntryLastRead ? new Date(_chatEntryLastRead) : null;
+  let html = '', lastDate = '', readLineDrawn = false;
   msgs.forEach((msg, i) => {
     const isMine  = msg.senderId === me.id;
     const ts      = _chatTs(msg);
@@ -8889,6 +8946,12 @@ function _chatMsgsHtml(msgs, opts) {
     if (newDay) {
       html += `<div class="openchat-date-divider"><span>${dateStr}</span></div>`;
       lastDate = dateStr;
+    }
+
+    // 못 보고 지나간 첫 메시지 앞에 선을 긋는다. 내가 보낸 것은 기준이 되지 않는다.
+    if (!readLineDrawn && entryRead && msg.senderId !== me.id && ts > entryRead) {
+      html += '<div class="chat-readline"><span>여기까지 읽었습니다</span></div>';
+      readLineDrawn = true;
     }
 
     // 같은 사람이 이어 보낸 것이면 프로필·이름을 한 번만 보여준다(날짜가 바뀌면 다시 보여준다).
@@ -8933,7 +8996,13 @@ function _chatMsgsHtml(msgs, opts) {
       <div class="chat-bubble-col">
         ${(!isMine && !grouped) ? `<div class="chat-sender">${name}</div>` : ''}
         <div class="chat-bubble${isImg ? ' img' : ''}${isDeleted ? ' deleted' : ''}">${bubbleInner}</div>
-        ${lastOfGroup ? `<div class="chat-time">${timeStr}</div>` : ''}
+        ${(() => {
+          const unread = isDeleted ? 0 : _chatUnreadCount(ts, msg.senderId);
+          const bits = [];
+          if (unread > 0) bits.push(`<span class="chat-unread">${unread}</span>`);
+          if (lastOfGroup) bits.push(timeStr);
+          return bits.length ? `<div class="chat-time">${bits.join(' ')}</div>` : '';
+        })()}
       </div>
     </div>`;
   });
@@ -9109,6 +9178,7 @@ async function _renderRoomMsgs(msgs) {
   const grew = msgs.length > (Number(el.dataset.msgCount) || 0);
   el.dataset.msgCount = msgs.length;
 
+  _chatLastMsgs.room = msgs;
   el.innerHTML = _chatMsgsHtml(msgs, { showRole: false, roomId: _currentRoomId })
     + `<div class="chat-newmsg" id="room-panel-msgs-newbtn"
             onclick="_chatScrollBottom('room-panel-msgs')">새 메시지 ↓</div>`;
@@ -9234,6 +9304,7 @@ function openImageLightbox(src) {
 
 function closeChatRoomPanel() {
   if (_roomUnsubscribe) { _roomUnsubscribe(); _roomUnsubscribe = null; }
+  _chatStopRoomWatch();
   _currentRoomId = null;
   const panel = document.getElementById('chat-room-panel');
   if (panel) panel.style.display = 'none';
@@ -9991,6 +10062,7 @@ function initOpenChat() {
   if (!noChurch || !list || !room) return;
 
   if (_ocUnsubscribe) { _ocUnsubscribe(); _ocUnsubscribe = null; }
+  _chatStopRoomWatch();
   _currentOpenChannelId = null;
 
   if (!me.church || !me.churchCode) {
@@ -10095,8 +10167,9 @@ function openOpenChannel(channelId, name, sub) {
     `<div style="text-align:center;padding:20px;color:var(--muted);font-size:13px">메시지 불러오는 중...</div>`;
 
   if (_ocUnsubscribe) { _ocUnsubscribe(); _ocUnsubscribe = null; }
-  _markRoomAsRead(channelId);
-  if (!window._fbReady || !window._fb) return;
+  if (!window._fbReady || !window._fb) { _markRoomAsRead(channelId); return; }
+  // 읽음 처리는 방 문서를 받은 뒤에 — 먼저 하면 '여기까지' 기준이 지금이 돼 선이 안 생긴다
+  _chatWatchRoomDoc(channelId, () => _renderOpenChatMsgs(_chatLastMsgs.open || []), true);
 
   window._fb.ensureChatRoom(channelId, {
     name, type: 'open', churchCode: me.churchCode, church: me.church
@@ -10111,6 +10184,7 @@ function openOpenChannel(channelId, name, sub) {
 
 function backToOpenList() {
   if (_ocUnsubscribe) { _ocUnsubscribe(); _ocUnsubscribe = null; }
+  _chatStopRoomWatch();
   _currentOpenChannelId = null;
   document.getElementById('openchat-room').style.display = 'none';
   document.getElementById('openchat-list').style.display = 'flex';
@@ -10184,6 +10258,7 @@ async function _renderOpenChatMsgs(msgs) {
   const grew = msgs.length > (Number(el.dataset.msgCount) || 0);
   el.dataset.msgCount = msgs.length;
 
+  _chatLastMsgs.open = msgs;
   el.innerHTML = _chatMsgsHtml(msgs, { showRole: true, roomId: _currentOpenChannelId })
     + `<div class="chat-newmsg" id="openchat-msgs-newbtn"
             onclick="_chatScrollBottom('openchat-msgs')">새 메시지 ↓</div>`;

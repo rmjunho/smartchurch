@@ -171,6 +171,10 @@ window._fb = {
           err => console.warn('listenMyRooms 오류:', err)),
       updateChatRoom: (roomId, data) =>
         updateDoc(doc(fbDb, 'chatRooms', roomId), data),
+      // 열려 있는 방 문서 하나를 실시간으로 — lastReadAt/members 가 바뀌면 안 읽은 수를 다시 센다
+      listenChatRoom: (roomId, cb) =>
+        onSnapshot(doc(fbDb, 'chatRooms', roomId), cb,
+          e => window._fbErr && window._fbErr('채팅방 실시간 수신', e)),
       // 채팅방 읽음 처리 (lastReadAt.userId 업데이트)
       markRoomRead: (roomId, userId) => {
         const update = {};
