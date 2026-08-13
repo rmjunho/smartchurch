@@ -9200,9 +9200,35 @@ async function syncFriendsFromFirestore() {
         changed = true;
       }
     };
-    sent.forEach(d => { const r = d.data(); if (r.status === 'accepted') addIfNew(r.toId, r.toName, r.toRole, r.toChurch); });
-    recv.forEach(d => { const r = d.data(); if (r.status === 'accepted') addIfNew(r.fromId, r.fromName, r.fromRole, r.fromChurch); });
+    const serverIds = {};
+    sent.forEach(d => { const r = d.data(); if (r.status === 'accepted') { serverIds[r.toId]   = 1; addIfNew(r.toId,   r.toName,   r.toRole,   r.toChurch); } });
+    recv.forEach(d => { const r = d.data(); if (r.status === 'accepted') { serverIds[r.fromId] = 1; addIfNew(r.fromId, r.fromName, r.fromRole, r.fromChurch); } });
     if (changed) saveFriends(friends);
+
+    // 친구 끊기가 다른 기기에 전달되지 않았다. 이 함수가 추가만 했기 때문에, PC 에서 끊어도
+    // 폰에는 그대로 남았다(끊기는 fr_ 문서를 지우는데 여기서는 없어진 걸 보지 않았다).
+    // 다만 서버를 그대로 정답으로 삼으면, fr_ 문서가 없는 옛 친구가 그 자리에서 사라진다.
+    // → 처음 한 번은 로컬에만 있는 친구의 fr_ 문서를 만들어 서버를 완전하게 채우고(백필),
+    //   그 다음 실행부터 '서버에 없으면 끊긴 것' 으로 판단한다.
+    const backfillKey = 'friendsBackfilled_' + me.id;
+    if (!DB.get(backfillKey, false)) {
+      const orphans = getFriends().filter(f => f.userId && !serverIds[f.userId]);
+      await Promise.all(orphans.map(f =>
+        window._fb.setFriendRequest(`fr_${me.id}_${f.userId}`, {
+          id: `fr_${me.id}_${f.userId}`,
+          fromId: me.id,     fromName: me.name,   fromRole: me.role || '성도', fromChurch: me.church || '',
+          toId:   f.userId,  toName:   f.name || '', toRole: f.role || '성도',  toChurch:  f.church || '',
+          status: 'accepted', createdAt: f.addedAt || new Date().toISOString(),
+          backfilled: true
+        }).catch(e => { if (window._fbErr) window._fbErr('친구 관계 백필', e); })
+      ));
+      DB.set(backfillKey, true);
+    } else {
+      // 서버에 없는 친구 = 다른 기기에서 끊은 것. 조회가 성공했을 때만 지운다
+      // (오프라인이면 위 try/catch 로 여기까지 오지 않는다 — 목록이 통째로 비는 사고 방지).
+      const dropped = getFriends().filter(f => f.userId && !serverIds[f.userId]);
+      if (dropped.length) saveFriends(getFriends().filter(f => serverIds[f.userId]));
+    }
 
     // 삭제된 계정 정리 — users 문서가 없거나(관리자 삭제) deleted 플래그면 친구에서 제거
     const checks = await Promise.all(getFriends().map(async f => {
