@@ -4270,8 +4270,25 @@ var _heroTimer   = null;
 var _heroSettleT = null;
 
 function _heroEl() { return document.getElementById('hero-slides'); }
+
+// i 번째 판의 정확한 스크롤 위치. clientWidth * i 로 어림하면 안 된다 — 기기 배율에 따라
+// 판 폭에 소수점이 생기고, 그 오차가 링 끝에서 5배로 누적돼 아래 '판에 앉았나' 판정이 빗나간다.
+function _heroX(el, i) {
+  const k = el.children[i];
+  if (!k) return 0;
+  return k.getBoundingClientRect().left - el.getBoundingClientRect().left + el.scrollLeft;
+}
+// 지금 가장 가까운 판과 그 오차(px)
+function _heroNearest(el) {
+  let p = 2, d = Infinity;
+  for (let i = 0; i < el.children.length; i++) {
+    const gap = Math.abs(_heroX(el, i) - el.scrollLeft);
+    if (gap < d) { d = gap; p = i; }
+  }
+  return { p, d };
+}
 function _heroPanel(el) {                       // 지금 몇 번째 판인가 (0~5)
-  return el && el.clientWidth ? Math.round(el.scrollLeft / el.clientWidth) : 2;
+  return el && el.clientWidth ? _heroNearest(el).p : 2;
 }
 function _heroIndex() {                         // 실제로 보이는 장 (0=제목, 1=말씀)
   return _heroPanel(_heroEl()) % 2;             // 짝수 판이 제목
@@ -4280,7 +4297,7 @@ function _heroIndex() {                         // 실제로 보이는 장 (0=�
 function goHeroSlide(i) {                       // i: 0=제목, 1=말씀
   const el = _heroEl();
   if (!el || !el.clientWidth) return;
-  el.scrollTo({ left: el.clientWidth * (i === 0 ? 2 : 3), behavior: 'smooth' });
+  el.scrollTo({ left: _heroX(el, i === 0 ? 2 : 3), behavior: 'smooth' });
   _heroRestartTimer();                          // 손으로 넘겼으면 30초를 처음부터 다시 센다
 }
 
@@ -4296,26 +4313,33 @@ function _heroSyncDots() {
 function _heroWrap() {
   const el = _heroEl();
   if (!el || !el.clientWidth) return;
-  const w = el.clientWidth;
-  const p = Math.round(el.scrollLeft / w);
+  const { p, d } = _heroNearest(el);
   // 아직 판 경계에 정확히 앉지 않았다 = 스냅/관성이 진행 중이다. 이때 scrollLeft 를 건드리면
   // 브라우저가 진행 중인 넘김을 취소해서, 손으로 민 게 도로 제자리로 돌아온다("잘 안 넘어감").
   // 스크롤이 잠깐 뜸해지는 것만 보고 '멈췄다' 고 판단하던 게 원인이었다.
-  if (Math.abs(el.scrollLeft - p * w) > 2) return;
-  if (p <= 1)      el.scrollLeft = (p + 2) * w;
-  else if (p >= 4) el.scrollLeft = (p - 2) * w;
+  if (d > 2) return;
+  if (p <= 1)      el.scrollLeft = _heroX(el, p + 2);
+  else if (p >= 4) el.scrollLeft = _heroX(el, p - 2);
 }
 
-// 장마다 머무는 시간이 달라서 setInterval 을 쓸 수 없다. 다음 예약은 넘어간 뒤 스크롤이
-// 실제로 앉았을 때(아래 settle 처리) 다시 걸린다 — 그래야 '넘어간 장' 기준으로 센다.
+// 장마다 머무는 시간이 달라서 setInterval 을 쓸 수 없다. 넘어간 뒤 스크롤이 실제로 앉으면
+// (아래 settle 처리) 다시 걸리므로 '넘어간 장' 기준으로 세어진다.
 function _heroRestartTimer() {
   clearTimeout(_heroTimer);
   _heroTimer = setTimeout(() => {
+    // 다음 예약을 먼저 걸어둔다. 예전에는 재예약을 '스크롤이 일어난다'는 데에만 맡겼는데,
+    // 링 끝 판에 앉아 있으면 더 갈 곳이 없어 scrollTo 가 한 픽셀도 못 움직이고 —
+    // 스크롤 이벤트가 없으니 settle 도 없고 — 타이머가 영영 끊겼다. 그게 '오늘의 말씀에서
+    // 슬라이드가 멈춰버리는' 증상이었다(끝 판 5번이 말씀이라 늘 말씀에서 멈춘다).
+    _heroRestartTimer();
     const el = _heroEl();
     // 삶의 예배 탭이 화면에 없으면 넘기지 않는다 — 돌아왔을 때 엉뚱한 장이 떠 있지 않게.
-    if (!el || !el.offsetParent || !el.clientWidth) { _heroRestartTimer(); return; }
+    if (!el || !el.offsetParent || !el.clientWidth) return;
     _heroWrap();                                          // 끝에 걸쳐 있으면 먼저 안쪽으로
-    el.scrollTo({ left: el.scrollLeft + el.clientWidth, behavior: 'smooth' });   // 항상 앞으로
+    // 목표를 '판 번호'로 잡는다. scrollLeft + clientWidth 로 잡으면 벽 너머를 겨냥해서
+    // 아무 일도 일어나지 않는 경우가 생긴다.
+    const next = Math.min(_heroPanel(el) + 1, el.children.length - 1);
+    el.scrollTo({ left: _heroX(el, next), behavior: 'smooth' });   // 항상 앞으로
   }, HERO_AUTO_MS[_heroIndex()] || 30000);
 }
 
@@ -4342,7 +4366,7 @@ function _heroRestartTimer() {
 
   const start = () => {
     if (!el.clientWidth) { requestAnimationFrame(start); return; }   // 아직 폭이 안 잡혔으면 기다린다
-    el.scrollLeft = el.clientWidth * 2;           // 2번 판(진짜 제목)에서 시작
+    el.scrollLeft = _heroX(el, 2);                // 2번 판(진짜 제목)에서 시작
     _heroSyncDots();
   };
   start();
