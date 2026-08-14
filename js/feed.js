@@ -19,7 +19,7 @@ async function loadBoardPosts(type) {
   if (!window._fbReady || !window._fb) return;
   try {
     const snap = await window._fb.getBoardPosts(type);
-    const posts = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const posts = _sweepAdoptedPosts(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     // localStorage 캐시 업데이트
     saveBoardPosts(type, posts);
     return posts;
@@ -97,7 +97,8 @@ function renderBoard() {
                border-radius:12px;padding:12px 14px;margin-bottom:14px;font-size:12.5px;
                color:var(--muted);line-height:1.7">
       앱 개선을 위한 제안이나 새 챌린지 카테고리를 자유롭게 건의해 주세요!<br>
-      앱 관리자가 검토 후 상태를 업데이트해 드려요.
+      앱 관리자가 검토 후 상태를 업데이트해 드려요.<br>
+      <b>반영됨</b>이 된 건의는 2주 뒤 사진과 함께 자동으로 정리돼요.
     </div>`;
   }
 
@@ -114,6 +115,7 @@ function renderBoard() {
       const likeCount    = (p.likes    || []).length;
       const liked        = (p.likes    || []).includes(me.id);
       const date         = p.createdAt ? new Date(p.createdAt).toLocaleDateString('ko-KR',{month:'numeric',day:'numeric'}) : '';
+      const cover        = _safeImgSrc(p.coverThumb);
       html += `
         <div onclick="viewBoardPost('${p.id}')"
           style="background:white;border-radius:14px;border:1.5px solid ${p.pinned?'rgba(201,169,110,0.4)':'var(--border)'};
@@ -126,13 +128,19 @@ function renderBoard() {
             </div>
             <span style="font-size:11px;color:var(--muted);flex-shrink:0">${date}</span>
           </div>
-          <div style="font-size:14px;font-weight:800;margin-bottom:4px;line-height:1.4">${p.isPrivate?'<span title="비공개">🔒</span> ':''}${escHtml(p.title)}</div>
-          <div style="font-size:12.5px;color:var(--muted);margin-bottom:8px;
-                      overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(p.content||'')}</div>
+          <div style="display:flex;gap:10px;align-items:flex-start">
+            <div style="flex:1;min-width:0">
+              <div style="font-size:14px;font-weight:800;margin-bottom:4px;line-height:1.4">${p.isPrivate?'<span title="비공개">🔒</span> ':''}${escHtml(p.title)}</div>
+              <div style="font-size:12.5px;color:var(--muted);margin-bottom:8px;
+                          overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(p.content||'')}</div>
+            </div>
+            ${cover ? `<img class="bp-card-cover" src="${cover}" alt="대표사진" loading="lazy">` : ''}
+          </div>
           <div style="display:flex;align-items:center;gap:10px;font-size:12px;color:var(--muted)">
             <span>${escHtml(p.authorName||'익명')}</span>
             <span>${likeCount}</span>
             <span>${commentCount}</span>
+            ${p.photoCount ? `<span>📷 ${p.photoCount}</span>` : ''}
           </div>
         </div>`;
     });
@@ -180,6 +188,8 @@ function renderBoardPost() {
     </div>
     <!-- 본문 -->
     <div style="font-size:14px;line-height:1.9;color:#333;white-space:pre-wrap;margin-bottom:20px">${escHtml(p.content||'')}</div>
+    <!-- 첨부 사진 — 서브컬렉션에서 비동기로 채운다 -->
+    <div id="board-photos" class="board-photos"></div>
 
     <!-- 좋아요 -->
     <button onclick="likeBoardPost('${p.id}')"
@@ -252,6 +262,7 @@ function renderBoardPost() {
   </div>`;
 
   setTimeout(() => initBoardComments(p.id), 60);  // 실시간 댓글 구독 시작
+  if (p.photoCount) setTimeout(() => loadBoardPostPhotos(p.id, p.coverId), 60);
   return html + '</div>';
 }
 
@@ -280,7 +291,138 @@ function openBoardPostModal(type, editId) {
   if (privRow) privRow.style.display = isApp ? 'none' : 'block';
   const privCb = document.getElementById('bp-private');
   if (privCb) privCb.checked = !!(p && p.isPrivate);
+  // 사진 — 수정 모드면 서버에서 불러와 채운다(그동안 빈 자리로 먼저 보인다)
+  _bpPhotos = []; _bpCoverId = p ? (p.coverId || null) : null; _bpRemovedPhotos = [];
+  _bpRenderPhotoStrip();
+  if (p && p.photoCount && window._fbReady && window._fb?.getBoardPhotos) {
+    window._fb.getBoardPhotos(p.id).then(snap => {
+      if (_boardPostEditId !== p.id) return;          // 그 사이 모달이 바뀜
+      snap.forEach(d => _bpPhotos.push({ id: d.id, url: d.data().url, isNew: false }));
+      if (!_bpCoverId && _bpPhotos.length) _bpCoverId = _bpPhotos[0].id;
+      _bpRenderPhotoStrip();
+    }).catch(() => {});
+  }
   document.getElementById('modal-board-post').classList.add('open');
+}
+
+// ── 게시글 첨부 사진 ──
+// 사진은 boardPosts/{id}/photos 서브컬렉션에 한 장씩. 글 문서에는 목록용 작은 썸네일
+// (coverThumb) 만 둔다 — 목록은 글 50개를 한 번에 읽어서 원본이 딸려 오면 감당이 안 된다.
+var BP_PHOTO_MAX      = 10;
+var BP_PHOTO_BYTES    = 200 * 1024;   // 장당 목표 (문서 1MB 한도 안쪽)
+// 목록 썸네일은 예산이 아니라 크기를 고정한다. _fitImageForFirestore 는 한도에 못
+// 들어가면 마지막(560px) 결과를 그냥 돌려주는데, 그게 100KB 면 글 50개짜리 목록이
+// 5MB 가 된다. 카드에 58px 로 들어가므로 320px 이면 고해상도에서도 충분하다.
+var BP_COVER_DIM      = 320;
+var BP_COVER_Q        = 0.6;
+
+function _bpRenderPhotoStrip() {
+  const box = document.getElementById('bp-photo-strip');
+  if (!box) return;
+  const thumbs = _bpPhotos.map(p => {
+    const src = _safeImgSrc(p.url);
+    if (!src) return '';
+    const isCover = p.id === _bpCoverId;
+    return `<div class="bp-thumb${isCover ? ' cover' : ''}" onclick="setBoardPostCover('${escHtml(p.id)}')">
+        <img src="${src}" alt="첨부 사진" loading="lazy">
+        ${isCover ? '<span class="bp-thumb-tag">대표</span>' : ''}
+        <button class="bp-thumb-x" onclick="event.stopPropagation();removeBoardPostPhoto('${escHtml(p.id)}')"
+          aria-label="사진 빼기">✕</button>
+      </div>`;
+  }).join('');
+  const addBtn = _bpPhotos.length >= BP_PHOTO_MAX ? '' :
+    `<button type="button" class="bp-thumb-add" onclick="document.getElementById('bp-photo-input').click()">
+       <span>＋</span><span class="bp-thumb-add-n">${_bpPhotos.length}/${BP_PHOTO_MAX}</span>
+     </button>`;
+  box.innerHTML = thumbs + addBtn;
+}
+
+async function addBoardPostPhotos(event) {
+  const files = Array.from(event.target.files || []);
+  event.target.value = '';
+  if (!files.length) return;
+  const room = BP_PHOTO_MAX - _bpPhotos.length;
+  if (room <= 0) { toast(`사진은 최대 ${BP_PHOTO_MAX}장까지예요`); return; }
+  if (files.length > room) toast(`${room}장만 담았어요 (최대 ${BP_PHOTO_MAX}장)`);
+  loading(true);
+  try {
+    for (const file of files.slice(0, room)) {
+      if (!file.type.startsWith('image/')) { toast('이미지 파일만 올릴 수 있어요'); continue; }
+      if (file.size > 10 * 1024 * 1024) { toast('사진이 너무 커요 (10MB 이하)'); continue; }
+      const raw = await _readFileAsDataUrl(file);
+      const url = await _fitImageForFirestore(raw, BP_PHOTO_BYTES);
+      const id  = 'ph_' + uid();
+      _bpPhotos.push({ id, url, isNew: true });
+      if (!_bpCoverId) _bpCoverId = id;      // 첫 장이 기본 대표
+    }
+  } catch (e) {
+    console.error('사진 준비 실패:', e);
+    toast('사진을 불러오지 못했어요');
+  }
+  loading(false);
+  _bpRenderPhotoStrip();
+}
+
+function setBoardPostCover(id) {
+  if (!_bpPhotos.some(p => p.id === id)) return;
+  _bpCoverId = id;
+  _bpRenderPhotoStrip();
+  toast('대표사진으로 정했어요');
+}
+
+function removeBoardPostPhoto(id) {
+  const p = _bpPhotos.find(x => x.id === id);
+  if (!p) return;
+  if (!p.isNew) _bpRemovedPhotos.push(id);   // 이미 서버에 있는 것만 지울 목록에
+  _bpPhotos = _bpPhotos.filter(x => x.id !== id);
+  if (_bpCoverId === id) _bpCoverId = _bpPhotos.length ? _bpPhotos[0].id : null;
+  _bpRenderPhotoStrip();
+}
+
+// 저장 시점의 사진 반영. 글 문서 쓰기가 성공한 뒤에 부른다.
+async function _bpCommitPhotos(postId) {
+  if (!window._fbReady || !window._fb?.setBoardPhoto) return;
+  for (const id of _bpRemovedPhotos) {
+    await window._fb.deleteBoardPhoto(postId, id).catch(() => {});
+  }
+  for (const p of _bpPhotos) {
+    if (!p.isNew) continue;
+    await window._fb.setBoardPhoto(postId, p.id, {
+      url: p.url, authorId: me.id, at: new Date().toISOString()
+    }).catch(e => { console.error('사진 저장 실패:', e); });
+  }
+  _bpRemovedPhotos = [];
+  _bpPhotos.forEach(p => { p.isNew = false; });
+}
+
+// 목록 카드에 띄울 대표사진 썸네일. 원본을 그대로 글 문서에 넣으면 목록 한 번에 수 MB 다.
+async function _bpCoverThumb() {
+  const cover = _bpPhotos.find(p => p.id === _bpCoverId) || _bpPhotos[0];
+  if (!cover) return '';
+  try { return await _compressImageDataUrl(cover.url, BP_COVER_DIM, BP_COVER_Q); }
+  catch (e) { return ''; }
+}
+
+// 상세 화면의 사진 — 렌더는 동기라 자리만 만들어 두고 여기서 채운다(댓글과 같은 방식).
+async function loadBoardPostPhotos(postId, coverId) {
+  const box = document.getElementById('board-photos');
+  if (!box) return;
+  if (!window._fbReady || !window._fb?.getBoardPhotos) { box.innerHTML = ''; return; }
+  try {
+    const snap = await window._fb.getBoardPhotos(postId);
+    const rows = [];
+    snap.forEach(d => rows.push({ id: d.id, url: d.data().url }));
+    if (document.getElementById('board-photos') !== box) return;   // 그 사이 화면이 바뀜
+    // 대표를 맨 앞으로
+    rows.sort((a, b) => (a.id === coverId ? -1 : b.id === coverId ? 1 : 0));
+    box.innerHTML = rows.map(r => {
+      const src = _safeImgSrc(r.url);
+      return src ? `<img src="${src}" alt="첨부 사진" loading="lazy" onclick="openImageLightbox(this.src)">` : '';
+    }).join('');
+  } catch (e) {
+    console.warn('게시글 사진 로드 실패:', e);
+    box.innerHTML = '';
+  }
 }
 
 function closeBoardPostModal(e) {
@@ -297,9 +439,12 @@ async function submitBoardPost() {
   const pinned  = _boardPostModalType === 'app' && document.getElementById('bp-pinned')?.checked;
   const isPrivate = _boardPostModalType === 'user' && document.getElementById('bp-private')?.checked;
 
+  const coverThumb = await _bpCoverThumb();
+
   // ── 수정 모드 ── 서버가 거절하면 로컬도 건드리지 않는다(등록과 같은 이유)
   if (_boardPostEditId) {
-    const patch = { category, title, content, editedAt: new Date().toISOString() };
+    const patch = { category, title, content, editedAt: new Date().toISOString(),
+                    coverThumb, coverId: _bpCoverId || '', photoCount: _bpPhotos.length };
     if (_boardPostModalType === 'app')  patch.pinned    = !!pinned;
     if (_boardPostModalType === 'user') patch.isPrivate = !!isPrivate;
     if (window._fbReady && window._fb) {
@@ -311,6 +456,7 @@ async function submitBoardPost() {
         return;
       }
     }
+    await _bpCommitPhotos(_boardPostEditId);
     const list = getBoardPosts(_boardPostModalType);
     const cur  = list.find(x => x.id === _boardPostEditId);
     if (cur) { Object.assign(cur, patch); saveBoardPosts(_boardPostModalType, list); }
@@ -328,6 +474,7 @@ async function submitBoardPost() {
     isPrivate: !!isPrivate,   // 비공개: 작성자 + 앱 관리자만 열람
     status: 'pending',
     likes: [], comments: [],
+    coverThumb, coverId: _bpCoverId || '', photoCount: _bpPhotos.length,
     createdAt: new Date().toISOString()
   };
   // 서버 저장이 먼저다. 로컬에만 넣고 "등록됐어요" 라고 하면, 목록을 다시 불러오는 순간
@@ -341,6 +488,8 @@ async function submitBoardPost() {
       return;
     }
   }
+
+  await _bpCommitPhotos(post.id);
 
   const list = getBoardPosts(_boardPostModalType);
   list.unshift(post);
@@ -385,23 +534,61 @@ function changeBoardPostStatus(id, status) {
   const list = getBoardPosts('user');
   const p    = list.find(x => x.id === id);
   if (!p) return;
-  p.status = status;
+  // '반영됨' 으로 바뀐 시각을 남긴다 — 2주 뒤 자동 정리의 기준.
+  // 이 필드가 없는 옛 글은 정리 대상이 아니다(어느 날 반영됐는지 알 수 없다).
+  const patch = { status };
+  if (status === 'adopted') patch.adoptedAt = new Date().toISOString();
+  Object.assign(p, patch);
   saveBoardPosts('user', list);
   if (window._fbReady && window._fb)
-    window._fb.updateBoardPost(id, { status }).catch(() => {});
+    window._fb.updateBoardPost(id, patch).catch(() => {});
   const st = BOARD_STATUS[status];
   toast(`상태를 "${st?.label||status}"로 변경했어요`);
   openSubscreen('board-post');
 }
 
 function deleteBoardPost(id) {
+  const p = getBoardPost(id);
   ['app','user'].forEach(type => {
-    saveBoardPosts(type, getBoardPosts(type).filter(p => p.id !== id));
+    saveBoardPosts(type, getBoardPosts(type).filter(x => x.id !== id));
   });
-  if (window._fbReady && window._fb)
-    window._fb.deleteBoardPost(id).catch(() => {});
+  _deleteBoardPostEverywhere(id, p && p.photoCount);
   toast('게시글을 삭제했어요');
   openBoardScreen(_boardType);
+}
+
+// 글 문서만 지우면 사진 서브컬렉션은 서버에 그대로 남는다(Firestore 는 하위 문서를
+// 같이 지워주지 않는다). 사진부터 훑어 지운 뒤 글을 지운다.
+async function _deleteBoardPostEverywhere(id, hasPhotos) {
+  if (!window._fbReady || !window._fb) return;
+  if (hasPhotos && window._fb.getBoardPhotos) {
+    try {
+      const snap = await window._fb.getBoardPhotos(id);
+      const ids  = [];
+      snap.forEach(d => ids.push(d.id));
+      for (const pid of ids) await window._fb.deleteBoardPhoto(id, pid).catch(() => {});
+    } catch (e) { console.warn('첨부 사진 삭제 실패:', e); }
+  }
+  await window._fb.deleteBoardPost(id).catch(() => {});
+}
+
+// ── 반영된 건의 자동 정리 ──
+// 사진이 base64 로 들어 있어 그냥 두면 무료 요금제 저장 용량을 갉아먹는다(인증샷·채팅과 같은 이유).
+// 예약 정리(Cloud Functions)는 Blaze 전용이라 못 쓴다 → 목록을 여는 사람이 조금씩 치운다.
+// 규칙상 지울 수 있는 사람은 작성자와 앱 관리자뿐이라, 그 둘이 건의함을 열 때 실제로 지워진다.
+var BOARD_ADOPTED_TTL_MS = 14 * 24 * 60 * 60 * 1000;
+function _boardPostExpired(p) {
+  if (!p || p.status !== 'adopted' || !p.adoptedAt) return false;
+  const t = Date.parse(p.adoptedAt);
+  return !isNaN(t) && (Date.now() - t > BOARD_ADOPTED_TTL_MS);
+}
+function _sweepAdoptedPosts(posts) {
+  if (!me || !window._fbReady || !window._fb) return posts;
+  const expired = posts.filter(_boardPostExpired)
+                       .filter(p => p.authorId === me.id || me.isAppAdmin);
+  expired.slice(0, 5).forEach(p => _deleteBoardPostEverywhere(p.id, p.photoCount));
+  const gone = new Set(expired.slice(0, 5).map(p => p.id));
+  return posts.filter(p => !gone.has(p.id));
 }
 
 function commentsCacheKey(postId) { return 'boardComments_' + postId; }

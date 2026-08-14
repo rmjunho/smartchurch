@@ -246,6 +246,13 @@ window._fb = {
       setBoardPost:    (id, data) => setDoc(doc(fbDb, 'boardPosts', id), data),
       updateBoardPost: (id, data) => updateDoc(doc(fbDb, 'boardPosts', id), data),
       deleteBoardPost: (id)       => deleteDoc(doc(fbDb, 'boardPosts', id)),
+      // ── 게시판 사진 (서브컬렉션: boardPosts/{postId}/photos/{photoId}) ──
+      // 글 문서에 넣지 않는다 — 10장이면 1MB 한도를 넘고, 목록은 글 50개를 한 번에 읽는다.
+      // 목록에 띄울 대표사진만 작은 썸네일로 글 문서(coverThumb)에 둔다.
+      setBoardPhoto:    (postId, photoId, data) => setDoc(doc(fbDb, 'boardPosts', postId, 'photos', photoId), data),
+      getBoardPhotos:   (postId) => getDocs(query(
+        collection(fbDb, 'boardPosts', postId, 'photos'), orderBy('at', 'asc'), limit(10))),
+      deleteBoardPhoto: (postId, photoId) => deleteDoc(doc(fbDb, 'boardPosts', postId, 'photos', photoId)),
       // ── 게시판 댓글 (서브컬렉션: boardPosts/{postId}/comments/{commentId}) ──
       setBoardComment:    (postId, commentId, data) => setDoc(doc(fbDb, 'boardPosts', postId, 'comments', commentId), data),
       updateBoardComment: (postId, commentId, data) => updateDoc(doc(fbDb, 'boardPosts', postId, 'comments', commentId), data),

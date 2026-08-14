@@ -973,6 +973,37 @@
       font-size:11.5px; font-weight:700; font-family:inherit;
       color:var(--danger); cursor:pointer;
     }
+    /* ── 게시판 첨부 사진 ── */
+    .bp-photo-strip { display:flex; gap:8px; overflow-x:auto; padding:2px 0 4px; }
+    .bp-thumb {
+      position:relative; flex:0 0 72px; height:72px; border-radius:10px;
+      overflow:hidden; cursor:pointer; border:2px solid transparent;
+    }
+    .bp-thumb.cover { border-color:var(--gold); }
+    .bp-thumb img { width:100%; height:100%; object-fit:cover; display:block; }
+    .bp-thumb-tag {
+      position:absolute; left:0; bottom:0; right:0; text-align:center;
+      background:var(--gold); color:white; font-size:10px; font-weight:800; padding:1px 0;
+    }
+    .bp-thumb-x {
+      position:absolute; top:2px; right:2px; width:20px; height:20px; border:none;
+      border-radius:10px; background:rgba(0,0,0,0.55); color:white;
+      font-size:11px; line-height:1; font-family:inherit; cursor:pointer; padding:0;
+    }
+    .bp-thumb-add {
+      flex:0 0 72px; height:72px; border-radius:10px; cursor:pointer;
+      border:1.5px dashed var(--border); background:var(--cream2);
+      display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;
+      font-family:inherit; color:var(--muted); font-size:20px; line-height:1;
+    }
+    .bp-thumb-add-n { font-size:10.5px; font-weight:700; }
+    .bp-card-cover {
+      flex-shrink:0; width:58px; height:58px; object-fit:cover; border-radius:9px;
+    }
+    .board-photos { display:flex; flex-direction:column; gap:8px; margin-bottom:16px; }
+    .board-photos img {
+      width:100%; border-radius:12px; display:block; cursor:zoom-in;
+    }
     /* ── @멘션 ── */
     .chat-mention { color:var(--gold); font-weight:700; }
     .chat-bubble-wrap.mentioned .chat-bubble { box-shadow:0 0 0 2px var(--gold); }

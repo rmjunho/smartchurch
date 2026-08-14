@@ -2166,6 +2166,12 @@
           style="font-size:13px;line-height:1.8;resize:none"
           placeholder="내용을 자유롭게 작성해 주세요"></textarea>
       </div>
+      <div class="form-group">
+        <label class="form-label">사진 <span style="font-weight:500;color:var(--muted)">(최대 10장 · 눌러서 대표 지정)</span></label>
+        <input type="file" id="bp-photo-input" accept="image/*" multiple style="display:none"
+               onchange="addBoardPostPhotos(event)">
+        <div id="bp-photo-strip" class="bp-photo-strip"></div>
+      </div>
       <div id="bp-pin-row" class="form-group" style="display:none">
         <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
           <input type="checkbox" id="bp-pinned" style="accent-color:var(--black);width:16px;height:16px">
@@ -8505,6 +8511,9 @@ var _boardLoaded  = '';   // 서버에서 이미 읽어온 게시판 타입 — 
 // ── 게시글 액션 함수들 ──
 var _boardPostModalType = 'app';
 var _boardPostEditId    = null;   // 값이 있으면 새 글이 아니라 그 글을 고치는 중
+var _bpPhotos           = [];     // 모달에 담긴 사진 [{id, url, isNew}]
+var _bpCoverId          = null;   // 대표사진 id
+var _bpRemovedPhotos    = [];     // 저장할 때 서버에서 지울 사진 id
 
 
 
