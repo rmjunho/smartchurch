@@ -4532,6 +4532,11 @@ function loadBinder() {
   // 다른 기기에서 저장한 최신본 있으면 가져와 반영
   startBinderWatch();    // 그날 바인더도 실시간 감시 (날짜 바뀌면 재구독)
   startTodosWatch();     // 그날 투두는 실시간 감시 (날짜 바뀌면 재구독)
+  // 오늘 칸을 열 때마다 나눔본을 화면과 맞춘다. 전송은 '저장할 때'만 일어나서, 이월처럼
+  // 사람이 아무것도 안 친 날은 나눔이 비어 있었다. 지난 날짜는 열어보는 것만으로
+  // 없던 나눔 항목이 생기면 안 되므로 오늘만.
+  // 빈 날까지 올리면 리더 목록에 아무것도 안 쓴 사람이 전부 뜬다 → 내용이 있을 때만.
+  if (dateKey() === todayDateKey() && binderHasContent(data)) syncShareToServer();
 }
 
 // 시간표: 행 편집형 (시간/계획 직접 입력, 행 추가/삭제). data.schRows = [{time, plan}]
@@ -4733,9 +4738,16 @@ function autoSave(section) {
 // 타이머는 개인 동기화와 같은 이유로 반드시 날짜별이어야 한다 — 전역 하나면 날짜를 옮길 때
 // 앞 날짜의 대기 중인 전송이 죽는다.
 var _shareSyncTimers = {};
+var _shareRetry = 0;
 function syncShareToServer() {
   if (!me || !me.binderShareEnabled) return;                 // 공유 허용 안 했으면 아무것도 안 올린다
-  if (!window._fbReady || !window._fb || !window._fb.setBinderEntry) return;
+  // 이월은 부팅 직후 loadBinder 안에서 돈다 — Firebase 가 아직 준비 전이면 그냥 버려졌고,
+  // 이월은 하루 한 번뿐이라 그날 손으로 뭘 더 쓰기 전까지 나눔에 영영 안 올라갔다.
+  if (!window._fbReady || !window._fb || !window._fb.setBinderEntry) {
+    if (_shareRetry++ < 20) setTimeout(syncShareToServer, 1500);
+    return;
+  }
+  _shareRetry = 0;
   const dk = dateKey();
   clearTimeout(_shareSyncTimers[dk]);
   _shareSyncTimers[dk] = setTimeout(() => {
@@ -5007,6 +5019,7 @@ function startBinderWatch() {
     // (동점이라 상대는 자기 것을 최신이라 믿는다). 병합은 양쪽이 같은 답을 내는 함수라
     // 한두 번 오간 뒤 더 바뀌지 않는다 — 서로 주고받으며 도는 일은 없다.
     syncBinderToServer();
+    syncShareToServer();   // 같은 이유 — 병합 결과가 나눔에도 반영돼야 한다
   });
 }
 function stopBinderWatch() {
@@ -6152,6 +6165,7 @@ function startTodosWatch() {
     if (JSON.stringify(merged) !== JSON.stringify(local.todos || [])) {
       local.todos = merged;
       DB.set(localKey, local);
+      syncShareToServer();   // 여기서 DB 를 직접 고치면 saveBinderData 를 안 타 나눔이 옛 목록에 멈춘다
       try { renderTodos(); renderDrawTodoSection(); } catch (e) {}
     }
     // 서버가 모르는 항목이 내게 있으면(오프라인 중 추가 등) 올려서 양쪽을 맞춘다
