@@ -1300,7 +1300,7 @@
       <!-- Sub-screen (오른쪽에서 슬라이드인) -->
       <div class="subscreen" id="subscreen">
         <div class="subscreen-topbar">
-          <button class="subscreen-back" onclick="closeSubscreen()">
+          <button class="subscreen-back" onclick="backSubscreen()">
             <svg width="10" height="17" viewBox="0 0 10 17" fill="none"><path d="M9 1L1 8.5L9 16" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
             뒤로
           </button>
@@ -7782,6 +7782,13 @@ function _renderSubscreen(id) {   // 히스토리는 건드리지 않고 렌더�
   // 매칭/행사 화면 진입 시 Firestore 최신 데이터 동기화 (교인 간 공유)
   if (MATCH_SUBSCREENS.includes(id)) syncMatchingFromFirestore();
   if (EVENT_SUBSCREENS.includes(id)) syncEventsFromFirestore();
+}
+
+// 뒤로 버튼 = 한 단계만. 건의함 글을 열었다 닫으면 목록으로 돌아와야 하는데
+// closeSubscreen 은 스택을 통째로 비워 홈까지 나가버렸다. 되감기는 popstate 가 이미 한다.
+function backSubscreen() {
+  if (_subStack.length > 1) { try { history.back(); return; } catch (e) {} }
+  closeSubscreen();
 }
 
 function closeSubscreen() {
