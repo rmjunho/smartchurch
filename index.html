@@ -4256,27 +4256,31 @@ function _calCenterDate(container) {
 // ── 히어로 슬라이드 (1장: 삶의 예배 제목 / 2장: 오늘의 말씀) ──
 // 넘김은 CSS 가로 스크롤 + scroll-snap 에 맡긴다 — 손으로 미는 건 브라우저가 알아서 부드럽게 한다.
 // JS 는 30초 자동 전환과 점(dot) 표시만 맡는다.
-// 무한으로 넘기기 위해 앞뒤에 복제 장을 하나씩 붙인다:
-//   [말씀(복제)] [제목] [말씀] [제목(복제)]
-//        0         1      2        3
-// 평소에는 1·2번 사이를 오가고, 끝(0 또는 3)에 닿으면 같은 그림인 반대쪽으로 소리 없이
-// 옮겨 놓는다(애니메이션 없이). 사용자 눈에는 계속 같은 방향으로 넘어가는 것처럼 보인다.
+// 무한으로 넘기기 위해 앞뒤에 복제 장을 두 개씩 붙여 6판 링을 만든다:
+//   [제목'] [말씀'] [제목] [말씀] [제목''] [말씀'']
+//      0       1      2      3       4        5
+// 짝수 판 = 제목, 홀수 판 = 말씀. 평소에는 2·3번에 앉고, 바깥으로 나가면 같은 그림인
+// 두 판 안쪽으로 소리 없이 옮긴다(애니메이션 없이).
+//
+// 앞뒤로 하나씩(4판)만 붙였을 때는, 끝 판에 닿는 순간 다음 스와이프가 갈 곳이 없어서
+// 순간이동(아래 settle)이 일어나기 전까지 손짓이 통째로 씹혔다 — 빠르게 연속으로 밀 때
+// "중간중간 걸리던" 원인. 여유 판을 양쪽 2개로 늘리고 순간이동도 scrollend 로 앞당긴다.
 var HERO_AUTO_MS = [10000, 30000];   // 0=제목 10초, 1=오늘의 말씀 30초
 var _heroTimer   = null;
 var _heroSettleT = null;
 
 function _heroEl() { return document.getElementById('hero-slides'); }
-function _heroPanel(el) {                       // 지금 몇 번째 판인가 (0~3)
-  return el && el.clientWidth ? Math.round(el.scrollLeft / el.clientWidth) : 1;
+function _heroPanel(el) {                       // 지금 몇 번째 판인가 (0~5)
+  return el && el.clientWidth ? Math.round(el.scrollLeft / el.clientWidth) : 2;
 }
 function _heroIndex() {                         // 실제로 보이는 장 (0=제목, 1=말씀)
-  return (_heroPanel(_heroEl()) + 1) % 2;
+  return _heroPanel(_heroEl()) % 2;             // 짝수 판이 제목
 }
 
 function goHeroSlide(i) {                       // i: 0=제목, 1=말씀
   const el = _heroEl();
   if (!el || !el.clientWidth) return;
-  el.scrollTo({ left: el.clientWidth * (i === 0 ? 1 : 2), behavior: 'smooth' });
+  el.scrollTo({ left: el.clientWidth * (i === 0 ? 2 : 3), behavior: 'smooth' });
   _heroRestartTimer();                          // 손으로 넘겼으면 30초를 처음부터 다시 센다
 }
 
@@ -4287,7 +4291,8 @@ function _heroSyncDots() {
   }
 }
 
-// 끝 판에 멈췄으면 같은 그림인 안쪽 판으로 순간이동 — 이게 '무한'을 만든다.
+// 바깥 판에 멈췄으면 같은 그림인 안쪽 판으로 순간이동 — 이게 '무한'을 만든다.
+// 두 판씩 옮겨야 그림이 이어진다(짝=제목, 홀=말씀).
 function _heroWrap() {
   const el = _heroEl();
   if (!el || !el.clientWidth) return;
@@ -4297,8 +4302,8 @@ function _heroWrap() {
   // 브라우저가 진행 중인 넘김을 취소해서, 손으로 민 게 도로 제자리로 돌아온다("잘 안 넘어감").
   // 스크롤이 잠깐 뜸해지는 것만 보고 '멈췄다' 고 판단하던 게 원인이었다.
   if (Math.abs(el.scrollLeft - p * w) > 2) return;
-  if (p === 0) el.scrollLeft = w * 2;        // 말씀(복제) → 진짜 말씀
-  else if (p === 3) el.scrollLeft = w;       // 제목(복제) → 진짜 제목
+  if (p <= 1)      el.scrollLeft = (p + 2) * w;
+  else if (p >= 4) el.scrollLeft = (p - 2) * w;
 }
 
 // 장마다 머무는 시간이 달라서 setInterval 을 쓸 수 없다. 다음 예약은 넘어간 뒤 스크롤이
@@ -4329,24 +4334,30 @@ function _heroRestartTimer() {
     c.dataset.heroClone = '1';
     return c;
   };
-  el.insertBefore(clone(slides[1]), slides[0]);   // 앞에 말씀 복제
-  el.appendChild(clone(slides[0]));               // 뒤에 제목 복제
+  const [title, verse] = slides;
+  el.insertBefore(clone(verse), title);           // [말씀'] [제목] [말씀]
+  el.insertBefore(clone(title), el.firstChild);   // [제목'] [말씀'] [제목] [말씀]
+  el.appendChild(clone(title));                   // … [제목'']
+  el.appendChild(clone(verse));                   // … [제목''] [말씀'']
 
   const start = () => {
     if (!el.clientWidth) { requestAnimationFrame(start); return; }   // 아직 폭이 안 잡혔으면 기다린다
-    el.scrollLeft = el.clientWidth;               // 1번 판(진짜 제목)에서 시작
+    el.scrollLeft = el.clientWidth * 2;           // 2번 판(진짜 제목)에서 시작
     _heroSyncDots();
   };
   start();
 
+  const settle = () => { _heroWrap(); _heroRestartTimer(); };  // 앉은 장 기준으로 시간을 다시 센다
   el.addEventListener('scroll', () => {
     _heroSyncDots();
     clearTimeout(_heroSettleT);
-    _heroSettleT = setTimeout(() => {             // 멈춘 뒤에 옮겨야 스크롤을 끊지 않는다
-      _heroWrap();
-      _heroRestartTimer();                        // 앉은 장 기준으로 자동 전환 시간을 다시 센다
-    }, 160);
+    _heroSettleT = setTimeout(settle, 160);       // 멈춘 뒤에 옮겨야 스크롤을 끊지 않는다
   }, { passive: true });
+  // scrollend 는 스냅까지 끝난 바로 그 순간에 한 번 온다. 160ms 를 기다리지 않으므로
+  // 빠르게 연속으로 밀어도 링 바깥으로 나간 채 멈춰 있는 시간이 없다.
+  if ('onscrollend' in el) {
+    el.addEventListener('scrollend', () => { clearTimeout(_heroSettleT); settle(); });
+  }
   // 손으로 미는 중에는 자동 전환이 끼어들지 않게 타이머를 미룬다
   el.addEventListener('pointerdown', _heroRestartTimer);
   _heroRestartTimer();
