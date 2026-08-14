@@ -1313,6 +1313,13 @@
       font-size: 13px; font-weight: 700; color: rgba(255,255,255,0.7);
       white-space: nowrap;   /* "2026년 7월"이 여러 줄로 쪼개지지 않게 */
     }
+    .cal-strip-tools { display: flex; align-items: center; gap: 8px; }
+    .cal-today-btn {
+      background: rgba(255,255,255,0.1); border: none; color: rgba(255,255,255,0.75);
+      font-size: 11.5px; font-weight: 700; padding: 4px 11px; border-radius: 999px;
+      cursor: pointer; line-height: 1.5; flex-shrink: 0;
+    }
+    .cal-today-btn:active { background: var(--gold); color: white; }
     .cal-strip {
       display: flex; align-items: center;
       padding: 6px 0 10px; background: var(--dark);
@@ -1334,7 +1341,10 @@
       -ms-overflow-style: none;
       -webkit-overflow-scrolling: touch; /* iOS 관성 */
       overscroll-behavior-x: contain;    /* 끝에서 페이지가 딸려 나가지 않게 */
-      scroll-snap-type: x proximity;     /* 살짝만 붙여준다 — mandatory 면 자유로운 느낌이 죽는다 */
+      /* proximity 는 안드로이드에서 관성을 그냥 흘려보낸다 — 살짝만 밀어도 몇 주가 지나가서
+         "아이폰보다 너무 빠르다" 는 소리를 들었다. mandatory 면 반드시 한 날짜 위에 내려앉아
+         감속이 눈에 보이고, 어중간한 위치에서 멈추지도 않는다. */
+      scroll-snap-type: x mandatory;
       touch-action: pan-x;
       user-select: none;                 /* PC 에서 드래그할 때 글자가 선택되지 않게 */
       padding: 0 8px;
@@ -1343,9 +1353,17 @@
     .cal-strip-days::-webkit-scrollbar { display: none; }
     .cal-strip-day {
       text-align: center; cursor: pointer; padding: 4px 0;
-      min-width: 42px; flex: 0 0 auto;   /* 줄어들지 않아야 스크롤이 생긴다 */
+      /* 화면 폭과 상관없이 딱 7칸(일~토)만 보이게. 여기서 100% 는 스크롤 폭이 아니라
+         컨테이너 안쪽 폭이라 안전하다. 12px 는 칸 사이 gap 6개. */
+      flex: 0 0 calc((100% - 12px) / 7);
+      min-width: 42px;                   /* 아주 좁은 기기에서 숫자가 뭉개지지 않게 */
       scroll-snap-align: center;
       border-radius: 12px; transition: background 0.15s;
+    }
+    /* 달이 넘어가는 자리 표시 — 스크롤하다 어디서 달이 바뀌었는지 보이게 */
+    .cal-strip-sep {
+      flex: 0 0 1px; align-self: stretch; margin: 5px 3px;
+      background: rgba(255,255,255,0.22); border-radius: 1px;
     }
     .cal-strip-day:active { background: rgba(255,255,255,0.08); }
     .cal-strip-day.selected {
@@ -1363,7 +1381,12 @@
     }
     .cal-strip-day.selected .cal-strip-dow,
     .cal-strip-day.selected .cal-strip-num { color: white; }
-    .cal-strip-day.future { opacity: 0.5; }
+    /* .future 는 리더 나눔 스트립(js/church.js)이 아직 쓴다 — 같이 둔다.
+       .dim 은 삶의 예배 스트립에서 '이번 주(일~토) 밖' 을 뜻한다. */
+    .cal-strip-day.future,
+    .cal-strip-day.dim { opacity: 0.45; }
+    .cal-strip-day.dim.selected,
+    .cal-strip-day.dim.today { opacity: 1; }   /* 고른 날·오늘은 주 밖이어도 흐리면 안 된다 */
     .cal-strip-day.sunday .cal-strip-dow,
     .cal-strip-day.sunday .cal-strip-num { color: #E8665A; }
     .cal-strip-day.sunday.selected .cal-strip-dow,

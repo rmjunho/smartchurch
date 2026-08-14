@@ -612,14 +612,17 @@
           <span style="display:none" id="dseg-year"></span>
           <span style="display:none" id="dseg-month"></span>
           <span style="display:none" id="dseg-day"></span>
-          <button class="date-cal-btn" onclick="openCalendar('days')" aria-label="달력 열기"
-            style="position:static;margin-left:0">
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
-              <rect x="3" y="5" width="18" height="16" rx="2" stroke="currentColor" stroke-width="1.8"/>
-              <path d="M3 9.5h18" stroke="currentColor" stroke-width="1.8"/>
-              <path d="M8 3v4M16 3v4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-            </svg>
-          </button>
+          <span class="cal-strip-tools">
+            <button class="cal-today-btn" onclick="goToToday()">오늘</button>
+            <button class="date-cal-btn" onclick="openCalendar('days')" aria-label="달력 열기"
+              style="position:static;margin-left:0">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
+                <rect x="3" y="5" width="18" height="16" rx="2" stroke="currentColor" stroke-width="1.8"/>
+                <path d="M3 9.5h18" stroke="currentColor" stroke-width="1.8"/>
+                <path d="M8 3v4M16 3v4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+              </svg>
+            </button>
+          </span>
         </div>
         <div class="cal-strip">
           <div class="cal-strip-days" id="cal-strip-days"></div>
@@ -4159,6 +4162,8 @@ function goToDate(newDate) {
   if (_currentWorshipMode === 'share') loadCommunityBinders();
 }
 
+function goToToday() { goToDate(todayDateKey()); }
+
 // ── 날짜 스트립 ──
 // 예전에는 7칸짜리 '주'를 통째로 그리고 화살표로 7일씩 건너뛰었다. 이제는 앞뒤로 넉넉히 그려두고
 // 브라우저의 가로 스크롤에 맡긴다 — 하루 단위로 걸리는 것 없이 부드럽게 밀린다(관성 스크롤도 공짜).
@@ -4180,14 +4185,20 @@ function _renderCalWindow(container, center, selected) {
   const c = new Date(center + 'T00:00:00');
   const from = new Date(c); from.setDate(c.getDate() - CAL_SPAN);
   const today = todayDateKey();
+  // 진하게 보이는 범위는 '오늘까지' 가 아니라 '이번 주(일~토)' 다. 지난주도, 다음 주도 연하게.
+  const ws = new Date(); ws.setDate(ws.getDate() - ws.getDay());
+  const we = new Date(ws); we.setDate(ws.getDate() + 6);
+  const weekFrom = ymdLocal(ws), weekTo = ymdLocal(we);
   let html = '';
   for (let i = 0; i <= CAL_SPAN * 2; i++) {
     const d = new Date(from); d.setDate(from.getDate() + i);
     const dk = ymdLocal(d);
+    // 달이 바뀌는 자리에 얇은 선 — 스크롤하다 어디서 달이 넘어갔는지 보이게
+    if (i > 0 && d.getDate() === 1) html += '<div class="cal-strip-sep"></div>';
     let cls = 'cal-strip-day';
     if (dk === selected) cls += ' selected';
     if (dk === today)    cls += ' today';
-    if (dk > today)      cls += ' future';
+    if (dk < weekFrom || dk > weekTo) cls += ' dim';
     if (d.getDay() === 0) cls += ' sunday';
     html += `<div class="${cls}" data-dk="${dk}" onclick="goToDate('${dk}')">
       <div class="cal-strip-dow">${DOW_KR[d.getDay()]}</div>
@@ -4250,7 +4261,7 @@ function _calCenterDate(container) {
 //        0         1      2        3
 // 평소에는 1·2번 사이를 오가고, 끝(0 또는 3)에 닿으면 같은 그림인 반대쪽으로 소리 없이
 // 옮겨 놓는다(애니메이션 없이). 사용자 눈에는 계속 같은 방향으로 넘어가는 것처럼 보인다.
-var HERO_AUTO_MS = 30000;
+var HERO_AUTO_MS = [10000, 30000];   // 0=제목 10초, 1=오늘의 말씀 30초
 var _heroTimer   = null;
 var _heroSettleT = null;
 
@@ -4280,20 +4291,27 @@ function _heroSyncDots() {
 function _heroWrap() {
   const el = _heroEl();
   if (!el || !el.clientWidth) return;
-  const p = _heroPanel(el);
-  if (p === 0) el.scrollLeft = el.clientWidth * 2;        // 말씀(복제) → 진짜 말씀
-  else if (p === 3) el.scrollLeft = el.clientWidth * 1;   // 제목(복제) → 진짜 제목
+  const w = el.clientWidth;
+  const p = Math.round(el.scrollLeft / w);
+  // 아직 판 경계에 정확히 앉지 않았다 = 스냅/관성이 진행 중이다. 이때 scrollLeft 를 건드리면
+  // 브라우저가 진행 중인 넘김을 취소해서, 손으로 민 게 도로 제자리로 돌아온다("잘 안 넘어감").
+  // 스크롤이 잠깐 뜸해지는 것만 보고 '멈췄다' 고 판단하던 게 원인이었다.
+  if (Math.abs(el.scrollLeft - p * w) > 2) return;
+  if (p === 0) el.scrollLeft = w * 2;        // 말씀(복제) → 진짜 말씀
+  else if (p === 3) el.scrollLeft = w;       // 제목(복제) → 진짜 제목
 }
 
+// 장마다 머무는 시간이 달라서 setInterval 을 쓸 수 없다. 다음 예약은 넘어간 뒤 스크롤이
+// 실제로 앉았을 때(아래 settle 처리) 다시 걸린다 — 그래야 '넘어간 장' 기준으로 센다.
 function _heroRestartTimer() {
-  clearInterval(_heroTimer);
-  _heroTimer = setInterval(() => {
+  clearTimeout(_heroTimer);
+  _heroTimer = setTimeout(() => {
     const el = _heroEl();
     // 삶의 예배 탭이 화면에 없으면 넘기지 않는다 — 돌아왔을 때 엉뚱한 장이 떠 있지 않게.
-    if (!el || !el.offsetParent || !el.clientWidth) return;
+    if (!el || !el.offsetParent || !el.clientWidth) { _heroRestartTimer(); return; }
     _heroWrap();                                          // 끝에 걸쳐 있으면 먼저 안쪽으로
     el.scrollTo({ left: el.scrollLeft + el.clientWidth, behavior: 'smooth' });   // 항상 앞으로
-  }, HERO_AUTO_MS);
+  }, HERO_AUTO_MS[_heroIndex()] || 30000);
 }
 
 (function initHeroSlides() {
@@ -4324,7 +4342,10 @@ function _heroRestartTimer() {
   el.addEventListener('scroll', () => {
     _heroSyncDots();
     clearTimeout(_heroSettleT);
-    _heroSettleT = setTimeout(_heroWrap, 120);    // 멈춘 뒤에 옮겨야 스크롤을 끊지 않는다
+    _heroSettleT = setTimeout(() => {             // 멈춘 뒤에 옮겨야 스크롤을 끊지 않는다
+      _heroWrap();
+      _heroRestartTimer();                        // 앉은 장 기준으로 자동 전환 시간을 다시 센다
+    }, 160);
   }, { passive: true });
   // 손으로 미는 중에는 자동 전환이 끼어들지 않게 타이머를 미룬다
   el.addEventListener('pointerdown', _heroRestartTimer);
