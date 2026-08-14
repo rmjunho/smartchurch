@@ -6807,7 +6807,8 @@ function renderTodos() {
       }
 
       html += `
-        <div class="todo-item${done?' done':''}" onclick="toggleTodo('${t.id}')">
+        <div class="todo-item${done?' done':''}" onclick="toggleTodo('${t.id}')"
+             data-tid="${escHtml(t.id)}" data-cat="${escHtml(t.cat || '')}">
           <div class="todo-cb">${ckMark}</div>
           <span class="todo-cat-tag">${escHtml(t.cat)}</span>
           <span class="todo-txt">${escHtml(t.text)}</span>
@@ -6819,6 +6820,98 @@ function renderTodos() {
     });
   });
   container.innerHTML = html;
+  _todoBindDrag();
+}
+
+// ── 할 일 순서 바꾸기 (길게 눌러 끌기) ──
+// 배열 순서가 곧 화면 순서라(renderTodos 가 카테고리로 묶어 순서대로 그린다) 화면에서
+// 옮긴 결과를 그대로 배열에 되돌려 저장하면 된다.
+// 카테고리를 넘나드는 이동은 막는다 — 그건 t.cat 을 바꾸는 일이고 ✎(수정)에 이미 있다.
+var TODO_DRAG_MS = 450;
+var _todoDrag = { timer: null, el: null, cat: '', y: 0, active: false };
+var _todoDragged = false;   // 끌어 놓은 직후의 click 을 '완료 토글' 로 오해하지 않게
+
+function _todoCancelDrag() {
+  clearTimeout(_todoDrag.timer);
+  if (_todoDrag.el) _todoDrag.el.classList.remove('dragging');
+  document.getElementById('todo-list')?.classList.remove('reordering');
+  _todoDrag.timer = null; _todoDrag.el = null; _todoDrag.active = false;
+}
+
+// 화면에 놓인 순서를 읽어 저장한다. 카테고리 제목은 .todo-item 이 아니라 건너뛴다.
+function _todoCommitOrder() {
+  const ids = [...document.querySelectorAll('#todo-list .todo-item')].map(el => el.dataset.tid);
+  const todos = getDayTodos();
+  const byId = {};
+  todos.forEach(t => { byId[t.id] = t; });
+  const ordered = [];
+  ids.forEach(id => { if (byId[id] && ordered.indexOf(byId[id]) < 0) ordered.push(byId[id]); });
+  // 화면에 없던 항목(카테고리가 지워진 것 등)은 뒤에 붙여 잃지 않는다
+  todos.forEach(t => { if (ordered.indexOf(t) < 0) ordered.push(t); });
+  saveDayTodos(ordered);
+  renderTodos();
+}
+
+// 리스너는 항목이 아니라 컨테이너에 건다 — 항목은 렌더할 때마다 새로 그려진다.
+function _todoBindDrag() {
+  const list = document.getElementById('todo-list');
+  if (!list || list.dataset.dragBound) return;
+  list.dataset.dragBound = '1';
+
+  list.addEventListener('pointerdown', e => {
+    const el = e.target.closest('.todo-item');
+    // 체크·진행도·버튼 위에서 시작한 것은 끌기가 아니다
+    if (!el || e.target.closest('button, input, .todo-edit, .todo-del, .sub-cb, .todo-cb')) return;
+    _todoCancelDrag();
+    _todoDrag.el = el;
+    _todoDrag.cat = el.dataset.cat || '';
+    _todoDrag.y = e.clientY;
+    _todoDrag.timer = setTimeout(() => {
+      _todoDrag.active = true;
+      el.classList.add('dragging');
+      list.classList.add('reordering');
+      if (navigator.vibrate) navigator.vibrate(15);
+    }, TODO_DRAG_MS);
+  });
+
+  list.addEventListener('pointermove', e => {
+    if (!_todoDrag.el) return;
+    if (!_todoDrag.active) {
+      // 아직 길게 누르기 전에 손가락이 움직였다 = 목록을 넘기려는 것 → 끌기 취소
+      if (Math.abs(e.clientY - _todoDrag.y) > 10) _todoCancelDrag();
+      return;
+    }
+    const under = document.elementFromPoint(e.clientX, e.clientY);
+    const over  = under && under.closest('.todo-item');
+    if (!over || over === _todoDrag.el) return;
+    if ((over.dataset.cat || '') !== _todoDrag.cat) return;   // 다른 카테고리로는 못 옮긴다
+    const r = over.getBoundingClientRect();
+    const after = e.clientY > r.top + r.height / 2;
+    over.parentNode.insertBefore(_todoDrag.el, after ? over.nextSibling : over);
+  });
+
+  // 끄는 동안 화면이 같이 스크롤되지 않게. pointermove 의 preventDefault 로는 안 막히고
+  // touchmove 를 passive 아닌 리스너로 잡아야 한다.
+  list.addEventListener('touchmove', e => {
+    if (_todoDrag.active) e.preventDefault();
+  }, { passive: false });
+
+  const finish = () => {
+    if (!_todoDrag.el) return;
+    const moved = _todoDrag.active;
+    _todoCancelDrag();
+    if (moved) { _todoDragged = true; _todoCommitOrder(); }
+  };
+  list.addEventListener('pointerup', finish);
+  list.addEventListener('pointercancel', finish);
+
+  // 끌어 놓은 뒤 따라오는 click 을 한 번 삼킨다(안 그러면 완료 처리까지 돼 버린다)
+  list.addEventListener('click', e => {
+    if (!_todoDragged) return;
+    _todoDragged = false;
+    e.stopPropagation();
+    e.preventDefault();
+  }, true);
 }
 
 function escHtml(s) {
