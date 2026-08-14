@@ -2286,12 +2286,12 @@
     .todo-item.done .todo-txt {
       text-decoration: line-through;
     }
+    .todo-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
     /* 진행도 슬라이더(114px)나 하위 체크가 붙은 줄은 제목에 남는 자리가 거의 없다.
-       그 줄만 접어서 슬라이더·버튼을 아랫줄로 내리고 제목에 첫 줄을 통째로 준다. */
-    .todo-item.wide { flex-wrap: wrap; }
+       그 줄만 접어서 버튼 덩어리를 아랫줄로 내린다. justify-content 는 접힌 아랫줄을
+       오른쪽에 붙이려는 것 — 윗줄은 제목이 flex:1 로 남는 자리를 다 먹어 영향이 없다. */
+    .todo-item.wide { flex-wrap: wrap; justify-content: flex-end; }
     .todo-item.wide .todo-txt { min-width: 7em; }
-    .todo-item.wide .todo-progress-wrap,
-    .todo-item.wide .todo-sub-wrap { margin-left: auto; }
     .todo-progress {
       width: 48px; height: 30px;
       border-radius: 8px;
