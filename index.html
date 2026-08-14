@@ -7796,7 +7796,10 @@ function closeSubscreen() {
   _subStack = [];
   if (depth) {                     // 쌓인 히스토리 되감기 (popstate는 무시)
     _suppressPop = true;
-    try { history.go(-depth); } catch (e) { _suppressPop = false; }
+    // popstate 가 안 오는 경우가 있다(되감을 항목이 없을 때). 플래그가 켜진 채 남으면
+    // 그 다음 뒤로가기 한 번이 통째로 먹혀 두 번째 누름이 홈까지 나가버린다 → 반드시 푼다.
+    try { history.go(-depth); setTimeout(() => { _suppressPop = false; }, 300); }
+    catch (e) { _suppressPop = false; }
   }
   _closeSubscreenUI();
 }
@@ -8025,11 +8028,11 @@ function renderAppSettings() {
           <span style="font-size:12px;background:rgba(39,174,96,0.1);color:#27AE60;border-radius:6px;padding:2px 8px;font-weight:700">최신</span>
         </div>
         <div class="ss-setting-row" style="border-top:1px solid var(--border);cursor:pointer"
-          onclick="closeSubscreen();setTimeout(()=>openBoardScreen('app'),100)">
+          onclick="openBoardScreen('app')">
           <div class="ss-setting-label">업데이트 소식 보기</div><span class="sm-arrow">›</span>
         </div>
         <div class="ss-setting-row" style="border-top:1px solid var(--border);cursor:pointer"
-          onclick="closeSubscreen();setTimeout(()=>openBoardScreen('user'),100)">
+          onclick="openBoardScreen('user')">
           <div class="ss-setting-label">건의하기</div><span class="sm-arrow">›</span>
         </div>
       </div>
