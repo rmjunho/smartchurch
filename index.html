@@ -6807,10 +6807,11 @@ function renderTodos() {
       }
 
       html += `
-        <div class="todo-item${done?' done':''}" onclick="toggleTodo('${t.id}')"
+        <div class="todo-item${done?' done':''}${rightHtml?' wide':''}" onclick="toggleTodo('${t.id}')"
              data-tid="${escHtml(t.id)}" data-cat="${escHtml(t.cat || '')}">
           <div class="todo-cb">${ckMark}</div>
-          <span class="todo-cat-tag">${escHtml(t.cat)}</span>
+          <!-- 분류 태그는 뺐다 — 바로 위에 같은 분류가 헤더로 떠 있어 같은 말을 두 번
+               하는 셈이고, 그 78px 때문에 정작 제목이 한두 낱말 폭으로 짜부라졌다 -->
           <span class="todo-txt">${escHtml(t.text)}</span>
           ${rightHtml}
           ${flagBtn}
