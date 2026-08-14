@@ -176,6 +176,7 @@ function renderBoardPost() {
     <div style="font-size:12px;color:var(--muted);margin-bottom:16px;display:flex;gap:8px">
       <span>${escHtml(p.authorName||'익명')}</span>
       <span>${date}</span>
+      ${p.editedAt?'<span>(수정됨)</span>':''}
     </div>
     <!-- 본문 -->
     <div style="font-size:14px;line-height:1.9;color:#333;white-space:pre-wrap;margin-bottom:20px">${escHtml(p.content||'')}</div>
@@ -188,6 +189,15 @@ function renderBoardPost() {
              color:${liked?'#E74C3C':'var(--muted)'};font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:16px">
       ${liked?'❤️':'🤍'} 좋아요 ${(p.likes||[]).length}
     </button>`;
+
+  // 글 수정 — 작성자 본인 + 앱 관리자 (관리자 블록 밖에 둬야 작성자에게도 보인다)
+  if (isOwner || canAdmin) {
+    html += `<button onclick="openBoardPostModal('${p.type || _boardType}','${p.id}')"
+      style="width:100%;height:36px;border-radius:10px;border:1.5px solid var(--border);background:white;
+             color:var(--black);font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:10px">
+      글 수정
+    </button>`;
+  }
 
   // 관리자 전용 컨트롤
   if (canAdmin) {
@@ -245,22 +255,31 @@ function renderBoardPost() {
   return html + '</div>';
 }
 
-function openBoardPostModal(type) {
-  _boardPostModalType = type;
-  const isApp = type === 'app';
-  document.getElementById('board-post-modal-title').textContent = isApp ? '공지 작성' : '건의하기';
-  document.getElementById('bp-submit-btn').textContent = isApp ? '공지 등록' : '건의 등록';
+// editId 가 있으면 그 글을 고치는 모드 — 작성 모달을 그대로 재사용한다.
+function openBoardPostModal(type, editId) {
+  const p = editId ? getBoardPost(editId) : null;
+  if (editId && !p) { toast('글을 찾을 수 없어요'); return; }
+  _boardPostEditId    = p ? p.id : null;
+  _boardPostModalType = p ? (p.type || type) : type;
+  const isApp = _boardPostModalType === 'app';
+  document.getElementById('board-post-modal-title').textContent = p ? '글 수정' : (isApp ? '공지 작성' : '건의하기');
+  document.getElementById('bp-submit-btn').textContent = p ? '수정 완료' : (isApp ? '공지 등록' : '건의 등록');
   const cats = isApp ? BOARD_APP_CATEGORIES : BOARD_USER_CATEGORIES;
-  document.getElementById('bp-category').innerHTML = cats.map(c=>`<option value="${c}">${c}</option>`).join('');
-  document.getElementById('bp-title').value   = '';
-  document.getElementById('bp-content').value = '';
+  // 옛 글의 분류가 목록에서 빠졌을 수 있다 — 없으면 그 값을 임시로 넣어 원래 분류가 날아가지 않게
+  const list = (p && p.category && !cats.includes(p.category)) ? [p.category, ...cats] : cats;
+  document.getElementById('bp-category').innerHTML = list.map(c=>`<option value="${escHtml(c)}">${escHtml(c)}</option>`).join('');
+  if (p && p.category) document.getElementById('bp-category').value = p.category;
+  document.getElementById('bp-title').value   = p ? (p.title   || '') : '';
+  document.getElementById('bp-content').value = p ? (p.content || '') : '';
   const pinRow = document.getElementById('bp-pin-row');
   if (pinRow) pinRow.style.display = isApp && me.isAppAdmin ? 'block' : 'none';
+  const pinCb = document.getElementById('bp-pinned');
+  if (pinCb) pinCb.checked = !!(p && p.pinned);
   // 비공개 토글 — 건의함(user)에서만 노출
   const privRow = document.getElementById('bp-private-row');
   if (privRow) privRow.style.display = isApp ? 'none' : 'block';
   const privCb = document.getElementById('bp-private');
-  if (privCb) privCb.checked = false;
+  if (privCb) privCb.checked = !!(p && p.isPrivate);
   document.getElementById('modal-board-post').classList.add('open');
 }
 
@@ -277,6 +296,29 @@ async function submitBoardPost() {
   if (!content) { toast('내용을 입력해 주세요'); return; }
   const pinned  = _boardPostModalType === 'app' && document.getElementById('bp-pinned')?.checked;
   const isPrivate = _boardPostModalType === 'user' && document.getElementById('bp-private')?.checked;
+
+  // ── 수정 모드 ── 서버가 거절하면 로컬도 건드리지 않는다(등록과 같은 이유)
+  if (_boardPostEditId) {
+    const patch = { category, title, content, editedAt: new Date().toISOString() };
+    if (_boardPostModalType === 'app')  patch.pinned    = !!pinned;
+    if (_boardPostModalType === 'user') patch.isPrivate = !!isPrivate;
+    if (window._fbReady && window._fb) {
+      try {
+        await window._fb.updateBoardPost(_boardPostEditId, patch);
+      } catch(e) {
+        console.error('게시글 수정 실패:', e);
+        toast(`수정 실패 (${e.code || e.message || e})`);
+        return;
+      }
+    }
+    const list = getBoardPosts(_boardPostModalType);
+    const cur  = list.find(x => x.id === _boardPostEditId);
+    if (cur) { Object.assign(cur, patch); saveBoardPosts(_boardPostModalType, list); }
+    closeBoardPostModal();
+    toast('글을 수정했어요');
+    openSubscreen('board-post');   // 상세로 되돌아오며 새 내용 반영
+    return;
+  }
 
   const post = {
     id: 'bp_' + uid(), type: _boardPostModalType,
