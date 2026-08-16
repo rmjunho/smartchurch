@@ -396,6 +396,57 @@ function cancelTicketFromMyEvents(eventId) {
   setTimeout(() => openSubscreen('my-events'), 200);
 }
 
+// ── 내 공동체 목록 ── 한 번이라도 몸담았던 곳을 모아 보여주고, 탭하면 그리로 옮긴다.
+// 관리자 '빠른 이동' 과 같은 모양을 일반 사용자에게도 준다. 목록의 근거는 두 가지다:
+//   memberships   — 그곳에서의 직분·등록 형태를 떠 둔 기록 (1단계)
+//   approvedChurches — 승인받은 이력. memberships 가 생기기 전부터 쌓여 있어 같이 본다.
+// 소속이 한 곳뿐이면 아무것도 그리지 않는다(빈 목록을 보여줄 이유가 없다).
+function renderMyChurchList() {
+  if (!me) return '';
+  const mem   = me.memberships || {};
+  const codes = [...new Set([...Object.keys(mem), ...(me.approvedChurches || [])])]
+                  .filter(c => c && c !== me.churchCode);
+  if (!codes.length) return '';
+
+  const card = (code, isCurrent) => {
+    const m     = mem[code] || {};
+    const name  = getChurchName(code) || m.church || code;
+    const emoji = (m.orgType && m.orgType !== 'church') ? '🏢' : '⛪';
+    // 승인받은 적이 있으면 바로 들어간다. 아니면 그때 리더 승인을 다시 받아야 한다.
+    const ok    = isPreApprovedChurch(code);
+    // escHtml 은 따옴표를 안 막는다 — onclick 문자열에 넣을 코드는 글자 종류로 자른다
+    const safe  = String(code).replace(/[^A-Za-z0-9_-]/g, '');
+    return `<div ${isCurrent ? '' : `onclick="changeChurchCode('${safe}')"`}
+      style="display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:10px;
+             background:${isCurrent ? 'var(--black)' : 'white'};
+             border:1.5px solid ${isCurrent ? 'var(--black)' : 'var(--border)'};
+             cursor:${isCurrent ? 'default' : 'pointer'}">
+      <span style="font-size:20px">${emoji}</span>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13.5px;font-weight:700;color:${isCurrent ? 'white' : 'var(--dark)'}">${escHtml(name)}</div>
+        <div style="font-size:11px;color:${isCurrent ? 'rgba(255,255,255,0.55)' : 'var(--muted)'};font-family:monospace">${escHtml(code)}</div>
+      </div>
+      ${isCurrent
+        ? '<span style="font-size:11px;color:rgba(255,255,255,0.7);font-weight:700">현재</span>'
+        : ok
+          ? '<span style="font-size:16px;color:var(--muted)">›</span>'
+          : '<span style="font-size:11px;color:#E67E22;font-weight:700">승인 필요</span>'}
+    </div>`;
+  };
+
+  return `
+    <div class="ss-section-title">내 공동체 (${codes.length + (me.churchCode ? 1 : 0)})</div>
+    <div class="ss-card">
+      <div style="padding:12px;display:flex;flex-direction:column;gap:6px">
+        ${me.churchCode ? card(me.churchCode, true) : ''}
+        ${codes.map(c => card(c, false)).join('')}
+      </div>
+      <div style="padding:0 14px 14px;font-size:12px;color:var(--muted);line-height:1.6">
+        탭하면 그 공동체로 옮겨가요. 그곳에서의 직분은 그대로 남아 있어요.
+      </div>
+    </div>`;
+}
+
 function renderChurchInfo() {
   // 교회 등록을 신청한 사람은 아직 소속 교회가 없다(승인돼야 생김) → 신청 상태를 대신 보여준다.
   const statusBadge = me.church
@@ -430,6 +481,7 @@ function renderChurchInfo() {
     <div id="church-detail-body">
       <div style="padding:24px 16px;text-align:center;color:var(--muted);font-size:13px">교회 정보 불러오는 중...</div>
     </div>
+    ${renderMyChurchList()}
     <div class="ss-section-title">교회 코드 변경</div>
     <div class="ss-card">
       <div style="padding:16px">
@@ -2711,8 +2763,9 @@ function isPreApprovedChurch(code) {
   return !!me.isAppAdmin || (me.approvedChurches || []).includes(code);
 }
 
-function changeChurchCode() {
-  const code     = (document.getElementById('new-church-code')?.value || '').trim().toUpperCase();
+// codeArg 를 주면 그 코드로 바로 옮긴다(내 공동체 목록에서 탭). 없으면 입력칸을 읽는다.
+function changeChurchCode(codeArg) {
+  const code     = (codeArg || document.getElementById('new-church-code')?.value || '').trim().toUpperCase();
   const churchName = getChurchName(code);
   if (!code)        { toast('교회 코드를 입력해 주세요'); return; }
   if (!churchName)  { toast('유효하지 않은 교회 코드예요'); return; }
@@ -2776,7 +2829,9 @@ function changeChurchCode() {
 
   updateProfileDisplay();
   initSideMenu();
-  closeSubscreen();
+  // 목록에서 탭해 옮긴 것이면 화면을 닫지 말고 다시 그린다 — 바뀐 '현재'가 보여야 한다.
+  // 같은 id 라 히스토리에는 쌓이지 않는다.
+  if (codeArg) openSubscreen('church-info'); else closeSubscreen();
 
   const msg = me.churchStatus === 'active'
     ? `${churchName}으로 이동했어요!`
