@@ -914,27 +914,27 @@ function adminSwitchChurch(code) {
   if (!me.isAppAdmin) { toast('관리자 전용 기능이에요'); return; }
 
   const name = getChurchName(code) || '';
+  // 관리자도 옮길 때마다 직분이 따라다녔다 — 교회 변경과 같은 규칙으로 떠 두고 되살린다.
+  // 교회 이름만은 스냅샷이 아니라 지금 등록된 이름을 쓴다(그 사이 이름이 바뀌었을 수 있다).
+  const prev        = typeof getMembership       === 'function' ? getMembership(code) : null;
+  const memberships = typeof snapshotMemberships === 'function' ? snapshotMemberships() : null;
+  const restored    = {};
+  if (prev) MEMBERSHIP_FIELDS.forEach(f => { if (prev[f]) restored[f] = prev[f]; });
+  const base = Object.assign({}, restored, {
+    church: name, churchCode: code, churchStatus: code ? 'active' : ''
+  });
+  if (memberships) base.memberships = memberships;
 
-  // me 객체 업데이트
-  me.church       = name;
-  me.churchCode   = code;
-  me.churchStatus = code ? 'active' : '';
+  Object.assign(me, base);   // me 객체 업데이트
 
   // localStorage 저장
   const users = DB.get('users', []);
   const u     = users.find(x => x.id === me.id);
-  if (u) {
-    u.church       = name;
-    u.churchCode   = code;
-    u.churchStatus = code ? 'active' : '';
-    DB.set('users', users);
-  }
+  if (u) { Object.assign(u, base); DB.set('users', users); }
 
   // Firestore 동기화
   if (window._fbReady && window._fb) {
-    window._fb.updateUser(me.id, {
-      church: name, churchCode: code, churchStatus: code ? 'active' : ''
-    }).catch(() => {});
+    window._fb.updateUser(me.id, base).catch(() => {});
   }
 
   if (typeof _photoCacheWarmed !== 'undefined') _photoCacheWarmed = false;

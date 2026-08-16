@@ -4064,6 +4064,12 @@ function startSelfDocWatch() {
           JSON.stringify(data.leaderPerms) !== JSON.stringify(me.leaderPerms || [])) {
         me.leaderPerms = data.leaderPerms; changed = true;
       }
+      // memberships (공동체별 소속 기록, 객체) — 위 목록은 !== 로 비교해 객체가 늘 '바뀜'이 된다.
+      // 다른 기기에서 옮긴 기록을 받아 둬야, 이 기기가 다음에 옮길 때 그걸 덮어 지우지 않는다.
+      if (data.memberships && typeof data.memberships === 'object' &&
+          JSON.stringify(data.memberships) !== JSON.stringify(me.memberships || {})) {
+        me.memberships = data.memberships; changed = true;
+      }
       _syncTodoCats(data);
       _syncTodoPrefs(data);
       _syncDrawDefaults(data);

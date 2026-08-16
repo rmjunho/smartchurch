@@ -2683,6 +2683,28 @@ function rememberApprovedChurch() {
     window._fb.updateUser(me.id, { approvedChurches: me.approvedChurches }).catch(() => {});
 }
 
+// ── 공동체별 소속 정보 (memberships) ──
+// users 문서의 공동체 칸(church/churchCode/role/…)은 하나뿐이라, 다른 공동체로 옮기면
+// 그 공동체에서의 직분·등록 형태가 덮여 사라졌다. 옮기기 직전에 지금 칸을 그대로 떠서
+// memberships[코드] 에 넣어 두고, 돌아올 때 꺼내 쓴다.
+// 활성 칸(churchCode)은 그대로 둔다 — churchCode 를 읽는 자리가 앱과 서버 규칙에 수백 곳이라
+// 여기를 다중화하면 전부 손봐야 하고, 규칙의 권한 방어까지 다시 짜야 한다.
+var MEMBERSHIP_FIELDS = ['church', 'orgType', 'role', 'registrationType'];
+
+// 지금 소속을 떠서 넣은 새 memberships 맵을 돌려준다(me 는 건드리지 않는다).
+function snapshotMemberships() {
+  const m = Object.assign({}, (me && me.memberships) || {});
+  if (!me || !me.churchCode) return m;
+  const snap = { at: new Date().toISOString(), churchStatus: me.churchStatus || '' };
+  MEMBERSHIP_FIELDS.forEach(f => { if (me[f]) snap[f] = me[f]; });
+  m[me.churchCode] = snap;
+  return m;
+}
+
+function getMembership(code) {
+  return (code && me && me.memberships && me.memberships[code]) || null;
+}
+
 // 전에 승인받은 곳이면 리더 수락 없이 바로 들어간다. 앱 관리자는 어디든 자유.
 function isPreApprovedChurch(code) {
   if (!me || !code) return false;
@@ -2696,10 +2718,16 @@ function changeChurchCode() {
   if (!churchName)  { toast('유효하지 않은 교회 코드예요'); return; }
   if (churchName === me.church) { toast('이미 소속된 교회예요'); return; }
 
+  // 전에 있던 공동체면 그때 직분·기관 종류·등록 형태를 되살린다. 처음 가는 곳이면 종전대로
+  // '개인이었을 때만' 기본값을 붙인다(다른 공동체에서 오는 사람의 직분은 건드리지 않는다).
+  const prev        = getMembership(code);
+  const memberships = snapshotMemberships();
   const wasPersonal = me.orgType === 'personal';
-  const newOrgType = getOrgTypeForChurch(code);
-  const newDefRole = getDefaultRoleFor(code, newOrgType);
-  if (wasPersonal) { me.orgType = newOrgType; me.role = newDefRole; }
+  const newOrgType  = (prev && prev.orgType) || getOrgTypeForChurch(code);
+  const newDefRole  = (prev && prev.role)    || getDefaultRoleFor(code, newOrgType);
+  const takeRole    = !!prev || wasPersonal;
+  const newRegType  = (prev && prev.registrationType) || (wasPersonal ? 'newfamily' : 'regular');
+  if (takeRole) { me.orgType = newOrgType; me.role = newDefRole; }
 
   // 리더 권한은 그 교회에서 받은 것이다. 교회를 옮기면 내려놓고 새 교회에서 다시 받는다.
   // 예전에는 churchStatus 만 pending 으로 돌리고 leaderStatus/leaderPerms 를 그대로 둬서,
@@ -2715,8 +2743,9 @@ function changeChurchCode() {
     u.church           = churchName;
     u.churchCode       = code;
     u.churchStatus     = isPreApprovedChurch(code) ? 'active' : 'pending';
-    u.registrationType = wasPersonal ? 'newfamily' : 'regular';
-    if (wasPersonal) { u.orgType = newOrgType; u.role = newDefRole; }
+    u.registrationType = newRegType;
+    u.memberships      = memberships;
+    if (takeRole) { u.orgType = newOrgType; u.role = newDefRole; }
     // 'pending' 으로 둔다 — 규칙이 본인 수정으로는 leaderStatus 를 'pending' 까지만 허용하고,
     // 새 교회 관리자에게 다시 신청이 걸리는 편이 권한을 조용히 없애는 것보다 낫다.
     if (losesLeader) { u.leaderStatus = 'pending'; u.leaderPerms = []; u.isAppointedLeader = false; }
@@ -2724,13 +2753,15 @@ function changeChurchCode() {
     me.church           = churchName;
     me.churchCode       = code;
     me.churchStatus     = isPreApprovedChurch(code) ? 'active' : 'pending';
-    me.registrationType = wasPersonal ? 'newfamily' : 'regular';
+    me.registrationType = newRegType;
+    me.memberships      = memberships;
     if (losesLeader) { me.leaderStatus = 'pending'; me.leaderPerms = []; me.isAppointedLeader = false; }
   }
 
   if (window._fbReady && window._fb) {
-    const update = { church: me.church, churchCode: me.churchCode, churchStatus: me.churchStatus, registrationType: me.registrationType };
-    if (wasPersonal) { update.orgType = newOrgType; update.role = newDefRole; }
+    const update = { church: me.church, churchCode: me.churchCode, churchStatus: me.churchStatus,
+                     registrationType: me.registrationType, memberships };
+    if (takeRole) { update.orgType = newOrgType; update.role = newDefRole; }
     if (losesLeader) { update.leaderStatus = 'pending'; update.leaderPerms = []; update.isAppointedLeader = false; }
     window._fb.updateUser(me.id, update).catch(() => {});
     // 사진 문서의 churchCode 도 갱신 → 새 교회 교인 목록에 사진 노출
