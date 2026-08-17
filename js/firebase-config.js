@@ -58,6 +58,19 @@ window._fb = {
       // 교회별 사용자
       getUsersByChurch: (churchCode) =>
         getDocs(query(collection(fbDb, 'users'), where('churchCode','==',churchCode))),
+      // ── 공동체 가입 신청 (joinRequests/{uid}_{code}) ──
+      // 이미 다른 공동체에 소속된 채로 신청하려면 신청서가 users 문서 밖에 있어야 한다.
+      // users 의 공동체 칸은 하나뿐이라, 거기에 pending 을 쓰면 원래 소속이 덮여 사라진다.
+      setJoinRequest:    (id, data) => setDoc(doc(fbDb, 'joinRequests', id), data, { merge: true }),
+      getJoinRequest:    (id)       => getDoc(doc(fbDb, 'joinRequests', id)),
+      updateJoinRequest: (id, data) => updateDoc(doc(fbDb, 'joinRequests', id), data),
+      deleteJoinRequest: (id)       => deleteDoc(doc(fbDb, 'joinRequests', id)),
+      // 리더용 — 우리 공동체로 온 신청서
+      getJoinRequestsFor: (churchCode) =>
+        getDocs(query(collection(fbDb, 'joinRequests'), where('churchCode','==',churchCode))),
+      // 본인용 — 내가 낸 신청서(승인됐는지 보려고)
+      getMyJoinRequests: (userId) =>
+        getDocs(query(collection(fbDb, 'joinRequests'), where('userId','==',userId))),
       // 챌린지 저장/삭제
       setChallenge:    (id, data) => setDoc(doc(fbDb, 'challenges', id), data, { merge: true }),
       deleteChallenge: (id)       => deleteDoc(doc(fbDb, 'challenges', id)),

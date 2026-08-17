@@ -396,6 +396,119 @@ function cancelTicketFromMyEvents(eventId) {
   setTimeout(() => openSubscreen('my-events'), 200);
 }
 
+// ── 공동체 가입 신청 (joinRequests/{uid}_{code}) ──
+// users 의 공동체 칸은 하나뿐이라, 거기에 pending 을 쓰면 원래 소속이 덮여 사라졌다.
+// 그래서 신청서를 users 밖에 둔다 — 지금 공동체를 그대로 쓰면서 다른 곳에 신청할 수 있다.
+// 승인되면 서버 규칙(joinApproved)이 그 문서를 직접 읽고 입장을 허락한다.
+var _myJoinReqs        = null;    // 내가 낸 신청서 (null = 아직 안 읽음)
+var _myJoinReqsLoading = false;
+var _joinReqsForUs     = [];      // 우리 공동체로 온 신청서 (리더 화면)
+
+function joinReqId(code) { return me.id + '_' + code; }
+
+function myJoinStatus(code) {
+  const r = (_myJoinReqs || []).find(x => x.churchCode === code);
+  return r ? (r.status || 'pending') : '';
+}
+
+// 화면에 들어올 때 한 번 읽고 다시 그린다. 게시판과 같은 이유로 '읽었음' 플래그가 필요하다 —
+// 없으면 읽기 → 재렌더 → 읽기 가 끝없이 돈다.
+async function loadMyJoinRequests() {
+  if (_myJoinReqsLoading || _myJoinReqs !== null) return;
+  if (!me || !window._fbReady || !window._fb || !window._fb.getMyJoinRequests) return;
+  _myJoinReqsLoading = true;
+  try {
+    const snap = await window._fb.getMyJoinRequests(me.id);
+    _myJoinReqs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  } catch (e) {
+    _myJoinReqs = [];            // 권한/네트워크 실패 — 목록만 비워 두고 화면은 계속 쓴다
+  }
+  _myJoinReqsLoading = false;
+  const ss = document.getElementById('subscreen');
+  if (ss && ss.dataset.current === 'church-info' && ss.classList.contains('open'))
+    openSubscreen('church-info');
+}
+
+// 코드로 공동체에 들어가기. 소속이 없거나 이미 허락받은 곳이면 바로 옮기고,
+// 그 밖에는 지금 소속을 그대로 둔 채 신청서만 낸다.
+async function requestJoinChurch(codeArg) {
+  const code       = (codeArg || document.getElementById('new-church-code')?.value || '').trim().toUpperCase();
+  const churchName = getChurchName(code);
+  if (!code)                  { toast('교회 코드를 입력해 주세요'); return; }
+  if (!churchName)            { toast('유효하지 않은 교회 코드예요'); return; }
+  if (code === me.churchCode) { toast('이미 있는 공동체예요'); return; }
+
+  // 승인 절차가 필요 없는 경우 — 종전 경로 그대로 바로 옮긴다.
+  //  · 아직 정착한 공동체가 없다 (개인 / 첫 가입 / 승인 대기 중)
+  //  · 전에 승인받았던 곳이거나, 이번 신청이 이미 승인됐다
+  const settled = !!me.churchCode && me.churchStatus === 'active';
+  if (!settled || isPreApprovedChurch(code) || myJoinStatus(code) === 'approved') {
+    changeChurchCode(code);
+    return;
+  }
+
+  if (myJoinStatus(code) === 'pending') { toast(`"${churchName}" 승인을 기다리는 중이에요`); return; }
+
+  if (!window._fbReady || !window._fb || !window._fb.setJoinRequest) {
+    toast('연결 후 다시 시도해 주세요'); return;
+  }
+  const req = {
+    userId:     me.id,
+    userName:   me.name || '',
+    churchCode: code,
+    churchName: churchName,
+    fromChurch: me.church || '',      // 리더가 어디서 오는 사람인지 보고 판단하게
+    role:       me.role || '',
+    orgType:    getOrgTypeForChurch(code),
+    status:     'pending',            // 규칙이 'pending' 으로 시작하는 신청서만 받는다
+    createdAt:  new Date().toISOString()
+  };
+  try {
+    await window._fb.setJoinRequest(joinReqId(code), req);
+  } catch (e) {
+    if (window._fbErr) window._fbErr('공동체 가입 신청', e);
+    toast('신청 실패 — 잠시 후 다시 시도해 주세요');
+    return;
+  }
+  _myJoinReqs = (_myJoinReqs || []).filter(r => r.churchCode !== code).concat([{ id: joinReqId(code), ...req }]);
+  toast(`"${churchName}"에 가입을 신청했어요! 지금 공동체는 그대로예요`);
+  openSubscreen('church-info');
+}
+
+async function cancelJoinRequest(code) {
+  if (!window._fbReady || !window._fb) return;
+  try { await window._fb.deleteJoinRequest(joinReqId(code)); } catch (e) { toast('취소 실패'); return; }
+  _myJoinReqs = (_myJoinReqs || []).filter(r => r.churchCode !== code);
+  toast('신청을 취소했어요');
+  openSubscreen('church-info');
+}
+
+// ── 리더: 우리 공동체로 온 신청 처리 ──
+// 승인은 신청서에 도장만 찍는다. 실제 입장은 본인이 '내 공동체'에서 옮겨올 때 일어나고,
+// 그때 서버 규칙이 이 도장을 직접 확인한다 — 리더가 남의 users 문서를 쓸 필요가 없다.
+async function decideJoinRequest(userId, code, approve) {
+  if (!(isLeader() || hasLeaderPerm('approve') || me.isAppAdmin)) { toast('권한이 없어요'); return; }
+  if (userId === me.id) { toast('본인의 신청은 승인할 수 없습니다'); return; }
+  try {
+    await window._fb.updateJoinRequest(userId + '_' + code, {
+      status:    approve ? 'approved' : 'rejected',
+      decidedAt: new Date().toISOString(),
+      decidedBy: me.id
+    });
+  } catch (e) {
+    if (window._fbErr) window._fbErr('가입 신청 처리', e);
+    toast('처리 실패 — 잠시 후 다시 시도해 주세요');
+    return;
+  }
+  const r = _joinReqsForUs.find(x => x.id === userId + '_' + code);
+  if (r) r.status = approve ? 'approved' : 'rejected';
+  toast(approve ? '가입을 승인했어요' : '가입 신청을 거절했어요');
+  const cur = document.getElementById('subscreen')?.dataset?.current;
+  if (cur) setTimeout(() => openSubscreen(cur), 150);
+}
+function approveJoinRequest(userId, code) { decideJoinRequest(userId, code, true);  }
+function rejectJoinRequest(userId, code)  { decideJoinRequest(userId, code, false); }
+
 // ── 내 공동체 목록 ── 한 번이라도 몸담았던 곳을 모아 보여주고, 탭하면 그리로 옮긴다.
 // 관리자 '빠른 이동' 과 같은 모양을 일반 사용자에게도 준다. 목록의 근거는 두 가지다:
 //   memberships   — 그곳에서의 직분·등록 형태를 떠 둔 기록 (1단계)
@@ -404,19 +517,32 @@ function cancelTicketFromMyEvents(eventId) {
 function renderMyChurchList() {
   if (!me) return '';
   const mem   = me.memberships || {};
-  const codes = [...new Set([...Object.keys(mem), ...(me.approvedChurches || [])])]
+  const codes = [...new Set([...Object.keys(mem), ...(me.approvedChurches || []),
+                             ...(_myJoinReqs || []).map(r => r.churchCode)])]
                   .filter(c => c && c !== me.churchCode);
   if (!codes.length) return '';
 
   const card = (code, isCurrent) => {
     const m     = mem[code] || {};
-    const name  = getChurchName(code) || m.church || code;
+    const req   = (_myJoinReqs || []).find(r => r.churchCode === code);
+    const name  = getChurchName(code) || m.church || (req && req.churchName) || code;
     const emoji = (m.orgType && m.orgType !== 'church') ? '🏢' : '⛪';
-    // 승인받은 적이 있으면 바로 들어간다. 아니면 그때 리더 승인을 다시 받아야 한다.
+    const st    = myJoinStatus(code);
+    // 승인받은 적이 있거나 이번 신청이 승인됐으면 탭해서 바로 들어간다(둘 다 여기서 본다).
     const ok    = isPreApprovedChurch(code);
     // escHtml 은 따옴표를 안 막는다 — onclick 문자열에 넣을 코드는 글자 종류로 자른다
     const safe  = String(code).replace(/[^A-Za-z0-9_-]/g, '');
-    return `<div ${isCurrent ? '' : `onclick="changeChurchCode('${safe}')"`}
+    const tag   =
+      isCurrent           ? '<span style="font-size:11px;color:rgba(255,255,255,0.7);font-weight:700">현재</span>' :
+      ok                  ? `<span style="font-size:16px;color:var(--muted)">›</span>` :
+      st === 'pending'    ? '<span style="font-size:11px;color:#E67E22;font-weight:700">승인 대기</span>' :
+      st === 'rejected'   ? '<span style="font-size:11px;color:#C0392B;font-weight:700">거절됨</span>' :
+                            '<span style="font-size:11px;color:var(--muted);font-weight:700">승인 필요</span>';
+    // 대기·거절 중인 곳은 눌러도 못 들어간다 — 신청을 물릴 수 있게만 해 준다.
+    const onclick = isCurrent ? ''
+      : (st === 'pending' || st === 'rejected') ? `onclick="cancelJoinRequest('${safe}')"`
+      : `onclick="requestJoinChurch('${safe}')"`;
+    return `<div ${onclick}
       style="display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:10px;
              background:${isCurrent ? 'var(--black)' : 'white'};
              border:1.5px solid ${isCurrent ? 'var(--black)' : 'var(--border)'};
@@ -426,11 +552,7 @@ function renderMyChurchList() {
         <div style="font-size:13.5px;font-weight:700;color:${isCurrent ? 'white' : 'var(--dark)'}">${escHtml(name)}</div>
         <div style="font-size:11px;color:${isCurrent ? 'rgba(255,255,255,0.55)' : 'var(--muted)'};font-family:monospace">${escHtml(code)}</div>
       </div>
-      ${isCurrent
-        ? '<span style="font-size:11px;color:rgba(255,255,255,0.7);font-weight:700">현재</span>'
-        : ok
-          ? '<span style="font-size:16px;color:var(--muted)">›</span>'
-          : '<span style="font-size:11px;color:#E67E22;font-weight:700">승인 필요</span>'}
+      ${tag}
     </div>`;
   };
 
@@ -442,12 +564,14 @@ function renderMyChurchList() {
         ${codes.map(c => card(c, false)).join('')}
       </div>
       <div style="padding:0 14px 14px;font-size:12px;color:var(--muted);line-height:1.6">
-        탭하면 그 공동체로 옮겨가요. 그곳에서의 직분은 그대로 남아 있어요.
+        탭하면 그 공동체로 옮겨가요. 그곳에서의 직분은 그대로 남아 있어요.<br>
+        승인 대기·거절 중인 곳을 누르면 신청을 취소해요.
       </div>
     </div>`;
 }
 
 function renderChurchInfo() {
+  loadMyJoinRequests();   // 내가 낸 신청서 — 다 읽으면 이 화면을 한 번 다시 그린다
   // 교회 등록을 신청한 사람은 아직 소속 교회가 없다(승인돼야 생김) → 신청 상태를 대신 보여준다.
   const statusBadge = me.church
     ? (me.churchStatus === 'pending'
@@ -482,7 +606,7 @@ function renderChurchInfo() {
       <div style="padding:24px 16px;text-align:center;color:var(--muted);font-size:13px">교회 정보 불러오는 중...</div>
     </div>
     ${renderMyChurchList()}
-    <div class="ss-section-title">교회 코드 변경</div>
+    <div class="ss-section-title">공동체 추가 · 코드로 들어가기</div>
     <div class="ss-card">
       <div style="padding:16px">
         <div class="form-group">
@@ -491,9 +615,10 @@ function renderChurchInfo() {
                  placeholder="예: SC0001" style="text-transform:uppercase"
                  oninput="this.value=this.value.toUpperCase()">
         </div>
-        <button class="btn-confirm" style="width:100%" onclick="changeChurchCode()">교회 변경하기</button>
+        <button class="btn-confirm" style="width:100%" onclick="requestJoinChurch()">공동체 추가하기</button>
         <div style="font-size:12px;color:var(--muted);margin-top:10px;text-align:center;line-height:1.6">
-          교회에서 받은 코드를 입력하세요<br>처음 가는 곳은 리더 승인을 받아야 정식 교인이 돼요<br>전에 승인받았던 곳은 바로 들어가요
+          교회·기관에서 받은 코드를 입력하세요<br>처음 가는 곳은 그곳 리더의 승인을 받아야 해요<br>
+          <b>승인을 기다리는 동안에도 지금 공동체는 그대로예요</b><br>전에 승인받았던 곳은 바로 들어가요
         </div>
       </div>
     </div>
@@ -1090,6 +1215,17 @@ async function loadMembersScreenData() {
 
   allUsers = allUsers.filter(u => !u.deleted);   // 삭제된 계정 제외
 
+  // 다른 공동체에 소속된 채로 낸 가입 신청 — users 문서에는 안 남으므로 따로 읽는다.
+  // (그 사람의 churchCode 는 아직 원래 공동체라 위 교인 조회에 잡히지 않는다)
+  _joinReqsForUs = [];
+  try {
+    if (window._fbReady && window._fb && window._fb.getJoinRequestsFor && me.churchCode) {
+      const rs = await window._fb.getJoinRequestsFor(me.churchCode);
+      _joinReqsForUs = rs.docs.map(d => ({ id: d.id, ...d.data() }))
+                              .filter(r => (r.status || 'pending') === 'pending');
+    }
+  } catch (e) { /* 권한 없음 등 — 신청 목록만 비운다 */ }
+
   // 로컬 전용 플래그(isAppAdmin)만 보존 — 최신 Firestore 값이 우선 (이전: 로컬이 원격을 덮어씀)
   const localUsers = DB.get('users', []);
   allUsers = allUsers.map(u => {
@@ -1139,7 +1275,8 @@ async function ensureMemberPhones(users) {
 function renderMembersScreenHtml(allUsers) {
   const minorPending  = allUsers.filter(u => u.status === 'pending');
   const churchPending = allUsers.filter(u => u.status !== 'pending' && u.churchStatus === 'pending');
-  const pending       = [...churchPending, ...minorPending];
+  const joinReqs      = _joinReqsForUs || [];
+  const pending       = [...churchPending, ...minorPending, ...joinReqs];
   const active        = allUsers.filter(u =>
     u.status !== 'pending' && u.status !== 'rejected' && u.churchStatus !== 'pending');
   const orgType = getOrgTypeForChurch(me.churchCode);
@@ -1273,6 +1410,42 @@ function renderMembersScreenHtml(allUsers) {
               </button>
             </div>` : `<div style="font-size:12px;color:var(--muted);text-align:center;padding:6px 0">
               ${isSelf ? '본인의 가입 신청은 승인할 수 없습니다' : '승인 권한이 없어요 — 담당 리더에게 문의하세요'}
+            </div>`}
+          </div>`;
+      });
+      html += `</div>`;
+    }
+    // 다른 공동체에서 온 가입 신청 — 아직 우리 교인이 아니라 users 목록에 없다.
+    // 승인은 신청서에 도장만 찍고, 실제 입장은 본인이 '내 공동체'에서 옮겨오며 일어난다.
+    if (joinReqs.length) {
+      const canApproveJoin = isLeader() || hasLeaderPerm('approve');
+      html += `<div class="ss-section-title">다른 공동체에서 온 신청 (${joinReqs.length}명)</div>
+      <div class="ss-card">`;
+      joinReqs.forEach(r => {
+        const isSelf = r.userId === me.id;
+        const safe   = String(r.churchCode || '').replace(/[^A-Za-z0-9_-]/g, '');
+        const uidSafe= String(r.userId || '').replace(/[^A-Za-z0-9_-]/g, '');
+        html += `
+          <div style="padding:14px 16px;border-bottom:1px solid var(--border)">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+              <div class="member-avatar">🙋</div>
+              <div>
+                <div class="member-name">${escHtml(r.userName || '이름 없음')}
+                  <span style="font-size:11px;background:rgba(155,89,182,0.12);color:#8E44AD;
+                        border-radius:6px;padding:2px 7px;font-weight:700;margin-left:6px">공동체 추가</span>
+                </div>
+                <div class="member-role">${escHtml(r.fromChurch || '소속 없음')}에서 · 신청일 ${(r.createdAt||'').split('T')[0]}</div>
+              </div>
+            </div>
+            ${(canApproveJoin && !isSelf) ? `<div style="display:flex;gap:8px">
+              <button onclick="approveJoinRequest('${uidSafe}','${safe}')"
+                style="flex:1;height:42px;border:none;border-radius:10px;background:var(--black);
+                       color:white;font-size:13.5px;font-weight:700;cursor:pointer;font-family:inherit">가입 승인</button>
+              <button onclick="rejectJoinRequest('${uidSafe}','${safe}')"
+                style="flex:1;height:42px;border:none;border-radius:10px;background:#FBE5E5;
+                       color:#C0392B;font-size:13.5px;font-weight:700;cursor:pointer;font-family:inherit">거절</button>
+            </div>` : `<div style="font-size:12px;color:var(--muted);text-align:center;padding:6px 0">
+              ${isSelf ? '본인의 신청은 승인할 수 없습니다' : '승인 권한이 없어요 — 담당 리더에게 문의하세요'}
             </div>`}
           </div>`;
       });
@@ -2757,10 +2930,15 @@ function getMembership(code) {
   return (code && me && me.memberships && me.memberships[code]) || null;
 }
 
-// 전에 승인받은 곳이면 리더 수락 없이 바로 들어간다. 앱 관리자는 어디든 자유.
+// 이미 허락받은 곳이면 리더 수락을 다시 기다리지 않고 바로 들어간다. 앱 관리자는 어디든 자유.
+// 판정 근거는 서버 규칙과 같은 두 가지여야 한다 — approvedChurches(전에 승인받음) 와
+// 승인된 가입 신청서(joinApproved). 여기가 규칙보다 좁으면 서버는 받아주는데 앱이 혼자
+// '승인 대기' 로 들어가 앉는다(교인 목록·채팅이 안 열린 채로).
 function isPreApprovedChurch(code) {
   if (!me || !code) return false;
-  return !!me.isAppAdmin || (me.approvedChurches || []).includes(code);
+  return !!me.isAppAdmin
+      || (me.approvedChurches || []).includes(code)
+      || myJoinStatus(code) === 'approved';
 }
 
 // codeArg 를 주면 그 코드로 바로 옮긴다(내 공동체 목록에서 탭). 없으면 입력칸을 읽는다.

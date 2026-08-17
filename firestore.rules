@@ -73,7 +73,10 @@ service cloud.firestore {
               || resource.data.get('approvedChurches', []).hasAny([request.resource.data.get('churchCode', '')])
               // 초대 코드로 입장. 코드를 아는 것이 곧 승인이다(목록 조회는 아래에서 막았다).
               || invitedTo(request.resource.data.get('joinedViaCode', ''),
-                           request.resource.data.get('churchCode', '')))
+                           request.resource.data.get('churchCode', ''))
+              // 그 공동체 리더가 승인한 신청서가 있으면 입장. 원래 소속을 유지한 채 신청할 수
+              // 있게 하려고 신청서를 users 밖(joinRequests)으로 뺐고, 그 결과가 여기로 들어온다.
+              || joinApproved(request.resource.data.get('churchCode', '')))
           // 승인 이력은 '지금 활성인 그 교회'만 덧붙일 수 있다. 아니면 위의 '돌아오기'가
           // 아무 교회나 적어 넣을 수 있는 무한 통행증이 된다.
           && (request.resource.data.get('approvedChurches', []) == resource.data.get('approvedChurches', [])
@@ -81,6 +84,24 @@ service cloud.firestore {
                   && request.resource.data.get('approvedChurches', [])
                        .hasOnly(resource.data.get('approvedChurches', [])
                                   .concat([resource.data.get('churchCode', '')]))));
+    }
+
+    // 그 공동체 리더가 실제로 승인한 신청서가 서버에 있는지 직접 확인한다.
+    // 초대 코드(invitedTo)와 같은 모양 — 이번 요청에 실려 온 값이 아니라 이미 저장된 문서만 본다.
+    // 신청서 id 가 uid_코드 로 고정이라 남의 승인서를 가리킬 수 없다.
+    function joinApproved(code) {
+      return code != ''
+          && exists(/databases/$(database)/documents/joinRequests/$(uid() + '_' + code))
+          && get(/databases/$(database)/documents/joinRequests/$(uid() + '_' + code)).data.get('status', '') == 'approved';
+    }
+
+    // 가입 신청을 처리할 수 있는 사람 — 그 공동체의 리더/가입승인 임명자, 또는 앱 관리자.
+    // 아래 users 수정 규칙과 같은 기준이다.
+    function canApproveFor(code) {
+      return signedIn() && hasProfile() && (
+        isAdmin() || ((isLeader() || hasPerm('approve') || hasPerm('newfamily'))
+                      && profile().churchCode == code)
+      );
     }
 
     // 초대 코드를 실제로 들고 있는지 서버가 직접 확인한다. 코드 문서의 churchCode 와
@@ -114,6 +135,27 @@ service cloud.firestore {
                        && resource.data.churchCode == profile().churchCode)
                     );
       allow delete: if signedIn() && (uid() == userId || isAdmin());
+    }
+
+    // ── 공동체 가입 신청 (joinRequests/{uid}_{code}) ──
+    // users 의 공동체 칸은 하나뿐이라, 거기에 pending 을 쓰면 원래 소속이 덮여 사라진다.
+    // 그래서 신청서를 밖으로 뺐다. 승인 결과는 위 joinApproved() 가 읽어 입장을 허락한다.
+    // id 를 uid_코드 로 못박아 남의 이름으로 신청서를 만들 수 없게 한다.
+    match /joinRequests/{reqId} {
+      allow read:   if signedIn() && (resource.data.userId == uid()
+                                      || canApproveFor(resource.data.get('churchCode', '')));
+      allow create: if signedIn()
+                    && request.resource.data.userId == uid()
+                    && reqId == uid() + '_' + request.resource.data.get('churchCode', '')
+                    // 스스로 승인된 신청서를 만들어 입장하는 것을 막는다 — 시작은 늘 'pending'.
+                    && request.resource.data.get('status', '') == 'pending';
+      // 결정은 그 공동체 리더만. 본인은 취소(삭제)만 할 수 있다.
+      allow update: if signedIn()
+                    && canApproveFor(resource.data.get('churchCode', ''))
+                    && request.resource.data.userId     == resource.data.userId
+                    && request.resource.data.churchCode == resource.data.churchCode;
+      allow delete: if signedIn() && (resource.data.userId == uid()
+                                      || canApproveFor(resource.data.get('churchCode', '')));
     }
 
     // ── 프로필 사진 (문서 ID = uid) ──

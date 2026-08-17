@@ -7837,6 +7837,9 @@ function _closeSubscreenUI() {
   el.dataset.current = ''; // 현재 화면 초기화
   _boardLoading = false;   // 게시판 로딩 플래그 리셋
   _boardLoaded  = '';
+  // 가입 신청 목록도 다시 읽게 한다 — 나갔다 들어오면 승인 여부가 갱신돼야 한다.
+  // 렌더 중에 비우면 읽기 → 재렌더 → 읽기 로 끝없이 돈다(그래서 닫을 때 비운다).
+  if (typeof _myJoinReqs !== 'undefined') _myJoinReqs = null;
 }
 
 function renderSubscreenContent(id) {
