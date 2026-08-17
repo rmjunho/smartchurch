@@ -303,6 +303,9 @@ function openBoardPostModal(type, editId) {
     }).catch(() => {});
   }
   document.getElementById('modal-board-post').classList.add('open');
+  // 열릴 때 내용 높이를 맞춘다 — 글 수정으로 긴 글을 불러오면 5줄에 잘린 채 열렸다.
+  // 모달이 화면에 붙은 뒤라야 scrollHeight 가 제대로 나온다.
+  setTimeout(() => autoGrow(document.getElementById('bp-content')), 30);
 }
 
 // ── 게시글 첨부 사진 ──

@@ -2162,8 +2162,11 @@
       </div>
       <div class="form-group">
         <label class="form-label">내용 <span style="color:#E74C3C">*</span></label>
-        <textarea id="bp-content" class="qt-ta" rows="5"
-          style="font-size:13px;line-height:1.8;resize:none"
+        <!-- .qt-ta 는 바인더용이라 overflow:hidden 이다(거기선 autoGrow 가 늘려 준다).
+             여기는 rows 고정이라 그대로 쓰면 긴 글이 잘리고 스크롤도 막힌다 —
+             같이 늘어나게 하고, 너무 길어지면 칸 안에서 스크롤되게 한다. -->
+        <textarea id="bp-content" class="qt-ta" rows="5" oninput="autoGrow(this)"
+          style="font-size:13px;line-height:1.8;resize:none;overflow-y:auto;max-height:45vh"
           placeholder="내용을 자유롭게 작성해 주세요"></textarea>
       </div>
       <div class="form-group">
