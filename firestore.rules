@@ -24,7 +24,29 @@ service cloud.firestore {
     // 서버에서만 막혀 "화면엔 보이는데 저장이 안 되는" 상태가 된다.
     // leaderStatus 는 selfKeepsPrivileges 가 본인 수정으로는 'pending' 까지만 허용하므로
     // 'approved' 는 앱 관리자(또는 이미 승인된 리더)가 써 준 값뿐이다 — 그 자체로 충분한 근거다.
-    function leaderApproved() { return profile().get('leaderStatus', '') == 'approved'; }
+    // 리더 권한은 공동체마다 따로 둔다 (churchLeaders/{코드}_{uid}).
+    // users 문서에 두면 칸이 하나뿐이라, 공동체를 옮길 때 반드시 지워야 했고(안 지우면 A교회
+    // 리더가 B교회 코드만 넣고 명부·전화번호를 연다) 돌아와도 되살릴 길이 없었다.
+    // 이 문서는 본인이 못 쓴다 — 그래서 권한의 근거가 될 수 있다.
+    function orgLeaderExists() {
+      return hasProfile() && profile().get('churchCode', '') != ''
+          && exists(/databases/$(database)/documents/churchLeaders/$(profile().get('churchCode', '') + '_' + uid()));
+    }
+    function orgLeaderDoc() {
+      return get(/databases/$(database)/documents/churchLeaders/$(profile().get('churchCode', '') + '_' + uid())).data;
+    }
+    function orgLeaderApproved() {
+      return orgLeaderExists() && orgLeaderDoc().get('leaderStatus', '') == 'approved';
+    }
+    function orgPerms() {
+      return orgLeaderExists() ? orgLeaderDoc().get('leaderPerms', []) : [];
+    }
+    // 레거시(users.leaderStatus)는 그대로 둔다 — 아직 이관 안 된 리더가 한 번에 권한을 잃으면
+    // 스스로 되살릴 방법이 없다(문서를 만들 권한조차 리더여야 생긴다). 공동체를 옮길 때
+    // 앱이 users.leaderStatus 를 비우므로, 이 갈래도 지금 있는 공동체에만 유효하다.
+    function leaderApproved() {
+      return profile().get('leaderStatus', '') == 'approved' || orgLeaderApproved();
+    }
     // 임명 리더(leaderPerms)는 여기 들어오지 않는다. 권한이 하나라도 있으면 리더로 쳤더니
     // '게시판' 하나만 임명받은 사람에게도 교인 전화번호와 교회 정보 수정이 열렸다.
     // 임명받은 일은 hasPerm(권한) 으로 각자 확인한다.
@@ -45,7 +67,9 @@ service cloud.firestore {
       return signedIn() && hasProfile() && (
         profile().isAppAdmin == true ||
         leaderApproved() ||
-        (profile().leaderPerms is list && p in profile().leaderPerms)
+        (profile().leaderPerms is list && p in profile().leaderPerms) ||
+        // 이 공동체에서 임명받은 권한 (공동체를 옮겨도 각자 제자리에 남는다)
+        (orgPerms() is list && p in orgPerms())
       );
     }
     // 본인 수정으로는 권한을 스스로 올릴 수 없다. role 은 계속 자유롭게 바꿀 수 있고
@@ -135,6 +159,23 @@ service cloud.firestore {
                        && resource.data.churchCode == profile().churchCode)
                     );
       allow delete: if signedIn() && (uid() == userId || isAdmin());
+    }
+
+    // ── 공동체별 리더 권한 (churchLeaders/{코드}_{uid}) ──
+    // 본인은 절대 못 쓴다 — 쓸 수 있으면 권한의 근거가 될 수 없다. 세우는 건 그 공동체의
+    // 승인된 리더이거나 앱 관리자뿐이고, 문서 id 를 코드_uid 로 못박아 남의 공동체에
+    // 자기 사람을 심지 못하게 한다(리더는 자기 공동체 코드로만 id 를 맞출 수 있다).
+    // 아직 이관 안 된 레거시 리더는 leaderApproved() 의 users 갈래로 통과해 자기 문서를
+    // 만들 수 있다 — 지금 그 공동체에서 이미 가진 권한을 옮겨 적는 것뿐이라 상승이 아니다.
+    match /churchLeaders/{leaderId} {
+      allow read: if signedIn();
+      allow create, update: if signedIn()
+                    && leaderId == request.resource.data.get('churchCode', '') + '_' + request.resource.data.get('userId', '')
+                    && (isAdmin() || (leaderApproved()
+                                      && request.resource.data.get('churchCode', '') == profile().churchCode));
+      allow delete: if signedIn()
+                    && (isAdmin() || (leaderApproved()
+                                      && resource.data.get('churchCode', '') == profile().churchCode));
     }
 
     // ── 공동체 가입 신청 (joinRequests/{uid}_{code}) ──

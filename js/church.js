@@ -396,6 +396,58 @@ function cancelTicketFromMyEvents(eventId) {
   setTimeout(() => openSubscreen('my-events'), 200);
 }
 
+// ── 공동체별 리더 권한 (churchLeaders/{코드}_{uid}) ──
+// 리더 권한이 users 문서에 있어서, 공동체를 옮길 때 반드시 비워야 했고(안 비우면 A교회 리더가
+// B교회 코드만 넣고 명부·전화번호를 연다) 돌아와도 되살릴 길이 없었다. 공동체마다 문서를 따로
+// 두면 각자 제자리에 남는다. 본인이 못 쓰는 문서라야 권한의 근거가 된다 — 규칙에서 막았다.
+// me._orgLeader / me._orgPerms 는 '지금 공동체' 의 판정 결과다(메모리 전용).
+// users 문서에 되쓰지 않는다 — 규칙이 본인 수정으로 leaderStatus:'approved' 를 막는다.
+function churchLeaderId(code, userId) { return code + '_' + userId; }
+
+async function saveChurchLeader(userId, userName, code, approved, perms) {
+  if (!code || !window._fbReady || !window._fb || !window._fb.setChurchLeader) return;
+  return window._fb.setChurchLeader(churchLeaderId(code, userId), {
+    churchCode:   code,
+    userId:       userId,
+    userName:     userName || '',
+    leaderStatus: approved ? 'approved' : '',
+    leaderPerms:  perms || [],
+    appointedBy:  me.id,
+    appointedAt:  new Date().toISOString()
+  });
+}
+
+// 지금 공동체에서 내가 무엇인지 읽어 온다. 부팅 때와 공동체를 옮길 때마다 부른다.
+async function loadMyLeadership() {
+  if (!me) return;
+  me._orgLeader = false;
+  me._orgPerms  = [];
+  const code = me.churchCode;
+  if (!code || !window._fbReady || !window._fb || !window._fb.getChurchLeader) return;
+  try {
+    const snap = await window._fb.getChurchLeader(churchLeaderId(code, me.id));
+    if (snap.exists()) {
+      const d = snap.data();
+      me._orgLeader = d.leaderStatus === 'approved';
+      me._orgPerms  = Array.isArray(d.leaderPerms) ? d.leaderPerms : [];
+    } else if (me.leaderStatus === 'approved' || (me.leaderPerms || []).length) {
+      // 이관 — 지금 이 공동체에서 이미 가진 권한을 문서로 옮겨 적는다. 권한 상승이 아니라
+      // 같은 권한을 옮기는 것뿐이다(규칙의 레거시 갈래로 통과한다). 이게 있어야 다음에
+      // 다른 공동체에 갔다 돌아와도 권한이 남는다.
+      me._orgLeader = me.leaderStatus === 'approved';
+      me._orgPerms  = me.leaderPerms || [];
+      await saveChurchLeader(me.id, me.name, code, me._orgLeader, me._orgPerms);
+    }
+  } catch (_) { /* 권한/네트워크 실패 — 레거시 판정으로 계속 쓴다 */ }
+  // 이 공동체의 리더로 이미 세워져 있는데 옮겨오며 걸린 '리더 승인 신청' 이 남아 있으면
+  // 관리자 대기 목록만 지저분해진다 — 내려놓는 건 본인도 쓸 수 있다.
+  if (me._orgLeader && me.leaderStatus === 'pending') {
+    me.leaderStatus = '';
+    if (window._fb && window._fb.updateUser) window._fb.updateUser(me.id, { leaderStatus: '' }).catch(() => {});
+  }
+  if (typeof initSideMenu === 'function') initSideMenu();
+}
+
 // ── 공동체 가입 신청 (joinRequests/{uid}_{code}) ──
 // users 의 공동체 칸은 하나뿐이라, 거기에 pending 을 쓰면 원래 소속이 덮여 사라졌다.
 // 그래서 신청서를 users 밖에 둔다 — 지금 공동체를 그대로 쓰면서 다른 곳에 신청할 수 있다.
@@ -1154,6 +1206,9 @@ function assignRole(userId, role) {
   if (window._fbReady && window._fb) {
     window._fb.updateUser(userId, { role, orgType, leaderStatus, requestedRole: '' })
       .catch(e => { if (window._fbErr) window._fbErr('직분 변경 저장', e); toast('동기화 실패 — 다시 시도해 주세요'); });
+    // 이 공동체의 리더 명부에도 남긴다 — 그래야 그 사람이 다른 공동체에 갔다 돌아와도 유지된다.
+    saveChurchLeader(userId, u.name, u.churchCode || me.churchCode,
+                     leaderStatus === 'approved', u.leaderPerms || []).catch(() => {});
   }
   toast(`${u.name || '교인'}님을 "${role}"(으)로 지정했어요`);
   const cur = document.getElementById('subscreen')?.dataset?.current;
@@ -3004,6 +3059,7 @@ function changeChurchCode(codeArg) {
   if (typeof _photoCacheWarmed !== 'undefined') _photoCacheWarmed = false;
   if (typeof _userInfoWarmed !== 'undefined') _userInfoWarmed = false;
   if (typeof startChurchMembersWatch === 'function') startChurchMembersWatch();   // 새 교회 교인 실시간 감시
+  loadMyLeadership();   // 옮겨간 공동체에서 내가 리더인지 다시 읽는다 (users 쪽 권한은 비워졌다)
 
   updateProfileDisplay();
   initSideMenu();

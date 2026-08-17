@@ -940,6 +940,7 @@ function adminSwitchChurch(code) {
   if (typeof _photoCacheWarmed !== 'undefined') _photoCacheWarmed = false;
   if (typeof _userInfoWarmed !== 'undefined') _userInfoWarmed = false;
   if (typeof startChurchMembersWatch === 'function') startChurchMembersWatch();   // 새 교회 교인 실시간 감시
+  if (typeof loadMyLeadership === 'function') loadMyLeadership();   // 옮긴 공동체 기준으로 리더 판정
   updateProfileDisplay();
   initSideMenu();
 

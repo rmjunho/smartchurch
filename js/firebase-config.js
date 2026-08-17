@@ -58,6 +58,14 @@ window._fb = {
       // 교회별 사용자
       getUsersByChurch: (churchCode) =>
         getDocs(query(collection(fbDb, 'users'), where('churchCode','==',churchCode))),
+      // ── 공동체별 리더 권한 (churchLeaders/{코드}_{uid}) ──
+      // users 문서에 두면 공동체를 옮길 때 지워야 해서 돌아와도 되살릴 수 없었다.
+      // 본인이 못 쓰는 문서라야 권한의 근거가 된다(규칙에서 리더/관리자만 쓰게 막았다).
+      setChurchLeader:    (id, data)   => setDoc(doc(fbDb, 'churchLeaders', id), data, { merge: true }),
+      getChurchLeader:    (id)         => getDoc(doc(fbDb, 'churchLeaders', id)),
+      deleteChurchLeader: (id)         => deleteDoc(doc(fbDb, 'churchLeaders', id)),
+      getChurchLeaders:   (churchCode) =>
+        getDocs(query(collection(fbDb, 'churchLeaders'), where('churchCode','==',churchCode))),
       // ── 공동체 가입 신청 (joinRequests/{uid}_{code}) ──
       // 이미 다른 공동체에 소속된 채로 신청하려면 신청서가 users 문서 밖에 있어야 한다.
       // users 의 공동체 칸은 하나뿐이라, 거기에 pending 을 쓰면 원래 소속이 덮여 사라진다.
