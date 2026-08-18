@@ -3051,6 +3051,22 @@ function isPreApprovedChurch(code) {
       || myJoinStatus(code) === 'approved';
 }
 
+// 이미 옛 orgType 을 달고 있는 사람을 부팅 때 한 번 바로잡는다(위 버그로 남은 값).
+// 아는 공동체일 때만 손댄다 — 교회 목록이 아직 로컬에 없으면 getOrgTypeForChurch 가
+// 'church' 로 폴백해서 멀쩡한 기관 소속을 교회로 덮어쓴다.
+function syncOrgTypeFromChurch() {
+  if (!me || !me.churchCode) return;
+  if (typeof getChurchName !== 'function' || !getChurchName(me.churchCode)) return;
+  const t = getOrgTypeForChurch(me.churchCode);
+  if (!t || t === me.orgType) return;
+  me.orgType = t;
+  const users = DB.get('users', []);
+  const u = users.find(x => x.id === me.id);
+  if (u) { u.orgType = t; DB.set('users', users); }
+  if (window._fbReady && window._fb) window._fb.updateUser(me.id, { orgType: t }).catch(() => {});
+  if (typeof updateCommunityTabLabel === 'function') updateCommunityTabLabel();
+}
+
 // codeArg 를 주면 그 코드로 바로 옮긴다(내 공동체 목록에서 탭). 없으면 입력칸을 읽는다.
 function changeChurchCode(codeArg) {
   const code     = (codeArg || document.getElementById('new-church-code')?.value || '').trim().toUpperCase();
@@ -3068,7 +3084,11 @@ function changeChurchCode(codeArg) {
   const newDefRole  = (prev && prev.role)    || getDefaultRoleFor(code, newOrgType);
   const takeRole    = !!prev || wasPersonal;
   const newRegType  = (prev && prev.registrationType) || (wasPersonal ? 'newfamily' : 'regular');
-  if (takeRole) { me.orgType = newOrgType; me.role = newDefRole; }
+  // orgType 은 그 공동체의 성격이지 사람의 속성이 아니다 — 직분을 물려받든 아니든 늘 따라간다.
+  // takeRole 에 묶여 있어서 기관에서 교회로 옮기면 옛 'org' 가 남았고, 4번째 탭이 '기관/단체' 로
+  // 뜨고 직분 목록도 기관 것이 나왔다.
+  me.orgType = newOrgType;
+  if (takeRole) me.role = newDefRole;
 
   // 리더 권한은 그 교회에서 받은 것이다. 교회를 옮기면 내려놓고 새 교회에서 다시 받는다.
   // 예전에는 churchStatus 만 pending 으로 돌리고 leaderStatus/leaderPerms 를 그대로 둬서,
@@ -3086,7 +3106,8 @@ function changeChurchCode(codeArg) {
     u.churchStatus     = isPreApprovedChurch(code) ? 'active' : 'pending';
     u.registrationType = newRegType;
     u.memberships      = memberships;
-    if (takeRole) { u.orgType = newOrgType; u.role = newDefRole; }
+    u.orgType = newOrgType;
+    if (takeRole) u.role = newDefRole;
     // 'pending' 으로 둔다 — 규칙이 본인 수정으로는 leaderStatus 를 'pending' 까지만 허용하고,
     // 새 교회 관리자에게 다시 신청이 걸리는 편이 권한을 조용히 없애는 것보다 낫다.
     if (losesLeader) { u.leaderStatus = 'pending'; u.leaderPerms = []; u.isAppointedLeader = false; }
@@ -3102,7 +3123,8 @@ function changeChurchCode(codeArg) {
   if (window._fbReady && window._fb) {
     const update = { church: me.church, churchCode: me.churchCode, churchStatus: me.churchStatus,
                      registrationType: me.registrationType, memberships };
-    if (takeRole) { update.orgType = newOrgType; update.role = newDefRole; }
+    update.orgType = newOrgType;
+    if (takeRole) update.role = newDefRole;
     if (losesLeader) { update.leaderStatus = 'pending'; update.leaderPerms = []; update.isAppointedLeader = false; }
     window._fb.updateUser(me.id, update).catch(() => {});
     // 사진 문서의 churchCode 도 갱신 → 새 교회 교인 목록에 사진 노출

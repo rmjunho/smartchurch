@@ -4005,6 +4005,8 @@ function bootApp() {
   // 지금 공동체에서 내가 리더인지 (churchLeaders 문서). 옮겨 다녀도 각자 제자리에 남는 권한이라
   // users 문서만 봐서는 알 수 없다. 늦게 와도 initSideMenu 가 다시 그린다.
   if (typeof loadMyLeadership === 'function') loadMyLeadership();
+  // 지금 공동체가 교회인지 기관인지에 맞춰 내 orgType 을 바로잡는다 (탭 이름·직분 목록의 근거)
+  if (typeof syncOrgTypeFromChurch === 'function') syncOrgTypeFromChurch();
 
   // 차단 목록 기기 간 동기화 (Firestore me.blocked → 로컬)
   syncBlockedFromMe();
