@@ -838,7 +838,34 @@ function renderAdminPanelHtml(allUsers) {
   // recentAccounts 는 로그인 폼(doLogin)을 거칠 때만 쌓인다. 세션이 유지된 채 들어오면
   // 목록이 비어 섹션이 쓸모없어 보였다 → 이메일 직접 입력 항목을 항상 둔다.
   const recentAccts = DB.get('recentAccounts', []).filter(a => a && a.email && a.email !== me.email);
-  html += `<div class="ss-section-title" style="margin-top:14px">계정 전환</div><div class="ss-card">`
+  // 슬롯마다 Firebase 세션이 따로 살아 있다 — 한 번 로그인해 둔 슬롯은 비밀번호 없이 오간다.
+  // 비밀번호는 저장하지 않는다(아래 '이메일로 전환' 이 여전히 비밀번호를 묻는 이유다).
+  const curSlot = typeof currentAuthSlot === 'function' ? currentAuthSlot() : '';
+  html += `<div class="ss-section-title" style="margin-top:14px">계정 슬롯 <span style="font-weight:600;color:var(--muted)">· 비밀번호 없이 전환</span></div>`
+    + `<div class="ss-card">`
+    + AUTH_SLOTS.map(s => {
+        const info  = getAuthSlotInfo(s);
+        const isCur = s === curSlot;
+        const safe  = String(s).replace(/[^A-Za-z0-9_-]/g, '');
+        const title = info ? escHtml(info.name || info.email) : '비어 있음';
+        const sub   = info ? escHtml(info.email) : '눌러서 이 슬롯에 로그인하세요';
+        return `<div class="ss-card-row" ${isCur ? '' : `onclick="switchAuthSlot('${safe}')"`}
+            style="cursor:${isCur ? 'default' : 'pointer'};${isCur ? 'background:rgba(201,169,110,0.10)' : ''}">
+          <div class="ss-card-icon">${info ? '👤' : '➕'}</div>
+          <div class="ss-card-info">
+            <div class="ss-card-title">${title}</div>
+            <div class="ss-card-sub">${escHtml(authSlotLabel(s))} · ${sub}</div>
+          </div>
+          ${isCur ? '<span style="font-size:11px;font-weight:700;color:var(--gold)">현재</span>'
+                  : '<span class="sm-arrow">›</span>'}
+        </div>`;
+      }).join('')
+    + `<div style="padding:10px 14px 14px;font-size:12px;color:var(--muted);line-height:1.6">
+         한 번 로그인해 둔 슬롯은 비밀번호 없이 오갈 수 있어요.<br>
+         비밀번호는 저장하지 않아요 — 기기를 잃어도 계정이 열리지 않게요.
+       </div></div>`;
+
+  html += `<div class="ss-section-title" style="margin-top:14px">이메일로 전환 <span style="font-weight:600;color:var(--muted)">· 비밀번호 필요</span></div><div class="ss-card">`
     + recentAccts.map(a => `
       <div class="ss-card-row" onclick="switchAccount('${escHtml(a.email).replace(/'/g, "\\'")}')" style="cursor:pointer">
         <div class="ss-card-icon">🔄</div>

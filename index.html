@@ -3606,6 +3606,7 @@ async function doLogin() {
         DB.setSession(uid);
         me = fbUser;
         rememberAccount(fbUser);   // 관리자 패널 계정 전환 목록에 기록 (비밀번호 미저장)
+        rememberAuthSlot(fbUser);  // 지금 슬롯에 누가 로그인해 있는지 — 슬롯 목록 표시용
         // 내 사진 캐시 하이드레이트 (다른 기기에서 바꾼 사진 반영)
         if (fbUser.photoURL) { _photoCache[uid] = fbUser.photoURL; DB.set('profilePhoto_' + uid, fbUser.photoURL); }
 
@@ -3745,6 +3746,7 @@ async function doRegister() {
       // 번호들은 공유 로컬 배열이 아니라 내 세션 객체에만 (대기 화면 표시용)
       me = Object.assign({}, userData, { phone, guardianPhone: guardianContact });
       rememberAccount(me);   // 관리자 패널 계정 전환 목록에 기록 (비밀번호 미저장)
+      rememberAuthSlot(me);  // 지금 슬롯에 누가 로그인해 있는지 — 슬롯 목록 표시용
 
       hideLoadingOverlay();
       if (isMinor) {
@@ -7710,6 +7712,36 @@ function closeLogoutModal(e) {
     document.getElementById('modal-logout').classList.remove('open');
   }
 }
+// ── 계정 슬롯 (비밀번호 없이 계정 전환) ──
+// 슬롯마다 Firebase 세션이 따로 보관된다(js/firebase-config.js 참고). 전환은 로그아웃이 아니라
+// '어느 슬롯으로 부팅할지' 를 바꾸고 새로고침하는 것이라, 이미 로그인해 둔 슬롯은 비밀번호를
+// 다시 치지 않는다. 여기 저장하는 건 화면에 보여줄 이메일·이름뿐 — 비밀번호는 저장하지 않는다.
+// '' 는 이름 없는 기본 앱이다. 기존 사용자의 세션이 전부 여기 있으므로 이름을 붙이면 안 된다.
+var AUTH_SLOTS = ['', 'slot2', 'slot3', 'slot4'];
+function currentAuthSlot()   { return window._authSlot || ''; }
+function authSlotKey(slot)   { return 'authSlot_' + (slot || 'main'); }
+function getAuthSlotInfo(s)  { return DB.get(authSlotKey(s), null); }
+function authSlotLabel(s)    { return s ? '슬롯 ' + (AUTH_SLOTS.indexOf(s) + 1) : '기본 슬롯'; }
+
+function rememberAuthSlot(u) {
+  if (!u || !u.email) return;
+  DB.set(authSlotKey(currentAuthSlot()),
+         { email: u.email, name: u.name || '', at: new Date().toISOString() });
+}
+
+function switchAuthSlot(slot) {
+  slot = slot || '';
+  if (slot === currentAuthSlot()) { toast('지금 쓰고 있는 계정이에요'); return; }
+  try {
+    // JSON 이 아니라 문자열 그대로 — firebase-config.js 가 DB 헬퍼 없이 직접 읽는다
+    if (slot) localStorage.setItem('sc2_authSlot', slot);
+    else      localStorage.removeItem('sc2_authSlot');
+  } catch (_) { toast('계정을 전환할 수 없어요'); return; }
+  const info = getAuthSlotInfo(slot);
+  toast(info ? `${info.name || info.email} 계정으로 전환할게요` : '새 계정으로 로그인해 주세요');
+  setTimeout(() => location.reload(), 400);
+}
+
 // ── 최근 사용 계정 (기기 단위) — 관리자 패널의 계정 전환용 ──
 // ★ 비밀번호는 저장하지 않는다. 전환 시 이메일만 채워주고 비밀번호는 직접 입력한다.
 //   (기기를 분실했을 때 저장된 비밀번호로 모든 계정이 열리는 상황을 만들지 않기 위함)
@@ -7748,6 +7780,8 @@ function doLogout() {
   if (typeof stopBinderWatch === 'function') stopBinderWatch();
   if (_selfDocUnsub) { _selfDocUnsub(); _selfDocUnsub = null; }
   DB.clearSession();
+  // 이 슬롯은 이제 비었다 — 목록에 옛 이름이 남아 있으면 눌렀을 때 바로 들어갈 것처럼 보인다
+  if (typeof authSlotKey === 'function') DB.del(authSlotKey(currentAuthSlot()));
   me = null;
   go('login');
   toast('로그아웃 되었어요');

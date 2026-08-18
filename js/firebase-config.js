@@ -18,7 +18,19 @@ const firebaseConfig = {
   appId:             "1:826976279573:web:49c222868c44f82071821c"
 };
 
-const fbApp    = initializeApp(firebaseConfig);
+// ── 계정 슬롯 ──
+// Firebase 앱 인스턴스에 이름을 주면 로그인 세션과 오프라인 캐시가 이름마다 따로 보관된다.
+// 계정마다 슬롯을 하나씩 두면 전환할 때 로그아웃을 하지 않으므로 비밀번호를 다시 칠 일이 없다.
+// ★ 비밀번호는 어디에도 저장하지 않는다 — 남는 건 Firebase 가 원래 쓰는 세션 토큰뿐이다.
+// 기본 슬롯은 반드시 '이름 없는 기본 앱' 이어야 한다. 여기에 이름을 붙이면 이미 로그인해 둔
+// 사용자 전원의 세션이 한 번에 끊긴다(세션이 앱 이름별로 보관되기 때문).
+// DB 헬퍼(sc2_ 접두사)는 이 모듈보다 늦게 뜨므로 localStorage 를 직접 읽는다. JSON 이 아니라
+// 슬롯 이름 문자열 그대로 저장한다 — 읽는 쪽이 파싱 없이 쓰도록.
+const AUTH_SLOT = (() => {
+  try { return localStorage.getItem('sc2_authSlot') || ''; } catch (_) { return ''; }
+})();
+const fbApp    = AUTH_SLOT ? initializeApp(firebaseConfig, AUTH_SLOT) : initializeApp(firebaseConfig);
+window._authSlot = AUTH_SLOT;
 // 오프라인 영속성(IndexedDB). 기본값은 메모리 캐시라, 지하철·엘리베이터에서 저장한 뒤
 // 앱을 닫으면 아직 전송 못 한 쓰기가 통째로 사라졌다. 영속 캐시는 그 대기 쓰기를 디스크에
 // 남겨 두었다가 다시 연결되면 스스로 보낸다. multipleTabManager 는 PWA 와 브라우저 탭이
