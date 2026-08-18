@@ -2857,7 +2857,10 @@ function requestNewChurch(code, name, newType) {
     requestedBy:     me.id,
     requestedByName: me.name,
     requestedAt:     new Date().toISOString(),
-    orgType:         newType
+    orgType:         newType,
+    // 개설자가 될 직분. 이게 빠져 있어서, 승인이 이 로컬 항목으로 처리되면(_findPendingChurch 의
+    // 폴백) 개설자 직분이 빈 값이 되고 리더 권한이 안 붙었다 — 아무도 리더가 아닌 공동체가 됐다.
+    role:            (newType === 'org' ? '기관장' : '담임목사')
   });
   DB.set('pendingChurches', pending);
 

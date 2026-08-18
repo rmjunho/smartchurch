@@ -306,8 +306,15 @@ function approveChurchRegistration(code) {
   // active 로 바꿔서, 개설자가 리더 승인 대기에 따로 남아 관리자가 같은 사람을 두 번 승인해야 했다.
   // 리더 직분일 때만 준다 — 성도로 신청한 사람에게 미리 붙여 두면, 직분은 본인이 바꿀 수 있으므로
   // 나중에 스스로 담임목사로 바꿔 승인 없이 권한을 갖게 된다.
-  const foundersRole = entry.role || (u && u.role) || '';
-  const grantsLeader = isLeaderRole(foundersRole);
+  // 등록을 승인한다는 건 이 사람을 그 공동체의 리더로 세운다는 뜻이다. 직분 이름이 리더로
+  // 인식될 때만 권한을 주다 보니, 직분이 비어 오면(로컬 신청 항목에 role 이 없던 경우)
+  // 리더가 한 명도 없는 공동체가 만들어졌다 — 가입 승인도 관리도 아무도 못 한다.
+  // 그래서 직분 이름과 무관하게 개설자에게 권한을 준다. 직분이 리더 이름이 아니면
+  // 유형에 맞는 리더 직분으로 채운다(권한과 화면 표시가 어긋나지 않게).
+  const orgType      = entry.orgType || 'church';
+  const rawRole      = entry.role || (u && u.role) || '';
+  const foundersRole = isLeaderRole(rawRole) ? rawRole : (orgType === 'org' ? '기관장' : '담임목사');
+  const grantsLeader = true;
   if (u) {
     u.church = entry.name; u.churchCode = code; u.churchStatus = 'active';
     u.pendingChurchCode = null; u.pendingChurchName = null; u.pendingChurchAt = null;
@@ -328,6 +335,11 @@ function approveChurchRegistration(code) {
     if (grantsLeader) { update.leaderStatus = 'approved'; update.role = foundersRole; }
     window._fb.updateUser(entry.requestedBy, update)
       .catch(() => toast('서버 반영 실패 — 신청자 화면에 승인이 안 보일 수 있어요'));
+    // 공동체별 리더 명부에도 세운다(4단계) — 이게 있어야 개설자가 다른 공동체에 다녀와도
+    // 자기 공동체의 리더로 남는다. users 쪽 권한은 옮길 때 비워지기 때문이다.
+    if (typeof saveChurchLeader === 'function')
+      saveChurchLeader(entry.requestedBy, entry.requestedByName || (u && u.name) || '', code, true, [])
+        .catch(() => {});
   }
   toast(`"${entry.name}" [${code}] 교회 등록을 승인했어요!`);
   setTimeout(() => openSubscreen('admin-panel'), 150);
