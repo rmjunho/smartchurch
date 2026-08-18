@@ -285,7 +285,11 @@ function _dropPendingChurch(code) {
   _pendingChurchCache = (_pendingChurchCache || []).filter(c => c.code !== code);
 }
 
-function approveChurchRegistration(code) {
+// 신청자 문서(users)를 고치는 게 승인의 본체다. 예전에는 그 쓰기를 기다리지 않고 먼저
+// 대기 목록에서 지우고 "승인했어요" 를 띄웠다 — 서버가 거부해도 화면은 성공처럼 보였고,
+// 목록을 다시 읽으면 서버에 남아 있던 신청이 되살아났다("이미 등록됐는데 또 떠 있어요").
+// 신청은 신청자 users 문서에 남으므로, 그 문서가 안 바뀌면 승인은 일어나지 않은 것이다.
+async function approveChurchRegistration(code) {
   const entry = _findPendingChurch(code);
   if (!entry) { toast('신청 정보를 찾을 수 없어요. 목록을 새로고침해 주세요'); return; }
   // customChurches에 전체 객체로 저장
@@ -299,13 +303,8 @@ function approveChurchRegistration(code) {
     active: true
   };
   DB.set('customChurches', custom);
-  _dropPendingChurch(code);
   const users = DB.get('users', []);
   const u = users.find(x => x.id === entry.requestedBy);
-  // 교회 등록을 승인했다는 건 이 사람을 그 교회 리더로 인정한 것이다. 예전에는 churchStatus 만
-  // active 로 바꿔서, 개설자가 리더 승인 대기에 따로 남아 관리자가 같은 사람을 두 번 승인해야 했다.
-  // 리더 직분일 때만 준다 — 성도로 신청한 사람에게 미리 붙여 두면, 직분은 본인이 바꿀 수 있으므로
-  // 나중에 스스로 담임목사로 바꿔 승인 없이 권한을 갖게 된다.
   // 등록을 승인한다는 건 이 사람을 그 공동체의 리더로 세운다는 뜻이다. 직분 이름이 리더로
   // 인식될 때만 권한을 주다 보니, 직분이 비어 오면(로컬 신청 항목에 role 이 없던 경우)
   // 리더가 한 명도 없는 공동체가 만들어졌다 — 가입 승인도 관리도 아무도 못 한다.
@@ -333,23 +332,33 @@ function approveChurchRegistration(code) {
       pendingChurchRole: null, pendingChurchOrgType: null, orgType: entry.orgType || 'church'
     };
     if (grantsLeader) { update.leaderStatus = 'approved'; update.role = foundersRole; }
-    window._fb.updateUser(entry.requestedBy, update)
-      .catch(() => toast('서버 반영 실패 — 신청자 화면에 승인이 안 보일 수 있어요'));
+    // 이 쓰기가 승인의 본체다 — 반드시 기다린다. 실패하면 신청을 그대로 두고 알린다.
+    // 여기서 지워 버리면 화면에서만 사라지고 서버에는 남아, 다시 불러올 때 되살아난다.
+    try {
+      await window._fb.updateUser(entry.requestedBy, update);
+    } catch (e) {
+      if (window._fbErr) window._fbErr('교회 등록 승인', e);
+      toast(`승인 실패 (${e.code || e.message || e}) — 신청은 그대로 뒀어요`);
+      return;
+    }
     // 공동체별 리더 명부에도 세운다(4단계) — 이게 있어야 개설자가 다른 공동체에 다녀와도
     // 자기 공동체의 리더로 남는다. users 쪽 권한은 옮길 때 비워지기 때문이다.
     if (typeof saveChurchLeader === 'function')
       saveChurchLeader(entry.requestedBy, entry.requestedByName || (u && u.name) || '', code, true, [])
         .catch(() => {});
   }
+  _dropPendingChurch(code);   // 서버가 받아준 뒤에야 대기 목록에서 뺀다
+  // 캐시가 옛 users 를 들고 있으면 방금 승인한 신청이 다시 그려진다 — 다음 렌더에서 새로 읽게 한다
+  _adminUsersData = null;
   toast(`"${entry.name}" [${code}] 교회 등록을 승인했어요!`);
   setTimeout(() => openSubscreen('admin-panel'), 150);
 }
 
-function rejectChurchRegistration(code) {
+// 승인과 같은 이유로 서버 쓰기를 기다린다 — 먼저 지우면 화면에서만 사라지고 되살아난다.
+async function rejectChurchRegistration(code) {
   const entry = _findPendingChurch(code);
   if (!entry) { toast('신청 정보를 찾을 수 없어요. 목록을 새로고침해 주세요'); return; }
   if (!confirm(`"${entry.name}" [${code}] 등록 신청을 거절할까요?\n\n신청자는 교회 없는 상태로 돌아가고, 다시 신청할 수 있어요.`)) return;
-  _dropPendingChurch(code);
   // 신청자 계정 초기화
   const users = DB.get('users', []);
   const u = users.find(x => x.id === entry.requestedBy);
@@ -362,10 +371,18 @@ function rejectChurchRegistration(code) {
   }
   // Firestore 동기화: 신청자 상태 초기화(다른 기기에도 반영)
   if (window._fbReady && window._fb) {
-    window._fb.updateUser(entry.requestedBy, {
-      churchStatus: null, pendingChurchCode: null, pendingChurchName: null, pendingChurchAt: null
-    }).catch(() => toast('서버 반영 실패 — 신청자 화면에 거절이 안 보일 수 있어요'));
+    try {
+      await window._fb.updateUser(entry.requestedBy, {
+        churchStatus: null, pendingChurchCode: null, pendingChurchName: null, pendingChurchAt: null
+      });
+    } catch (e) {
+      if (window._fbErr) window._fbErr('교회 등록 거절', e);
+      toast(`거절 실패 (${e.code || e.message || e}) — 신청은 그대로 뒀어요`);
+      return;
+    }
   }
+  _dropPendingChurch(code);
+  _adminUsersData = null;   // 캐시의 옛 users 로 신청이 다시 그려지지 않게
   toast(`"${entry.name}" 교회 등록 신청을 거절했어요`);
   setTimeout(() => openSubscreen('admin-panel'), 150);
 }
