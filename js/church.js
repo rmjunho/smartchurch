@@ -554,7 +554,7 @@ async function decideJoinRequest(userId, code, approve) {
   }
   const r = _joinReqsForUs.find(x => x.id === userId + '_' + code);
   if (r) r.status = approve ? 'approved' : 'rejected';
-  toast(approve ? '가입을 승인했어요' : '가입 신청을 거절했어요');
+  toast(approve ? '승인했어요 — 본인이 앱에서 들어오면 교인이 돼요' : '가입 신청을 거절했어요');
   const cur = document.getElementById('subscreen')?.dataset?.current;
   if (cur) setTimeout(() => openSubscreen(cur), 150);
 }
@@ -1276,8 +1276,10 @@ async function loadMembersScreenData() {
   try {
     if (window._fbReady && window._fb && window._fb.getJoinRequestsFor && me.churchCode) {
       const rs = await window._fb.getJoinRequestsFor(me.churchCode);
+      // 승인한 신청도 남긴다 — 신청자가 직접 들어와야 users 문서가 이쪽으로 옮겨오는데,
+      // 여기서 걸러 버리면 승인한 순간 리더 눈에는 그 사람이 사라진 걸로 보였다.
       _joinReqsForUs = rs.docs.map(d => ({ id: d.id, ...d.data() }))
-                              .filter(r => (r.status || 'pending') === 'pending');
+                              .filter(r => ['pending', 'approved'].includes(r.status || 'pending'));
     }
   } catch (e) { /* 권한 없음 등 — 신청 목록만 비운다 */ }
 
@@ -1361,7 +1363,9 @@ async function refreshMembersPendingBadge() {
 function renderMembersScreenHtml(allUsers) {
   const minorPending  = allUsers.filter(u => u.status === 'pending');
   const churchPending = allUsers.filter(u => u.status !== 'pending' && u.churchStatus === 'pending');
-  const joinReqs      = _joinReqsForUs || [];
+  const joinReqs      = (_joinReqsForUs || []).filter(r => (r.status || 'pending') === 'pending');
+  // 승인은 했는데 아직 본인이 안 들어온 사람 — 전체 목록에 '입장 대기' 로 따로 세워 둔다
+  const joinEntering  = (_joinReqsForUs || []).filter(r => r.status === 'approved');
   const pending       = [...churchPending, ...minorPending, ...joinReqs];
   const active        = allUsers.filter(u =>
     u.status !== 'pending' && u.status !== 'rejected' && u.churchStatus !== 'pending');
@@ -1451,6 +1455,23 @@ function renderMembersScreenHtml(allUsers) {
         </div>`;
       }).join('')}</div>`;
     });
+  }
+  // 승인은 끝났고 본인 입장만 남은 사람. 승인 대기에도 전체에도 없으면 사라진 걸로 보인다.
+  if (joinEntering.length) {
+    html += `<div class="ss-section-title">입장 대기 (${joinEntering.length}명)</div>
+      <div class="ss-card">${joinEntering.map(r => `
+        <div style="padding:14px 16px;border-bottom:1px solid var(--border)">
+          <div style="display:flex;align-items:center;gap:10px">
+            <div class="member-avatar">🙋</div>
+            <div style="min-width:0">
+              <div class="member-name">${escHtml(r.userName || '이름 없음')}
+                <span style="font-size:11px;background:rgba(39,174,96,0.12);color:#27AE60;
+                      border-radius:6px;padding:2px 7px;font-weight:700;margin-left:6px">승인함</span>
+              </div>
+              <div class="member-role">${escHtml(r.fromChurch || '소속 없음')}에서 · 본인이 앱에서 들어오면 교인이 돼요</div>
+            </div>
+          </div>
+        </div>`).join('')}</div>`;
   }
   html += `</div>`;
 
