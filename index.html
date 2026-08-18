@@ -1463,6 +1463,7 @@
         <div class="sm-item" onclick="openSubscreen('members');closeSideMenu()">
           <span class="sm-icon">📋</span>
           <span class="sm-text">교인 관리</span>
+          <span class="sm-badge-red" id="members-pending-badge" style="display:none;background:#E63946;color:white;font-size:11px;font-weight:700;border-radius:10px;padding:2px 7px"></span>
           <span class="sm-arrow">›</span>
         </div>
         <div class="sm-item" onclick="openSubscreen('challenge-manage');closeSideMenu()">
@@ -7608,6 +7609,8 @@ function initSideMenu() {
   // 임명 리더도 메뉴는 보여야 자기가 받은 권한을 쓸 수 있다 (안의 항목은 각자 권한으로 걸러진다)
   const isLeaderUser = isLeader() || (me.leaderPerms || []).length > 0;
   document.getElementById('sm-leader-section').style.display = isLeaderUser ? 'block' : 'none';
+  // 교인 관리 승인 대기 배지 — 메뉴를 열어야 알던 걸 메뉴에서 바로 보이게 한다
+  if (isLeaderUser && typeof refreshMembersPendingBadge === 'function') refreshMembersPendingBadge();
   // 앱 관리자 섹션
   const adminSec = document.getElementById('sm-admin-section');
   if (adminSec) adminSec.style.display = me.isAppAdmin ? 'block' : 'none';

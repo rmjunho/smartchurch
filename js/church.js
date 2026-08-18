@@ -1327,6 +1327,37 @@ async function ensureMemberPhones(users) {
   }));
 }
 
+// ── 사이드 메뉴 '교인 관리' 승인 대기 배지 ──
+// 셈법은 renderMembersScreenHtml 의 pending 과 같아야 한다 — 배지에 3 이 떴는데
+// 들어가 보니 1 이면 리더가 배지를 안 믿게 된다.
+function setMembersPendingBadge(cnt) {
+  const badge = document.getElementById('members-pending-badge');
+  if (badge) { badge.style.display = cnt > 0 ? 'inline' : 'none'; badge.textContent = String(cnt); }
+}
+
+async function refreshMembersPendingBadge() {
+  if (!me || !me.churchCode) { setMembersPendingBadge(0); return; }
+  const key = 'membersPendingCnt_' + me.churchCode;
+  setMembersPendingBadge(DB.get(key, 0));   // 서버 응답 전에는 지난번 숫자를 보여 둔다
+  if (!window._fbReady || !window._fb || !window._fb.getUsersByChurch) return;
+  try {
+    const [snap, reqs] = await Promise.all([
+      window._fb.getUsersByChurch(me.churchCode),
+      window._fb.getJoinRequestsFor ? window._fb.getJoinRequestsFor(me.churchCode)
+                                    : Promise.resolve({ docs: [] })
+    ]);
+    let cnt = 0;
+    snap.forEach(d => {
+      const u = d.data();
+      if (!u.deleted && (u.status === 'pending' || u.churchStatus === 'pending')) cnt++;
+    });
+    // 다른 공동체에 소속된 채로 낸 가입 신청 — 그 사람 users 문서는 아직 원래 공동체라 위에 안 잡힌다
+    cnt += reqs.docs.filter(d => (d.data().status || 'pending') === 'pending').length;
+    DB.set(key, cnt);
+    setMembersPendingBadge(cnt);
+  } catch (_) { /* 권한·네트워크 실패 — 지난번 숫자를 그대로 둔다 */ }
+}
+
 function renderMembersScreenHtml(allUsers) {
   const minorPending  = allUsers.filter(u => u.status === 'pending');
   const churchPending = allUsers.filter(u => u.status !== 'pending' && u.churchStatus === 'pending');
